@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { LoginForm } from "@/components/auth/login-form";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -10,7 +11,9 @@ export const metadata: Metadata = {
 export default function LoginPage() {
   return (
     <PageShell centered>
-      <LoginForm />
+      <Suspense fallback={null}>
+        <LoginForm />
+      </Suspense>
     </PageShell>
   );
 }

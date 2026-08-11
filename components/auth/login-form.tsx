@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { AuthCard } from "@/components/ui/auth-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getAuthErrorMessage } from "@/lib/supabase/auth-errors";
+import { createClient } from "@/lib/supabase/client";
 import { isValidEmail, validatePassword } from "@/lib/validation";
 
 type LoginErrors = {
@@ -14,11 +17,14 @@ type LoginErrors = {
 };
 
 export function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") ?? "/dashboard";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<LoginErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
 
   function validate(): LoginErrors {
     const nextErrors: LoginErrors = {};
@@ -37,7 +43,6 @@ export function LoginForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSuccess(false);
 
     const validationErrors = validate();
     setErrors(validationErrors);
@@ -46,11 +51,21 @@ export function LoginForm() {
 
     setIsSubmitting(true);
 
-    // Simulación de envío — se conectará a Supabase más adelante
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
 
     setIsSubmitting(false);
-    setIsSuccess(true);
+
+    if (error) {
+      setErrors({ form: getAuthErrorMessage(error.message) });
+      return;
+    }
+
+    router.push(redirectTo);
+    router.refresh();
   }
 
   return (
@@ -95,12 +110,6 @@ export function LoginForm() {
         {errors.form && (
           <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400" role="alert">
             {errors.form}
-          </p>
-        )}
-
-        {isSuccess && (
-          <p className="rounded-lg border border-[#00D4AA]/30 bg-[#00D4AA]/10 px-4 py-3 text-sm text-[#00D4AA]" role="status">
-            Formulario válido. La autenticación se conectará próximamente.
           </p>
         )}
 

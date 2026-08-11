@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { AuthCard } from "@/components/ui/auth-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getAuthErrorMessage } from "@/lib/supabase/auth-errors";
+import { createClient } from "@/lib/supabase/client";
 import { isValidEmail, validatePassword } from "@/lib/validation";
 
 type RegisterErrors = {
@@ -12,16 +15,19 @@ type RegisterErrors = {
   email?: string;
   password?: string;
   confirmPassword?: string;
+  form?: string;
 };
 
 export function RegisterForm() {
+  const router = useRouter();
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState<RegisterErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [confirmationSent, setConfirmationSent] = useState(false);
 
   function validate(): RegisterErrors {
     const nextErrors: RegisterErrors = {};
@@ -52,7 +58,7 @@ export function RegisterForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSuccess(false);
+    setConfirmationSent(false);
 
     const validationErrors = validate();
     setErrors(validationErrors);
@@ -61,11 +67,32 @@ export function RegisterForm() {
 
     setIsSubmitting(true);
 
-    // Simulación de envío — se conectará a Supabase más adelante
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: {
+          full_name: name.trim(),
+        },
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+      },
+    });
 
     setIsSubmitting(false);
-    setIsSuccess(true);
+
+    if (error) {
+      setErrors({ form: getAuthErrorMessage(error.message) });
+      return;
+    }
+
+    if (data.session) {
+      router.push("/dashboard");
+      router.refresh();
+      return;
+    }
+
+    setConfirmationSent(true);
   }
 
   return (
@@ -129,9 +156,15 @@ export function RegisterForm() {
           error={errors.confirmPassword}
         />
 
-        {isSuccess && (
+        {errors.form && (
+          <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400" role="alert">
+            {errors.form}
+          </p>
+        )}
+
+        {confirmationSent && (
           <p className="rounded-lg border border-[#00D4AA]/30 bg-[#00D4AA]/10 px-4 py-3 text-sm text-[#00D4AA]" role="status">
-            Cuenta validada. El registro se conectará próximamente.
+            Revisa tu email para confirmar la cuenta antes de iniciar sesión.
           </p>
         )}
 
