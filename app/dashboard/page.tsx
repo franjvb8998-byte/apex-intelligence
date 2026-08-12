@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { PageShell } from "@/components/layout/page-shell";
@@ -46,6 +47,20 @@ export default async function DashboardPage() {
             Has iniciado sesión correctamente. Aquí podrás visualizar tu
             rendimiento, métricas y análisis deportivo.
           </p>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:gap-4">
+            <Link
+              href="/match-analysis"
+              className="inline-flex text-sm font-medium text-[#00D4AA] transition-colors hover:text-[#00eabb]"
+            >
+              Ver Match Analysis (demo) →
+            </Link>
+            <Link
+              href="/match-live"
+              className="inline-flex text-sm font-medium text-[#00D4AA] transition-colors hover:text-[#00eabb]"
+            >
+              Abrir APEX Vision (live) →
+            </Link>
+          </div>
         </section>
       </div>
     </PageShell>

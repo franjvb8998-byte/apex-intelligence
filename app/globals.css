@@ -1,23 +1,138 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+ * APEX Design System — tokens
+ * Source of truth for color, type, space, elevation, motion.
+ * Docs: docs/DESIGN_SYSTEM.md
+ * --------------------------------------------------------------------------- */
+
 :root {
-  --background: #0b1220;
-  --foreground: #f1f5f9;
-  --accent: #00d4aa;
-  --accent-muted: #00d4aa33;
+  /* Color — surfaces */
+  --apex-bg: #0b1220;
+  --apex-bg-elevated: #111827;
+  --apex-surface: rgb(15 23 42 / 0.5);
+  --apex-surface-solid: #0f172a;
+  --apex-surface-muted: #020617;
+
+  /* Color — text */
+  --apex-fg: #f1f5f9;
+  --apex-fg-muted: #94a3b8;
+  --apex-fg-subtle: #64748b;
+  --apex-fg-inverse: #0b1220;
+
+  /* Color — brand */
+  --apex-accent: #00d4aa;
+  --apex-accent-hover: #00eabb;
+  --apex-accent-muted: rgb(0 212 170 / 0.12);
+  --apex-accent-border: rgb(0 212 170 / 0.35);
+
+  /* Color — borders */
+  --apex-border: #1e293b;
+  --apex-border-strong: #334155;
+
+  /* Color — semantic */
+  --apex-success: #00d4aa;
+  --apex-warning: #fbbf24;
+  --apex-warning-muted: rgb(251 191 36 / 0.12);
+  --apex-danger: #f87171;
+  --apex-danger-muted: rgb(248 113 113 / 0.12);
+  --apex-info: #38bdf8;
+  --apex-info-muted: rgb(56 189 248 / 0.12);
+
+  /* Legacy aliases (existing app) */
+  --background: var(--apex-bg);
+  --foreground: var(--apex-fg);
+  --accent: var(--apex-accent);
+  --accent-muted: var(--apex-accent-muted);
+
+  /* Typography */
+  --apex-font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --apex-font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --apex-text-xs: 0.75rem;
+  --apex-text-sm: 0.875rem;
+  --apex-text-base: 1rem;
+  --apex-text-lg: 1.125rem;
+  --apex-text-xl: 1.25rem;
+  --apex-text-2xl: 1.5rem;
+  --apex-text-3xl: 1.875rem;
+  --apex-text-4xl: 2.25rem;
+  --apex-leading-tight: 1.25;
+  --apex-leading-normal: 1.5;
+  --apex-leading-relaxed: 1.65;
+  --apex-tracking-wide: 0.08em;
+  --apex-tracking-wider: 0.12em;
+
+  /* Spacing (4px grid) */
+  --apex-space-1: 0.25rem;
+  --apex-space-2: 0.5rem;
+  --apex-space-3: 0.75rem;
+  --apex-space-4: 1rem;
+  --apex-space-5: 1.25rem;
+  --apex-space-6: 1.5rem;
+  --apex-space-8: 2rem;
+  --apex-space-10: 2.5rem;
+  --apex-space-12: 3rem;
+  --apex-space-16: 4rem;
+
+  /* Radius */
+  --apex-radius-sm: 0.375rem;
+  --apex-radius-md: 0.75rem;
+  --apex-radius-lg: 1rem;
+  --apex-radius-xl: 1.25rem;
+  --apex-radius-2xl: 1.5rem;
+  --apex-radius-full: 9999px;
+
+  /* Shadows */
+  --apex-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
+  --apex-shadow-md: 0 8px 24px rgb(0 0 0 / 0.35);
+  --apex-shadow-lg: 0 16px 40px rgb(0 0 0 / 0.45);
+  --apex-shadow-accent: 0 10px 28px rgb(0 212 170 / 0.25);
+
+  /* Motion */
+  --apex-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --apex-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --apex-duration-fast: 150ms;
+  --apex-duration-normal: 250ms;
+  --apex-duration-slow: 500ms;
+  --apex-duration-bar: 700ms;
+
+  /* Focus ring */
+  --apex-focus-ring: 0 0 0 2px var(--apex-bg), 0 0 0 4px var(--apex-accent);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-accent: var(--accent);
-  --color-accent-muted: var(--accent-muted);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--apex-bg);
+  --color-foreground: var(--apex-fg);
+  --color-accent: var(--apex-accent);
+  --color-accent-muted: var(--apex-accent-muted);
+  --color-apex-bg: var(--apex-bg);
+  --color-apex-surface: var(--apex-surface-solid);
+  --color-apex-border: var(--apex-border);
+  --color-apex-accent: var(--apex-accent);
+  --color-apex-danger: var(--apex-danger);
+  --color-apex-warning: var(--apex-warning);
+  --font-sans: var(--apex-font-sans);
+  --font-mono: var(--apex-font-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  background: var(--apex-bg);
+  color: var(--apex-fg);
+  font-family: var(--apex-font-sans);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Shared focus style for DS interactive elements */
+.apex-focusable:focus-visible {
+  outline: none;
+  box-shadow: var(--apex-focus-ring);
 }
