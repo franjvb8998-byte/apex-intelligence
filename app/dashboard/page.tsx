@@ -1,68 +1,79 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { SignOutButton } from "@/components/auth/sign-out-button";
-import { PageShell } from "@/components/layout/page-shell";
-import { createClient } from "@/lib/supabase/server";
+import { ProductShell } from "@/components/app-shell/product-shell";
+import { DashboardOverview } from "@/components/dashboard";
+import { MatchCenterView } from "@/components/match-center";
+import { getShellUser } from "@/lib/auth/get-shell-user";
+import { getDashboardData, resolveDashboardProvider } from "@/lib/dashboard";
+import { getMatchCenterData } from "@/lib/match-center";
 
 export const metadata: Metadata = {
   title: "Dashboard — APEX Intelligence",
-  description: "Tu panel de análisis deportivo.",
+  description:
+    "Partidos del día, próximos encuentros, ligas, equipos y estado del sistema.",
 };
 
+/**
+ * Authenticated home — Dashboard wired to Data Platform + Match Center.
+ */
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const shellUser = await getShellUser();
+  if (!shellUser) {
     redirect("/login");
   }
 
-  const displayName =
-    (user.user_metadata?.full_name as string | undefined)?.trim() ||
-    user.email?.split("@")[0] ||
-    "Usuario";
+  const resolved = resolveDashboardProvider();
+  const dashboard = await getDashboardData({ provider: resolved.provider });
+  const matchCenter = await getMatchCenterData({
+    externalMatchId: dashboard.featuredMatchId,
+    provider: resolved.provider,
+    requireProvider: false,
+  });
 
   return (
-    <PageShell>
-      <div className="w-full max-w-3xl">
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm text-[#00D4AA]">Panel protegido</p>
-            <h1 className="mt-2 text-3xl font-bold text-white sm:text-4xl">
-              Hola, {displayName}
-            </h1>
-            <p className="mt-2 text-slate-400">{user.email}</p>
-          </div>
-          <SignOutButton />
+    <ProductShell user={shellUser}>
+      <div className="w-full space-y-10">
+        <div>
+          <p className="text-sm text-[var(--apex-accent)]">Resumen</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--apex-fg)] sm:text-3xl">
+            Hola, {shellUser.displayName}
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm text-[var(--apex-fg-muted)]">
+            Datos vía Data Platform
+            {dashboard.system.hasApiKey
+              ? " (API-Football)."
+              : " (mock automático sin API key)."}{" "}
+            <Link
+              href="/match-center"
+              className="text-[var(--apex-accent)] hover:text-[var(--apex-accent-hover)]"
+            >
+              Abrir Match Center
+            </Link>
+            {" · "}
+            <Link
+              href="/copilot"
+              className="text-[var(--apex-accent)] hover:text-[var(--apex-accent-hover)]"
+            >
+              Copilot
+            </Link>
+          </p>
         </div>
 
-        <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6 backdrop-blur-sm">
-          <h2 className="text-lg font-semibold text-white">
-            Dashboard Inteligente
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-400">
-            Has iniciado sesión correctamente. Aquí podrás visualizar tu
-            rendimiento, métricas y análisis deportivo.
-          </p>
-          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:gap-4">
-            <Link
-              href="/match-analysis"
-              className="inline-flex text-sm font-medium text-[#00D4AA] transition-colors hover:text-[#00eabb]"
-            >
-              Ver Match Analysis (demo) →
-            </Link>
-            <Link
-              href="/match-live"
-              className="inline-flex text-sm font-medium text-[#00D4AA] transition-colors hover:text-[#00eabb]"
-            >
-              Abrir APEX Vision (live) →
-            </Link>
+        <DashboardOverview data={dashboard} />
+
+        <section className="space-y-4">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
+              Partido destacado
+            </p>
+            <p className="mt-1 text-sm text-[var(--apex-fg-muted)]">
+              Match Center™ — misma experiencia Preview / Live / Post.
+            </p>
           </div>
+          <MatchCenterView data={matchCenter} />
         </section>
       </div>
-    </PageShell>
+    </ProductShell>
   );
 }

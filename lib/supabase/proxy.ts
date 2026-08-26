@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
+import { getUserFast } from "@/lib/supabase/get-user-fast";
 
 function isPublicAuthRoute(pathname: string) {
   return (
@@ -42,7 +43,7 @@ export async function updateSession(request: NextRequest) {
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getUserFast(supabase);
 
   if (!user && pathname.startsWith("/dashboard")) {
     const url = request.nextUrl.clone();

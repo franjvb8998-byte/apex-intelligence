@@ -10,15 +10,15 @@ const features = [
   },
   {
     icon: "🤖",
-    title: "IA Predictiva",
+    title: "APEX Copilot",
     description:
-      "Modelos de inteligencia artificial que anticipan tendencias y oportunidades.",
+      "Asistente visual para valor, análisis y el porqué de cada probabilidad.",
   },
   {
     icon: "📈",
-    title: "Estadísticas Avanzadas",
+    title: "Match Center™",
     description:
-      "Análisis profundo de patrones, ROI y desempeño histórico de tus apuestas.",
+      "Preview, Live y Post Match en una sola experiencia de decisión.",
   },
   {
     icon: "🛡",
@@ -34,7 +34,7 @@ export default function Home() {
       <div className="w-full">
         <section className="mx-auto max-w-3xl text-center">
           <div className="mb-6 inline-flex items-center rounded-full border border-[#00D4AA]/20 bg-[#00D4AA]/10 px-4 py-1.5 text-sm text-[#00D4AA]">
-            Plataforma de análisis deportivo
+            Plataforma de análisis deportivo · Release 0.1
           </div>
 
           <h1 className="text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">
@@ -61,6 +61,14 @@ export default function Home() {
               className="sm:w-auto"
             >
               Iniciar sesión
+            </ButtonLink>
+            <ButtonLink
+              href="/dashboard"
+              variant="secondary"
+              fullWidth
+              className="sm:w-auto"
+            >
+              Abrir producto
             </ButtonLink>
           </div>
         </section>

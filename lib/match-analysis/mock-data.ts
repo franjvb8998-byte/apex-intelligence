@@ -1,10 +1,17 @@
 import type { MatchAnalysisData } from "@/lib/match-analysis/types";
+import { getMockExplainablePrediction } from "@/lib/explainable-ai/mock";
 
 /**
  * Simulated Match Analysis payload.
  * TODO(core-wire): map HybridProbabilityResult + ExplainabilityModule → MatchAnalysisData
  */
 export function getMockMatchAnalysis(): MatchAnalysisData {
+  const explainable = getMockExplainablePrediction({
+    matchId: "apex:mock:match:demo-1001",
+    homeName: "Northbridge FC",
+    awayName: "Southport United",
+  });
+
   return {
     matchId: "apex:mock:match:demo-1001",
     leagueName: "Premier League",
@@ -146,6 +153,7 @@ export function getMockMatchAnalysis(): MatchAnalysisData {
         "Over 2.5 queda ligeramente por encima del umbral neutro gracias al volumen ofensivo local, no por debilidad extrema de Southport. " +
         "En conjunto, la lectura de APEX es: señal a favor del local con disciplina — tamaño de stake reducido mientras la confianza no suba de banda media.",
     },
+    explainable,
     modelVersion: "elo-poisson-hybrid-0.1.0+mock-ui",
     source: "mock",
   };

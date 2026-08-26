@@ -1,0 +1,110 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { AiSidePanel } from "@/components/apex-vision/ai-side-panel";
+import { MomentumBar } from "@/components/apex-vision/momentum-bar";
+import { PitchField } from "@/components/apex-vision/pitch-field";
+import { PressureIndicator } from "@/components/apex-vision/pressure-indicator";
+import { VisionTimeline } from "@/components/apex-vision/vision-timeline";
+import {
+  Badge,
+  Card,
+  CardHeader,
+  HeatmapPlaceholder,
+} from "@/components/design-system";
+import { simulateVisionTick } from "@/lib/apex-vision";
+import type { MatchCenterLiveData } from "@/lib/match-center/types";
+import type { VisionLiveState } from "@/lib/apex-vision/types";
+
+const TICK_MS = 5000;
+
+type LivePhaseProps = {
+  data: MatchCenterLiveData;
+};
+
+/**
+ * Live phase — reuses APEX Vision components.
+ * Tick simulation is mock; replace with realtime feed later (`source`).
+ */
+export function LivePhase({ data }: LivePhaseProps) {
+  const [state, setState] = useState<VisionLiveState>(data.vision);
+  const [visionBaseline, setVisionBaseline] = useState(data.vision);
+
+  if (data.vision !== visionBaseline) {
+    setVisionBaseline(data.vision);
+    setState(data.vision);
+  }
+
+  useEffect(() => {
+    if (data.source !== "mock") return;
+    const id = window.setInterval(() => {
+      setState((prev) => simulateVisionTick(prev));
+    }, TICK_MS);
+    return () => window.clearInterval(id);
+  }, [data.source]);
+
+  return (
+    <div className="space-y-6" role="tabpanel" aria-labelledby="match-center-tab-live">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone="danger">Live</Badge>
+          <Badge tone="accent">APEX Vision</Badge>
+          {data.source === "mock" && (
+            <Badge>Mock · {TICK_MS / 1000}s</Badge>
+          )}
+        </div>
+        <Card padding="sm" className="min-w-[10rem] text-center">
+          <p className="font-mono text-2xl font-bold tabular-nums text-white">
+            {state.score.home} – {state.score.away}
+          </p>
+          <p className="mt-1 text-xs uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
+            Minuto {state.minute}&apos;
+          </p>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-5">
+        <div className="space-y-4 xl:col-span-3">
+          <PitchField
+            players={state.players}
+            ball={state.ball}
+            homeShort={state.homeTeam.shortName}
+            awayShort={state.awayTeam.shortName}
+          />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <MomentumBar
+              value={state.momentum}
+              homeLabel={state.homeTeam.shortName}
+              awayLabel={state.awayTeam.shortName}
+            />
+            <PressureIndicator
+              value={state.pressure}
+              side={state.pressureSide}
+              homeLabel={state.homeTeam.shortName}
+              awayLabel={state.awayTeam.shortName}
+            />
+          </div>
+
+          <Card>
+            <CardHeader title="Heatmap" description="Placeholder listo para feed real" />
+            <HeatmapPlaceholder
+              title="Actividad en campo"
+              description="Sustituir por agregación de zonas cuando el feed live esté conectado."
+            />
+          </Card>
+
+          <VisionTimeline
+            events={state.events}
+            homeShort={state.homeTeam.shortName}
+            awayShort={state.awayTeam.shortName}
+          />
+        </div>
+
+        <div className="xl:col-span-2">
+          <AiSidePanel state={state} />
+        </div>
+      </div>
+    </div>
+  );
+}

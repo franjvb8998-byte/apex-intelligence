@@ -5,6 +5,7 @@ import { MarketsPanel } from "@/components/match-analysis/markets-panel";
 import { MatchHeader } from "@/components/match-analysis/match-header";
 import { Probability1x2 } from "@/components/match-analysis/probability-1x2";
 import { RisksPanel } from "@/components/match-analysis/risks-panel";
+import { ExplainablePredictionPanel } from "@/components/explainable-ai";
 import type { MatchAnalysisData } from "@/lib/match-analysis/types";
 
 const outcomeLabel = {
@@ -59,6 +60,8 @@ export function MatchAnalysisView({ data }: MatchAnalysisViewProps) {
           <RisksPanel risks={data.risks} />
         </div>
       </div>
+
+      <ExplainablePredictionPanel data={data.explainable} />
     </div>
   );
 }

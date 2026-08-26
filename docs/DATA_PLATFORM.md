@@ -1,7 +1,7 @@
 # Data Platform — APEX Intelligence
 
 **Código:** `lib/data-platform/`  
-**Estado:** Infraestructura (mocks + interfaces; **sin HTTP real**)  
+**Estado:** Infraestructura + **API-Football v1 (HTTP real)**  
 **Principio:** desacoplar proveedores externos del Intelligence Core
 
 ---
@@ -13,8 +13,9 @@ Ingestar datos de fútbol desde múltiples vendors y exponer un **modelo interno
 - normalización por proveedor
 - **Data Trust Score** por partido
 - **EventStore** cronológico de eventos
+- cliente HTTP + caché TTL (API-Football)
 
-Agregar un proveedor nuevo **no** requiere cambiar el Probability Engine ni el resto del Intelligence Core.
+Agregar un proveedor nuevo **no** requiere cambiar el Probability Engine ni el Learning Engine.
 
 ---
 
@@ -24,16 +25,18 @@ Agregar un proveedor nuevo **no** requiere cambiar el Probability Engine ni el r
 lib/data-platform/
 ├── types/              # Modelo canónico APEX
 ├── contracts/          # Ports (MatchDataProvider, Normalizer, …)
+├── http/               # Cliente fetch + errores
+├── cache/              # TTL cache in-memory
 ├── providers/
-│   ├── api-football/   # Adapter (mock payload)
+│   ├── api-football/   # Adapter HTTP + mapper + recorded fixture
 │   ├── sportmonks/
 │   ├── football-data/
-│   ├── mock/           # MockProvider
-│   └── _shared/        # Fixtures de demo
-├── normalization/      # Envelope → ApexMatchBundle
-├── quality/            # Data Trust Score
-├── event-store/        # Timeline append-only (in-memory)
-├── platform.ts         # Composition root (ingestMatch)
+│   ├── mock/
+│   └── _shared/
+├── normalization/
+├── quality/
+├── event-store/
+├── platform.ts
 └── index.ts
 ```
 
@@ -45,11 +48,11 @@ lib/data-platform/
 | --- | --- |
 | `ApexMatch` | Kickoff, status, score, venue, refs externas |
 | `ApexTeam` / `ApexLeague` / `ApexPlayer` | Identidad + `externalRefs` |
-| `ApexMatchEvent` | Timeline ordenada (`sequence`, `occurredAt`, `minute`) |
+| `ApexMatchEvent` | Timeline ordenada |
 | `ApexOddsQuote` | 1X2, O/U, etc. |
-| `ApexMatchBundle` | Snapshot completo + `provenance` + `trustScore?` |
+| `ApexMatchBundle` | Snapshot + `provenance` + `trustScore?` |
 
-Los IDs canónicos son strings `apex:{provider}:{entity}:{externalId}` hasta persistir UUIDs en Supabase.
+IDs: `apex:{provider}:{entity}:{externalId}`.
 
 ---
 
@@ -64,24 +67,71 @@ interface MatchDataProvider {
 }
 ```
 
-**Regla:** el provider solo devuelve `ProviderRawEnvelope` (payload opaco del vendor).  
-**Nunca** construye tipos `Apex*` (eso es trabajo del mapper/normalizer).
+**Regla:** el provider solo devuelve `ProviderRawEnvelope`.  
+**Nunca** construye tipos `Apex*` (mapper/normalizer).
 
-### Adaptadores incluidos
+### Adaptadores
 
 | Adapter | `id` | Notas |
 | --- | --- | --- |
-| `ApiFootballProvider` | `api-football` | Mock anidado tipo `response[]` |
+| `ApiFootballProvider` | `api-football` | **HTTP real** + fallback recorded |
 | `SportMonksProvider` | `sportmonks` | Mock `{ data }` |
-| `FootballDataProvider` | `football-data` | Mock más pobre (sin odds) → trust más bajo |
+| `FootballDataProvider` | `football-data` | Mock sin odds |
 | `MockProvider` | `mock` | Fixture canónico in-memory |
-
-Todos marcan `capabilities().mockOnly = true`.  
-`TODO(http):` clientes REST reales por adapter.
 
 ---
 
-## 5. Normalización
+## 5. API-Football (v1)
+
+### Variables de entorno
+
+| Variable | Requerida | Descripción |
+| --- | --- | --- |
+| `API_FOOTBALL_KEY` | Para live | API key (api-sports.io). Alias: `APISPORTS_KEY` |
+| `API_FOOTBALL_BASE_URL` | No | Default `https://v3.football.api-sports.io` |
+| `API_FOOTBALL_DEFAULT_FIXTURE_ID` | No | Fixture para Match Center |
+
+Plantilla: [`.env.example`](../.env.example).
+
+### Modos
+
+1. **Live** — si hay API key: `GET /fixtures?id=` (+ eventos opcionales).
+2. **Recorded** — sin key: payload real-shaped Arsenal–Chelsea (`RECORDED_API_FOOTBALL_FIXTURE_ID`).
+
+```ts
+import {
+  createDataPlatform,
+  createApiFootballProvider,
+  RECORDED_API_FOOTBALL_FIXTURE_ID,
+} from "@/lib/data-platform";
+
+const platform = createDataPlatform({
+  providers: [createApiFootballProvider()],
+});
+
+const { bundle } = await platform.ingestMatch({
+  providerId: "api-football",
+  externalMatchId: RECORDED_API_FOOTBALL_FIXTURE_ID,
+});
+```
+
+### Piezas
+
+| Módulo | Rol |
+| --- | --- |
+| `http/createHttpClient` | Fetch + timeouts + `DataPlatformHttpError` |
+| `cache/createTtlCache` | Caché TTL in-process |
+| `providers/api-football/client` | Endpoints fixtures / events / odds |
+| `providers/api-football/mapper` | DTO vendor → `ApexMatchBundle` |
+| `providers/api-football` | `MatchDataProvider` |
+
+### Errores
+
+`DataPlatformHttpError` con `code`: `network` | `timeout` | `unauthorized` | `not_found` | `rate_limited` | `invalid_json` | `http_status` | `provider`.
+
+---
+
+## 6. Normalización
 
 ```text
 ProviderRawEnvelope
@@ -93,129 +143,51 @@ ProviderRawEnvelope
  ApexMatchBundle
 ```
 
-- `DefaultMatchDataNormalizer` registra un `ProviderMapper` por vendor.
-- Extender: implementar mapper + `normalizer.register(mapper)`.
+El mapper de `api-football` detecta DTOs reales (`fixture` / `teams` / `goals`) y, si no, acepta el nesting legacy de demo.
 
 ---
 
-## 6. Data Quality — Data Trust Score
+## 7. Data Quality — Data Trust Score
 
-`DefaultDataQualityModule.score(bundle)` → `DataTrustScore` ∈ `[0, 1]`
-
-Dimensiones ponderadas:
-
-| Dimensión | Peso | Señales |
-| --- | --- | --- |
-| identity | 0.20 | teams, league, external refs |
-| schedule | 0.15 | kickoff válido, status |
-| score | 0.10 | coherencia status/marcador |
-| lineups | 0.15 | nº de jugadores |
-| events | 0.15 | timeline vs status |
-| odds | 0.15 | presencia 1X2 / O/U |
-| freshness | 0.10 | antigüedad de `ingestedAt` |
-
-Bandas: `high` ≥ 0.75, `medium` ≥ 0.45, else `low`.
+Sin cambios de contrato. `DefaultDataQualityModule.score(bundle)`.
 
 ---
 
-## 7. EventStore
+## 8. EventStore
 
-Port `EventStore`:
-
-- `append` — append-only
-- `list` — orden cronológico (`sequence`, luego `occurredAt`)
-- `replaceTimeline` — re-ingest / corrección
-
-Implementación actual: `InMemoryEventStore`.  
-`TODO(persistence): SupabaseEventStore` sin cambiar el port.
+`InMemoryEventStore` — sin cambios de port.
 
 ---
 
-## 8. Flujo completo de datos
+## 9. Flujo
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│ Ingestion job / script / future API                         │
-│ createDataPlatform({ providers: [apiFootball, mock, …] })   │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ ingestMatch({ providerId, externalMatchId })
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│ MatchDataProvider.fetchMatch                                │
-│ → ProviderRawEnvelope (vendor JSON / mock)                  │
-└──────────────────────────────┬──────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│ MatchDataNormalizer.normalize                               │
-│ → ApexMatchBundle (modelo interno)                          │
-└──────────────────────────────┬──────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│ DataQualityModule.score                                     │
-│ → bundle.trustScore                                         │
-└──────────────────────────────┬──────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│ EventStore.append(events)                                   │
-│ → timeline por matchId                                      │
-└──────────────────────────────┬──────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Consumers                                                   │
-│ • Intelligence Core (MatchContext / features) — futuro      │
-│ • Persistencia Supabase — futuro                            │
-│ • UI — fuera de alcance de esta infra                       │
-└─────────────────────────────────────────────────────────────┘
+API_FOOTBALL_KEY? ──yes──▶ HttpClient ──▶ ApiFootballProvider.fetchMatch
+         │                                         │
+         no                                        ▼
+         └──▶ recorded fixture ────────▶ ProviderRawEnvelope
+                                                  │
+                                                  ▼
+                                         Normalizer + Trust + EventStore
+                                                  │
+                                                  ▼
+                                         ApexMatchBundle → Match Center
 ```
 
-### Ejemplo de wiring (mock)
+### Match Center
 
-```ts
-import {
-  createDataPlatform,
-  createMockProvider,
-  createApiFootballProvider,
-  DEMO_MATCH_EXTERNAL_ID,
-} from "@/lib/data-platform";
-
-const platform = createDataPlatform({
-  providers: [createMockProvider(), createApiFootballProvider()],
-});
-
-const { bundle } = await platform.ingestMatch({
-  providerId: "mock",
-  externalMatchId: DEMO_MATCH_EXTERNAL_ID,
-});
-
-bundle.match;
-bundle.trustScore?.value;
-```
+`getMatchCenterData()` / `loadMatchCenterFromApiFootball()` en `lib/match-center` consumen el bundle (PE solo para probs 1X2; Learning Engine intacto).
 
 ---
 
-## 9. Extensibilidad — nuevo proveedor
+## 10. Extensibilidad — nuevo proveedor
 
-1. Añadir literal a `DataProviderId` (si quieres tipado cerrado).
-2. Crear `providers/my-vendor/` implementando `MatchDataProvider` (mock primero).
-3. Crear `ProviderMapper` que traduzca el envelope → `ApexMatchBundle`.
-4. `normalizer.register(mapper)` o incluirlo en `createDefaultProviderMappers()`.
-5. Registrar el provider en `createDataPlatform({ providers })`.
+1. Literal en `DataProviderId` (opcional).
+2. `providers/my-vendor/` → `MatchDataProvider`.
+3. `ProviderMapper` → `ApexMatchBundle`.
+4. Registrar en `createDefaultProviderMappers()` + `createDataPlatform`.
 
-**No modificar** `lib/intelligence/**` para soportar el vendor.
-
----
-
-## 10. Separación respecto al Intelligence Core
-
-| Capa | Conoce vendors? | Consume |
-| --- | --- | --- |
-| Data Platform | Sí (adapters) | Raw envelopes |
-| Normalizer | Sí (mappers) | → Apex model |
-| Intelligence Core | **No** | `ApexMatchBundle` / proyección a `MatchContext` |
-| Frontend / Auth | No en este diseño | — |
-
-Bridge futuro sugerido (no implementado):  
-`toMatchContext(bundle: ApexMatchBundle): MatchContext` en un adapter fino, sin filtrar JSON de API-Football/SportMonks al motor Elo-Poisson.
+**No modificar** `lib/intelligence/**` ni `lib/learning-engine/**`.
 
 ---
 
@@ -223,11 +195,11 @@ Bridge futuro sugerido (no implementado):
 
 | ID | Descripción |
 | --- | --- |
-| `TODO(http)` | Clientes HTTP reales por adapter |
-| `TODO(persistence)` | `SupabaseEventStore` + tablas de catálogo |
-| `TODO(calibration)` | Pesos del Data Trust Score |
-| `TODO(identity-resolve)` | Merge de `externalRefs` → UUID estable cross-provider |
-| Bridge a Intelligence Core | Proyección `ApexMatchBundle` → features / Elo inputs |
+| `TODO(persistence)` | `SupabaseEventStore` + catálogo |
+| `TODO(calibration)` | Pesos del Trust Score |
+| `TODO(identity-resolve)` | Merge cross-provider → UUID |
+| `TODO(elo-provider)` | Ratings reales para Match Center |
+| Odds live | Cablear `getFixtureOdds` en el ingest |
 
 ---
 
@@ -237,5 +209,5 @@ Bridge futuro sugerido (no implementado):
 | --- | --- |
 | `AI_ENGINE.md` | Consume datos ya normalizados |
 | `PROBABILITY_ENGINE.md` | No conoce providers |
-| `DATABASE_DESIGN.md` | Persistencia futura del modelo Apex |
-| `API_STRATEGY.md` | Exponer ingest/read cuando exista HTTP boundary |
+| `DATABASE_DESIGN.md` | Persistencia futura |
+| `API_STRATEGY.md` | Boundary HTTP de producto |

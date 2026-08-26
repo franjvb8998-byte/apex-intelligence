@@ -11,6 +11,7 @@ import type {
   UUID,
 } from "@/lib/intelligence/types";
 import type { ExplanationFactor } from "@/lib/intelligence/types/engine";
+import type { ExplainablePrediction } from "@/lib/explainable-ai/types";
 
 export type MatchAnalysisTeam = {
   id: UUID;
@@ -78,6 +79,8 @@ export type MatchAnalysisData = {
   keyFactors: ExplanationFactor[];
   risks: MatchRisk[];
   explanation: MatchAnalysisExplanation;
+  /** Sprint 10 — structured Explainable AI (rules). */
+  explainable: ExplainablePrediction;
   modelVersion: string;
   /** Provenance flag until live Core wiring exists. */
   source: "mock" | "intelligence-core";

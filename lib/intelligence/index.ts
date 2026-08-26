@@ -5,6 +5,7 @@
  * - types/       shared domain + engine types
  * - contracts/   TypeScript interfaces (ports)
  * - modules/     probability, markets, simulation, learning, explainability, live
+ * - reasoning/   Reasoning Layer (stubs — see docs/REASONING_LAYER.md)
  * - engine/      prediction pipeline composition root
  * - adapters/    Supabase, API façade, AI model stubs
  *
@@ -78,3 +79,16 @@ export {
   StubInferenceModel,
   StubConfidenceCalibrator,
 } from "@/lib/intelligence/adapters/ai";
+
+/** Reasoning Layer — prefer `@/lib/intelligence/reasoning` for full surface (incl. ConfidenceScore). */
+export {
+  createReasoningLayer,
+  type ReasoningLayer,
+  type ReasoningInput,
+  type ReasoningOutput,
+  type Recommendation,
+  type RiskAnalysis,
+  type Explanation,
+  type ValueOpportunity,
+  type PredictionReport,
+} from "@/lib/intelligence/reasoning";

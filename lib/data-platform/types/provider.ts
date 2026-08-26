@@ -14,7 +14,14 @@ export type ProviderRawEnvelope<TPayload = unknown> = {
   /** Optional request metadata for debugging / quality. */
   meta?: {
     endpoint?: string;
-    // TODO(http): latencyMs, httpStatus once real clients exist
     notes?: string[];
+    /** live | recorded | etc. */
+    mode?: string;
+    cacheHit?: boolean;
+    includeEvents?: boolean;
+    date?: string;
+    latencyMs?: number;
+    httpStatus?: number;
+    [key: string]: unknown;
   };
 };

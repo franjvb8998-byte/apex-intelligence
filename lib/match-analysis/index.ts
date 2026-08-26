@@ -6,10 +6,24 @@ export type {
   MatchAnalysisTeam,
   MatchRisk,
 } from "@/lib/match-analysis/types";
+
+export type {
+  MatchAnalysis,
+  MatchAnalysisInput,
+  MatchAnalysisFactor,
+  MatchAnalysisPrediction,
+  MatchAnalysisTeamStats,
+  MatchAnalysisFromBundleOptions,
+} from "@/lib/match-analysis/analysis-types";
+
 export { getMockMatchAnalysis } from "@/lib/match-analysis/mock-data";
 
-/**
- * Future adapter seam:
- * createMatchAnalysisFromCore(result: HybridProbabilityResult, explanation, …): MatchAnalysisData
- * TODO(core-wire): implement when PredictionPipeline is live.
- */
+export {
+  MatchAnalysisService,
+  createMatchAnalysisService,
+} from "@/lib/match-analysis/match-analysis-service";
+
+export {
+  analyzeMatchWithRules,
+  confidenceFromProbability,
+} from "@/lib/match-analysis/rules/analyze-with-rules";

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { ProductShell } from "@/components/app-shell/product-shell";
 import { MatchLiveView } from "@/components/apex-vision";
-import { PageShell } from "@/components/layout/page-shell";
+import { getShellUser } from "@/lib/auth/get-shell-user";
 
 export const metadata: Metadata = {
   title: "APEX Vision — Match Live",
@@ -9,22 +9,14 @@ export const metadata: Metadata = {
     "Seguimiento inmersivo de partidos con campo 2D, momentum y panel de IA.",
 };
 
-export default function MatchLivePage() {
+export default async function MatchLivePage() {
+  const user = await getShellUser();
+
   return (
-    <PageShell>
+    <ProductShell user={user}>
       <div className="w-full">
-        <p className="mb-6 text-sm text-[var(--apex-fg-subtle)]">
-          <Link
-            href="/dashboard"
-            className="transition-colors hover:text-[var(--apex-accent)]"
-          >
-            Dashboard
-          </Link>
-          <span className="mx-2">/</span>
-          <span className="text-slate-300">APEX Vision</span>
-        </p>
         <MatchLiveView />
       </div>
-    </PageShell>
+    </ProductShell>
   );
 }

@@ -1,0 +1,8 @@
+export { ChatWindow } from "@/components/copilot/chat-window";
+export { Message } from "@/components/copilot/message";
+export { PromptBox } from "@/components/copilot/prompt-box";
+export { SuggestedPrompts } from "@/components/copilot/suggested-prompts";
+export { ThinkingIndicator } from "@/components/copilot/thinking-indicator";
+export { AnalysisCard } from "@/components/copilot/analysis-card";
+export { PredictionCard } from "@/components/copilot/prediction-card";
+export { ExplainableCard } from "@/components/copilot/explainable-card";

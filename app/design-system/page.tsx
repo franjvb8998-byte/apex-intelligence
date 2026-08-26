@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import {
   Badge,
   Card,
@@ -12,31 +11,29 @@ import {
   ScoreGauge,
   Timeline,
 } from "@/components/design-system";
-import { PageShell } from "@/components/layout/page-shell";
+import {
+  EmptyState,
+  ErrorState,
+  LoadingState,
+} from "@/components/app-shell/states";
+import { ProductShell } from "@/components/app-shell/product-shell";
+import { getShellUser } from "@/lib/auth/get-shell-user";
 
 export const metadata: Metadata = {
   title: "Design System — APEX Intelligence",
   description: "Biblioteca oficial de componentes y tokens visuales de APEX.",
 };
 
-export default function DesignSystemPage() {
+export default async function DesignSystemPage() {
+  const user = await getShellUser();
+
   return (
-    <PageShell>
+    <ProductShell user={user}>
       <div className="w-full space-y-10">
         <header className="space-y-3">
-          <p className="text-sm text-[var(--apex-fg-subtle)]">
-            <Link
-              href="/"
-              className="transition-colors hover:text-[var(--apex-accent)]"
-            >
-              Inicio
-            </Link>
-            <span className="mx-2">/</span>
-            <span className="text-slate-300">Design System</span>
-          </p>
-          <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+          <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
             Design System
-          </h1>
+          </h2>
           <p className="max-w-2xl text-sm leading-relaxed text-[var(--apex-fg-muted)] sm:text-base">
             Componentes reutilizables y tokens oficiales. Sin lógica de negocio
             ni APIs — solo presentación accesible para escritorio y móvil.
@@ -55,6 +52,23 @@ export default function DesignSystemPage() {
               <Badge tone="info">Info</Badge>
             </div>
           </Card>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-white">
+            Estados de producto
+          </h2>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <LoadingState label="Loading" rows={2} />
+            <EmptyState
+              title="Empty"
+              description="No hay elementos que mostrar en esta sección."
+            />
+            <ErrorState
+              title="Error"
+              description="Ejemplo de fallo recuperable."
+            />
+          </div>
         </section>
 
         <section className="grid gap-6 lg:grid-cols-2">
@@ -150,6 +164,6 @@ export default function DesignSystemPage() {
           </ExplanationPanel>
         </section>
       </div>
-    </PageShell>
+    </ProductShell>
   );
 }

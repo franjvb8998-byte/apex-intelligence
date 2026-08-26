@@ -10,6 +10,10 @@ import {
   nowIso,
   type MockFixturePayload,
 } from "@/lib/data-platform/providers/_shared/demo-fixture";
+import {
+  isApiFootballFixturesPayload,
+  mapApiFootballEnvelopeToApexBundle,
+} from "@/lib/data-platform/providers/api-football/mapper";
 
 function isFixturePayload(value: unknown): value is MockFixturePayload {
   return (
@@ -200,7 +204,27 @@ function createMapper(provider: DataProviderId): ProviderMapper {
 }
 
 export const mockProviderMapper = createMapper("mock");
-export const apiFootballMapper = createMapper("api-football");
+
+/**
+ * API-Football mapper: prefers real vendor DTOs; falls back to legacy
+ * MockFixturePayload nesting used by older demo envelopes.
+ */
+export const apiFootballMapper: ProviderMapper = {
+  provider: "api-football",
+  toApexBundle(envelope: ProviderRawEnvelope): ApexMatchBundle {
+    if (envelope.provider !== "api-football") {
+      throw new Error(
+        `Mapper for api-football received envelope from ${envelope.provider}`,
+      );
+    }
+    if (isApiFootballFixturesPayload(envelope.payload)) {
+      return mapApiFootballEnvelopeToApexBundle(envelope);
+    }
+    const fixture = extractFixturePayload("api-football", envelope.payload);
+    return mapFixtureToApexBundle("api-football", envelope, fixture);
+  },
+};
+
 export const sportMonksMapper = createMapper("sportmonks");
 export const footballDataMapper = createMapper("football-data");
 

@@ -1,0 +1,15 @@
+export {
+  COPILOT_SUGGESTED_PROMPTS,
+  COPILOT_WELCOME,
+  MOCK_CHAT_THREADS,
+  MOCK_RECENT_CHATS,
+  getMockCopilotReply,
+  type CopilotAnalysisCardData,
+  type CopilotCardData,
+  type CopilotChatSummary,
+  type CopilotExplainableCardData,
+  type CopilotMessage,
+  type CopilotPredictionCardData,
+  type CopilotRole,
+  type MockReply,
+} from "@/lib/copilot/mock-data";

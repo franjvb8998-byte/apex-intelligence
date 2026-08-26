@@ -1,65 +1,80 @@
-import type {
-  MatchDataProvider,
-  ProviderCapabilities,
-} from "@/lib/data-platform/contracts/match-data-provider";
-import {
-  createDemoFixturePayload,
-  DEMO_MATCH_EXTERNAL_ID,
-  nowIso,
-} from "@/lib/data-platform/providers/_shared/demo-fixture";
-import type { ProviderRawEnvelope } from "@/lib/data-platform/types/provider";
-
 /**
- * API-Football adapter (infrastructure only).
- *
- * TODO(http): replace mock payload with REST client (api-sports.io).
- * Do not import Intelligence Core types here.
+ * API-Football provider package barrel (Sprint 6 — Real Data v1).
  */
-export class ApiFootballProvider implements MatchDataProvider {
-  readonly id = "api-football" as const;
-  readonly displayName = "API-Football";
 
-  capabilities(): ProviderCapabilities {
-    return {
-      matches: true,
-      events: true,
-      lineups: true,
-      odds: true,
-      live: true,
-      mockOnly: true,
-    };
-  }
+export {
+  readApiFootballConfig,
+  readApiFootballEnv,
+  requireApiFootballKey,
+  API_FOOTBALL_DEFAULT_BASE_URL,
+  type ApiFootballConfig,
+  type ApiFootballEnv,
+} from "@/lib/data-platform/providers/api-football/config";
 
-  async fetchMatch(query: {
-    externalMatchId: string;
-  }): Promise<ProviderRawEnvelope> {
-    // Vendor-shaped wrapper kept intentional — mapper owns translation.
-    const fixture = createDemoFixturePayload(this.id);
-    if (query.externalMatchId !== DEMO_MATCH_EXTERNAL_ID) {
-      fixture.match.id = query.externalMatchId;
-    }
+export {
+  ApiFootballError,
+  isApiFootballError,
+  toApiFootballError,
+  type ApiFootballErrorCode,
+} from "@/lib/data-platform/providers/api-football/errors";
 
-    return {
-      provider: this.id,
-      externalMatchId: fixture.match.id,
-      fetchedAt: nowIso(),
-      payload: {
-        // Mimics a nested API-Football-ish response without calling HTTP.
-        response: [fixture],
-        results: 1,
-      },
-      meta: {
-        endpoint: "GET /fixtures (mock)",
-        notes: ["HTTP client not wired"],
-      },
-    };
-  }
+export {
+  withRetry,
+  defaultShouldRetry,
+  type RetryOptions,
+} from "@/lib/data-platform/providers/api-football/retry";
 
-  async fetchFixtures(): Promise<ProviderRawEnvelope[]> {
-    return [await this.fetchMatch({ externalMatchId: DEMO_MATCH_EXTERNAL_ID })];
-  }
-}
+export {
+  createRateLimiter,
+  type RateLimiter,
+  type RateLimiterOptions,
+} from "@/lib/data-platform/providers/api-football/rate-limiter";
 
-export function createApiFootballProvider(): MatchDataProvider {
-  return new ApiFootballProvider();
-}
+export {
+  createApiFootballClient,
+  tryCreateApiFootballClientFromEnv,
+  withApiFootballClientCache,
+  type ApiFootballClient,
+  type ApiFootballClientOptions,
+} from "@/lib/data-platform/providers/api-football/client";
+
+export { createFixtureApiFootballClient } from "@/lib/data-platform/providers/api-football/fixture-client";
+
+export {
+  createRecordedApiFootballFixturesResponse,
+  createRecordedApiFootballTeamsResponse,
+  createRecordedApiFootballPlayersResponse,
+  createRecordedApiFootballLeaguesResponse,
+  createRecordedApiFootballStandingsResponse,
+  createRecordedApiFootballTeamStatisticsResponse,
+  createRecordedApiFootballTodaysMatchesResponse,
+  RECORDED_API_FOOTBALL_FIXTURE_ID,
+  RECORDED_API_FOOTBALL_TEAM_ID,
+  RECORDED_API_FOOTBALL_PLAYER_ID,
+  RECORDED_API_FOOTBALL_LEAGUE_ID,
+  RECORDED_API_FOOTBALL_SEASON,
+} from "@/lib/data-platform/providers/api-football/fixtures";
+
+export {
+  mapApiFootballEnvelopeToApexBundle,
+  mapApiFootballFixtureItemToApexBundle,
+  mapApiFootballStatus,
+  isApiFootballFixturesPayload,
+  adaptApiFootballTeam,
+  adaptApiFootballPlayer,
+  adaptApiFootballLeague,
+  adaptApiFootballTeamStatistics,
+  type ApexTeamStatistics,
+} from "@/lib/data-platform/providers/api-football/adapters";
+
+export {
+  ApiFootballDataProvider,
+  createApiFootballDataProvider,
+  type ApiFootballDataProviderOptions,
+} from "@/lib/data-platform/providers/api-football/api-football-provider";
+
+export {
+  ApiFootballProvider,
+  createApiFootballProvider,
+  type ApiFootballProviderOptions,
+} from "@/lib/data-platform/providers/api-football/match-data-adapter";

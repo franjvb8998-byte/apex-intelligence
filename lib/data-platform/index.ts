@@ -1,14 +1,43 @@
 /**
  * APEX Data Platform — provider-agnostic ingestion infrastructure.
  *
- * Flow: MatchDataProvider → Normalizer → ApexMatchBundle → DataQuality → EventStore
- * Intelligence Core must consume Apex* types only — never vendor payloads.
+ * v2 access layer: IDataProvider + ProviderFactory (mock by default).
+ * Legacy flow: MatchDataProvider → Normalizer → ApexMatchBundle → DataQuality → EventStore
  *
- * See docs/DATA_PLATFORM.md
+ * See docs/data-platform.md
  */
 
-export type * from "@/lib/data-platform/types";
+export type * from "@/lib/data-platform/types/index";
 export type * from "@/lib/data-platform/contracts";
+
+export type {
+  DataProviderKind,
+  DataProviderMatchQuery,
+  DataProviderFixturesQuery,
+  DataProviderMatch,
+  DataProviderConfig,
+} from "@/lib/data-platform/types";
+
+export type { IDataProvider } from "@/lib/data-platform/provider";
+
+export {
+  MockDataProvider,
+  createMockDataProvider,
+} from "@/lib/data-platform/mock-provider";
+
+export {
+  ApiFootballDataProvider,
+  createApiFootballDataProvider,
+  type ApiFootballDataProviderOptions,
+} from "@/lib/data-platform/api-football-provider";
+
+export {
+  ProviderFactory,
+  createDataProviderFromEnv,
+  readDataProviderConfig,
+  getDefaultMatchId,
+  type ProviderFactoryOptions,
+} from "@/lib/data-platform/provider-factory";
 
 export {
   createDataPlatform,
@@ -20,6 +49,21 @@ export {
 export {
   createApiFootballProvider,
   ApiFootballProvider,
+  RECORDED_API_FOOTBALL_FIXTURE_ID,
+  createRecordedApiFootballFixturesResponse,
+  createApiFootballClient,
+  tryCreateApiFootballClientFromEnv,
+  readApiFootballEnv,
+  readApiFootballConfig,
+  requireApiFootballKey,
+  API_FOOTBALL_DEFAULT_BASE_URL,
+  mapApiFootballEnvelopeToApexBundle,
+  mapApiFootballStatus,
+  isApiFootballFixturesPayload,
+  ApiFootballError,
+  isApiFootballError,
+  createRateLimiter,
+  withRetry,
   createSportMonksProvider,
   SportMonksProvider,
   createFootballDataProvider,
@@ -28,7 +72,24 @@ export {
   MockProvider,
   DEMO_MATCH_EXTERNAL_ID,
   createDemoFixturePayload,
+  type ApiFootballProviderOptions,
+  type ApiFootballClient,
+  type ApiFootballClientOptions,
 } from "@/lib/data-platform/providers";
+
+export {
+  createHttpClient,
+  DataPlatformHttpError,
+  isDataPlatformHttpError,
+  type HttpClient,
+  type HttpClientOptions,
+} from "@/lib/data-platform/http";
+
+export {
+  createTtlCache,
+  type TtlCache,
+  type TtlCacheOptions,
+} from "@/lib/data-platform/cache";
 
 export {
   createMatchDataNormalizer,
