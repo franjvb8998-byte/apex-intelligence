@@ -36,12 +36,32 @@ export {
   withApiFootballClientCache,
   type ApiFootballClient,
   type ApiFootballClientOptions,
+  type ApiFootballClientCacheOptions,
 } from "@/lib/data-platform/providers/api-football/client";
+
+export {
+  API_FOOTBALL_CACHE_TTL_MS,
+  TEAM_LOGO_CACHE_TTL_SECONDS,
+  ttlForCacheKey,
+  logApiFootballCache,
+  isApiFootballRateLimitPayload,
+  isApiFootballRateLimitError,
+  type ApiFootballCacheLogger,
+  type ApiFootballCacheSource,
+} from "@/lib/data-platform/providers/api-football/cache-policy";
+
+export {
+  isApiFootballQuotaError,
+  loadUnlessQuota,
+  ignoreNonQuotaErrors,
+  type QuotaLoadResult,
+} from "@/lib/data-platform/providers/api-football/quota";
 
 export { createFixtureApiFootballClient } from "@/lib/data-platform/providers/api-football/fixture-client";
 
 export {
   createRecordedApiFootballFixturesResponse,
+  createRecordedApiFootballOddsResponse,
   createRecordedApiFootballTeamsResponse,
   createRecordedApiFootballPlayersResponse,
   createRecordedApiFootballLeaguesResponse,

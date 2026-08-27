@@ -101,6 +101,13 @@ const BREADCRUMB_MAP: Record<string, BreadcrumbItem[]> = {
 };
 
 export function breadcrumbsForPath(pathname: string): BreadcrumbItem[] {
+  if (pathname.startsWith("/match-analysis/")) {
+    return [
+      { label: "Dashboard", href: "/dashboard" },
+      { label: "Match Analysis", href: "/match-analysis" },
+      { label: "Partido" },
+    ];
+  }
   if (pathname.startsWith("/match-center/")) {
     return [
       { label: "Dashboard", href: "/dashboard" },
@@ -123,6 +130,7 @@ export function breadcrumbsForPath(pathname: string): BreadcrumbItem[] {
 
 export function titleForPath(pathname: string): string {
   if (pathname.startsWith("/match-center")) return "Match Center";
+  if (pathname.startsWith("/match-analysis")) return "Match Analysis";
   const item = ALL_NAV.find((n) => n.href === pathname);
   return item?.label ?? "APEX";
 }

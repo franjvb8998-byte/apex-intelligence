@@ -24,6 +24,12 @@ export {
 } from "@/lib/match-analysis/match-analysis-service";
 
 export {
+  getMatchAnalysisData,
+  listMatchAnalysisFixtures,
+  type LoadMatchAnalysisOptions,
+} from "@/lib/match-analysis/load";
+
+export {
   analyzeMatchWithRules,
   confidenceFromProbability,
 } from "@/lib/match-analysis/rules/analyze-with-rules";

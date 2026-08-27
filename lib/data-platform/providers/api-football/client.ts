@@ -17,6 +17,16 @@ import {
   toApiFootballError,
 } from "@/lib/data-platform/providers/api-football/errors";
 import {
+  apiFootballVendorErrorText,
+  defaultApiFootballCacheLogger,
+  isApiFootballRateLimitError,
+  isApiFootballRateLimitPayload,
+  logApiFootballCache,
+  ttlForCacheKey,
+  type ApiFootballCacheLogger,
+} from "@/lib/data-platform/providers/api-football/cache-policy";
+import { readThroughNextDataCache } from "@/lib/data-platform/providers/api-football/next-data-cache";
+import {
   createRateLimiter,
   type RateLimiter,
 } from "@/lib/data-platform/providers/api-football/rate-limiter";
@@ -33,6 +43,7 @@ import type {
   ApiFootballTeamsResponse,
   ApiFootballHeadToHeadResponse,
   ApiFootballInjuriesResponse,
+  ApiFootballFixtureStatisticsResponse,
 } from "@/lib/data-platform/providers/api-football/types";
 
 export type ApiFootballClientOptions = {
@@ -47,6 +58,14 @@ export type ApiFootballClientOptions = {
   retry?: boolean;
 };
 
+export type ApiFootballClientCacheOptions = {
+  /** Force a single TTL for every key (tests). */
+  ttlMs?: number;
+  logger?: ApiFootballCacheLogger;
+  /** Next.js Data Cache. Disabled automatically under Vitest. Default true. */
+  useNextDataCache?: boolean;
+};
+
 export type ApiFootballClient = {
   /** Match details */
   getFixture(id: string): Promise<ApiFootballFixturesResponse>;
@@ -55,6 +74,10 @@ export type ApiFootballClient = {
   getFixturesByLeague(
     league: string | number,
     season: string | number,
+  ): Promise<ApiFootballFixturesResponse>;
+  getTeamLastFixtures(
+    team: string | number,
+    last?: number,
   ): Promise<ApiFootballFixturesResponse>;
   getTeam(id: string): Promise<ApiFootballTeamsResponse>;
   getTeamStatistics(
@@ -73,6 +96,9 @@ export type ApiFootballClient = {
   ): Promise<ApiFootballStandingsResponse>;
   getLineups(fixture: string): Promise<ApiFootballLineupsResponse>;
   getEvents(fixture: string): Promise<ApiFootballEventsResponse>;
+  getFixtureStatistics(
+    fixture: string,
+  ): Promise<ApiFootballFixtureStatisticsResponse>;
 
   /** @deprecated Use getFixture */
   getFixtureById(fixtureId: string): Promise<ApiFootballFixturesResponse>;
@@ -169,6 +195,12 @@ export function createApiFootballClient(
         season,
       });
     },
+    getTeamLastFixtures(team, last = 5) {
+      return get<ApiFootballFixturesResponse>("/fixtures", {
+        team,
+        last,
+      });
+    },
     getTeam(id) {
       return get<ApiFootballTeamsResponse>("/teams", { id });
     },
@@ -200,6 +232,12 @@ export function createApiFootballClient(
     getEvents(fixture) {
       return get<ApiFootballEventsResponse>("/fixtures/events", { fixture });
     },
+    getFixtureStatistics(fixture) {
+      return get<ApiFootballFixtureStatisticsResponse>(
+        "/fixtures/statistics",
+        { fixture },
+      );
+    },
     getFixtureById(fixtureId) {
       return client.getFixture(fixtureId);
     },
@@ -228,22 +266,72 @@ export function createApiFootballClient(
 }
 
 /**
- * Wrap a client with a simple in-memory TTL cache (Sprint 6).
+ * Wrap a client so every response is cached before it is returned.
+ * Fresh hits never call API-Football. Rate-limit errors serve stale data.
  */
 export function withApiFootballClientCache(
   client: ApiFootballClient,
   cache: TtlCache,
-  ttlMs = 60_000,
+  ttlMsOrOptions: number | ApiFootballClientCacheOptions = {},
 ): ApiFootballClient {
-  async function cached<T>(
-    key: string,
-    run: () => Promise<T>,
-  ): Promise<T> {
-    const hit = cache.get<T>(key);
-    if (hit !== undefined) return hit;
-    const value = await run();
-    cache.set(key, value, ttlMs);
-    return value;
+  const options: ApiFootballClientCacheOptions =
+    typeof ttlMsOrOptions === "number"
+      ? { ttlMs: ttlMsOrOptions }
+      : ttlMsOrOptions;
+  const logger = options.logger ?? defaultApiFootballCacheLogger;
+  const useNextDataCache = options.useNextDataCache ?? true;
+
+  async function cached<T>(key: string, run: () => Promise<T>): Promise<T> {
+    const ttlMs = ttlForCacheKey(key, options.ttlMs);
+    const fresh = cache.get<T>(key);
+    if (fresh !== undefined) {
+      logApiFootballCache({ source: "CACHE", key }, logger);
+      return fresh;
+    }
+
+    let fromOrigin = false;
+    const load = async (): Promise<T> => {
+      fromOrigin = true;
+      const value = await run();
+      if (isApiFootballRateLimitPayload(value)) {
+        throw new ApiFootballError({
+          message:
+            apiFootballVendorErrorText(value) ??
+            "API-Football rate limit",
+          code: "rate_limited",
+          status: 429,
+          details: value,
+        });
+      }
+      return value;
+    };
+
+    try {
+      const value = await readThroughNextDataCache(
+        key,
+        Math.max(1, Math.round(ttlMs / 1000)),
+        load,
+        useNextDataCache,
+      );
+      const vendorError = apiFootballVendorErrorText(value);
+      if (!vendorError) {
+        cache.set(key, value, ttlMs);
+      }
+      logApiFootballCache(
+        { source: fromOrigin ? "API" : "CACHE", key },
+        logger,
+      );
+      return value;
+    } catch (error) {
+      if (isApiFootballRateLimitError(error)) {
+        const stale = cache.getStale<T>(key);
+        if (stale !== undefined) {
+          logApiFootballCache({ source: "CACHE", key, stale: true }, logger);
+          return stale;
+        }
+      }
+      throw error instanceof ApiFootballError ? error : toApiFootballError(error);
+    }
   }
 
   return {
@@ -254,6 +342,10 @@ export function withApiFootballClientCache(
     getFixturesByLeague: (league, season) =>
       cached(`af:fixtures:league:${league}:${season}`, () =>
         client.getFixturesByLeague(league, season),
+      ),
+    getTeamLastFixtures: (team, last) =>
+      cached(`af:fixtures:team:${team}:last:${last ?? 5}`, () =>
+        client.getTeamLastFixtures(team, last),
       ),
     getTeam: (id) => cached(`af:team:${id}`, () => client.getTeam(id)),
     getTeamStatistics: (team, league, season) =>
@@ -273,6 +365,10 @@ export function withApiFootballClientCache(
       cached(`af:lineups:${fixture}`, () => client.getLineups(fixture)),
     getEvents: (fixture) =>
       cached(`af:events:${fixture}`, () => client.getEvents(fixture)),
+    getFixtureStatistics: (fixture) =>
+      cached(`af:fixture-stats:${fixture}`, () =>
+        client.getFixtureStatistics(fixture),
+      ),
     getFixtureById: (fixtureId) =>
       cached(`af:fixture:${fixtureId}`, () => client.getFixtureById(fixtureId)),
     getFixtureEvents: (fixtureId) =>

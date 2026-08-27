@@ -24,6 +24,10 @@ import type {
   DashboardMatchSummary,
   DashboardProviderKind,
 } from "@/lib/dashboard/types";
+import {
+  ignoreNonQuotaErrors,
+  isApiFootballQuotaError,
+} from "@/lib/data-platform/providers/api-football/quota";
 import { getMatchCenterData } from "@/lib/match-center/load";
 import type { MatchCenterData } from "@/lib/match-center/types";
 
@@ -41,11 +45,7 @@ async function listForDate(
   >,
   date: string,
 ): Promise<ApexMatchBundle[]> {
-  try {
-    return await listFixtures({ date });
-  } catch {
-    return [];
-  }
+  return ignoreNonQuotaErrors(() => listFixtures({ date }), []);
 }
 
 /**
@@ -89,7 +89,8 @@ export async function getDashboardData(
       seed = await provider.getMatch({
         matchId: defaultMatchIdFor(kind, options.env),
       });
-    } catch {
+    } catch (error) {
+      if (isApiFootballQuotaError(error)) throw error;
       seed = null;
     }
   }
@@ -235,7 +236,11 @@ export function emptyDashboardData(
  */
 export async function loadDashboardWorkspace(
   options: LoadDashboardOptions = {},
-): Promise<{ dashboard: DashboardData; matchCenter: MatchCenterData | null }> {
+): Promise<{
+  dashboard: DashboardData;
+  matchCenter: MatchCenterData | null;
+  quotaExhausted: boolean;
+}> {
   const resolved = resolveDashboardProvider(options);
   let dashboard: DashboardData;
   try {
@@ -243,7 +248,14 @@ export async function loadDashboardWorkspace(
       ...options,
       provider: resolved.provider,
     });
-  } catch {
+  } catch (error) {
+    if (isApiFootballQuotaError(error)) {
+      return {
+        dashboard: emptyDashboardData(resolved),
+        matchCenter: null,
+        quotaExhausted: true,
+      };
+    }
     dashboard = emptyDashboardData(resolved);
   }
 
@@ -258,9 +270,16 @@ export async function loadDashboardWorkspace(
       includeFixtureList: false,
       env: options.env,
     });
-  } catch {
+  } catch (error) {
+    if (
+      isApiFootballQuotaError(error) &&
+      dashboard.todayMatches.length === 0 &&
+      dashboard.upcomingMatches.length === 0
+    ) {
+      return { dashboard, matchCenter: null, quotaExhausted: true };
+    }
     matchCenter = null;
   }
 
-  return { dashboard, matchCenter };
+  return { dashboard, matchCenter, quotaExhausted: false };
 }

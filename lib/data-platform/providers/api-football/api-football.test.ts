@@ -12,6 +12,7 @@ import {
   mapApiFootballStatus,
   RECORDED_API_FOOTBALL_FIXTURE_ID,
 } from "@/lib/data-platform";
+import { createRecordedApiFootballOddsResponse } from "@/lib/data-platform/providers/api-football/recorded-fixture";
 
 describe("TTL cache", () => {
   it("returns values within TTL and expires afterward", () => {
@@ -29,6 +30,7 @@ describe("TTL cache", () => {
 
     now = 1_200;
     expect(cache.get("a")).toBeUndefined();
+    expect(cache.getStale<{ ok: boolean }>("a")?.ok).toBe(true);
   });
 });
 
@@ -105,12 +107,16 @@ describe("API-Football mapper", () => {
     expect(bundle.match.score.home).toBe(2);
     expect(bundle.match.score.away).toBe(1);
     expect(bundle.league?.name).toBe("Premier League");
+    expect(bundle.match.venue?.name).toBe("Emirates Stadium");
+    expect(bundle.match.referee).toBe("M. Oliver");
+    expect(bundle.match.attendance).toBeNull();
+    expect(bundle.match.weather).toBeNull();
     expect(bundle.events.length).toBeGreaterThan(0);
     expect(bundle.players.length).toBeGreaterThan(0);
     expect(bundle.match.id).toContain("api-football");
   });
 
-  it("maps 1X2, O/U 2.5 and BTTS odds from the first bookmaker", () => {
+  it("maps 1X2, O/U 2.5 and BTTS odds from every bookmaker", () => {
     const payload = createRecordedApiFootballFixturesResponse();
     const bundle = mapApiFootballEnvelopeToApexBundle(
       {
@@ -155,21 +161,75 @@ describe("API-Football mapper", () => {
                   },
                 ],
               },
+              {
+                id: 11,
+                name: "1xBet",
+                bets: [
+                  {
+                    id: 1,
+                    name: "Match Winner",
+                    values: [
+                      { value: "Home", odd: "1.90" },
+                      { value: "Draw", odd: "3.50" },
+                      { value: "Away", odd: "4.00" },
+                    ],
+                  },
+                  {
+                    id: 5,
+                    name: "Goals Over/Under",
+                    values: [
+                      { value: "Over 2.5", odd: "2.00" },
+                      { value: "Under 2.5", odd: "1.85" },
+                    ],
+                  },
+                  {
+                    id: 8,
+                    name: "Both Teams Score",
+                    values: [
+                      { value: "Yes", odd: "1.75" },
+                      { value: "No", odd: "2.05" },
+                    ],
+                  },
+                ],
+              },
             ],
           },
         ],
       },
     );
 
-    expect(bundle.odds.map((q) => q.market)).toEqual([
-      "1x2",
-      "over_under",
-      "btts",
-    ]);
+    expect(bundle.odds).toHaveLength(6);
+    expect(bundle.odds.filter((q) => q.market === "1x2")).toHaveLength(2);
+    expect(new Set(bundle.odds.map((q) => q.bookmaker))).toEqual(
+      new Set(["Bet365", "1xBet"]),
+    );
     expect(bundle.odds.find((q) => q.market === "over_under")?.line).toBe(2.5);
     expect(
       bundle.odds.find((q) => q.market === "btts")?.selections[0]?.key,
     ).toBe("yes");
+  });
+
+  it("maps the recorded odds payload across Bet365, 1xBet and Pinnacle", () => {
+    const bundle = mapApiFootballEnvelopeToApexBundle(
+      {
+        provider: "api-football",
+        externalMatchId: RECORDED_API_FOOTBALL_FIXTURE_ID,
+        fetchedAt: "2026-08-12T12:00:00.000Z",
+        payload: createRecordedApiFootballFixturesResponse(),
+      },
+      { odds: createRecordedApiFootballOddsResponse().response },
+    );
+
+    expect(bundle.odds).toHaveLength(9);
+    expect(new Set(bundle.odds.map((q) => q.bookmaker))).toEqual(
+      new Set(["Bet365", "1xBet", "Pinnacle"]),
+    );
+    const home1xBet = bundle.odds.find(
+      (q) => q.market === "1x2" && q.bookmaker === "1xBet",
+    );
+    expect(home1xBet?.selections.find((s) => s.key === "home")?.decimalOdds).toBe(
+      1.7,
+    );
   });
 });
 

@@ -12,6 +12,7 @@ import {
   CardHeader,
   HeatmapPlaceholder,
 } from "@/components/design-system";
+import { LineupsCard, hasPublishedLineup } from "@/components/match-center/lineups-card";
 import { simulateVisionTick } from "@/lib/apex-vision";
 import type { MatchCenterLiveData } from "@/lib/match-center/types";
 import type { VisionLiveState } from "@/lib/apex-vision/types";
@@ -34,6 +35,10 @@ export function LivePhase({ data }: LivePhaseProps) {
     setVisionBaseline(data.vision);
     setState(data.vision);
   }
+
+  const lineups = data.lineups ?? { home: null, away: null };
+  const showLineups =
+    hasPublishedLineup(lineups.home) || hasPublishedLineup(lineups.away);
 
   useEffect(() => {
     if (data.source !== "mock") return;
@@ -93,6 +98,10 @@ export function LivePhase({ data }: LivePhaseProps) {
               description="Sustituir por agregación de zonas cuando el feed live esté conectado."
             />
           </Card>
+
+          {showLineups && (
+            <LineupsCard home={lineups.home} away={lineups.away} />
+          )}
 
           <VisionTimeline
             events={state.events}

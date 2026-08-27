@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { ApiQuotaCard } from "@/components/app-shell/api-quota-card";
 import { ProductShell } from "@/components/app-shell/product-shell";
 import { MatchCenterList } from "@/components/match-center/match-center-screen";
 import { getShellUser } from "@/lib/auth/get-shell-user";
+import { loadUnlessQuota } from "@/lib/data-platform/providers/api-football/quota";
 import { listMatchCenterFixtures } from "@/lib/match-center";
 import {
   firstSearchParam,
@@ -34,14 +36,18 @@ export default async function MatchCenterPage({
     redirect(matchCenterHref(fromQuery));
   }
 
-  const [matches, user] = await Promise.all([
+  const user = await getShellUser();
+  const loaded = await loadUnlessQuota(() =>
     listMatchCenterFixtures({ requireProvider: true }),
-    getShellUser(),
-  ]);
+  );
 
   return (
     <ProductShell user={user}>
-      <MatchCenterList matches={matches} />
+      {loaded.ok ? (
+        <MatchCenterList matches={loaded.data} />
+      ) : (
+        <ApiQuotaCard />
+      )}
     </ProductShell>
   );
 }

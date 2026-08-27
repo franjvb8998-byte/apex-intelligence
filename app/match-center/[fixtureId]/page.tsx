@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { ApiQuotaCard } from "@/components/app-shell/api-quota-card";
 import { ProductShell } from "@/components/app-shell/product-shell";
 import { MatchCenterDetail } from "@/components/match-center/match-center-screen";
 import { getShellUser } from "@/lib/auth/get-shell-user";
+import { loadUnlessQuota } from "@/lib/data-platform/providers/api-football/quota";
 import { getMatchCenterData } from "@/lib/match-center";
 import { vendorFixtureId } from "@/lib/match-center/fixture-id";
 
@@ -23,19 +25,22 @@ export default async function MatchCenterFixturePage({
 }: MatchCenterFixturePageProps) {
   const { fixtureId: rawFixtureId } = await params;
   const fixtureId = vendorFixtureId(decodeURIComponent(rawFixtureId));
-
-  const [data, user] = await Promise.all([
+  const user = await getShellUser();
+  const loaded = await loadUnlessQuota(() =>
     getMatchCenterData({
       externalMatchId: fixtureId ?? rawFixtureId,
       requireProvider: true,
       includeFixtureList: false,
     }),
-    getShellUser(),
-  ]);
+  );
 
   return (
     <ProductShell user={user}>
-      <MatchCenterDetail data={data} />
+      {loaded.ok ? (
+        <MatchCenterDetail data={loaded.data} />
+      ) : (
+        <ApiQuotaCard />
+      )}
     </ProductShell>
   );
 }

@@ -37,6 +37,9 @@ export type ApexMatch = {
   status: ApexMatchStatus;
   score: ApexScore;
   venue: ApexVenue | null;
+  referee?: string | null;
+  attendance?: number | null;
+  weather?: string | null;
   minute: number | null;
   externalRefs: ExternalRef[];
   /** ISO timestamps for lineage. */

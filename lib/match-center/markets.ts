@@ -45,9 +45,33 @@ function selectionProbability(
   return null;
 }
 
+function selectionKey(row: MatchCenterOddsRow): string {
+  return `${row.market}:${row.marketLabel}:${row.selection.toLowerCase()}`;
+}
+
+function markBestOdds(rows: MatchCenterOddsRow[]): MatchCenterOddsRow[] {
+  const best = new Map<string, number>();
+  for (const row of rows) {
+    if (row.decimalOdds == null || !Number.isFinite(row.decimalOdds)) continue;
+    const key = selectionKey(row);
+    const current = best.get(key);
+    if (current == null || row.decimalOdds > current) {
+      best.set(key, row.decimalOdds);
+    }
+  }
+  return rows.map((row) => ({
+    ...row,
+    isBest:
+      row.decimalOdds != null &&
+      Number.isFinite(row.decimalOdds) &&
+      best.get(selectionKey(row)) === row.decimalOdds,
+  }));
+}
+
 /**
  * Join catalogue odds with model probabilities to produce EV rows.
  * Skips markets the engine does not price (e.g. O/U lines other than 2.5).
+ * Marks the highest decimal price per selection across bookmakers.
  */
 export function buildOddsEvRows(input: {
   quotes: ApexOddsQuote[];
@@ -58,6 +82,11 @@ export function buildOddsEvRows(input: {
   const rows: MatchCenterOddsRow[] = [];
 
   for (const quote of input.quotes) {
+    if (quote.market === "over_under" && quote.line != null && quote.line !== 2.5) {
+      continue;
+    }
+    if (quote.market === "other") continue;
+
     for (const selection of quote.selections) {
       const modelProbability = selectionProbability(
         quote,
@@ -81,11 +110,46 @@ export function buildOddsEvRows(input: {
             ? null
             : expectedValue(modelProbability, decimalOdds),
         bookmaker: quote.bookmaker,
+        isBest: false,
       });
     }
   }
 
-  return rows;
+  return markBestOdds(rows);
+}
+
+export type PreMatchOddsBoard = {
+  oneXTwo: MatchCenterOddsRow[];
+  overUnder25: MatchCenterOddsRow[];
+  btts: MatchCenterOddsRow[];
+  bookmakerCount: number;
+};
+
+function pickBest(
+  rows: MatchCenterOddsRow[],
+  market: MatchCenterOddsRow["market"],
+  keys: string[],
+): MatchCenterOddsRow[] {
+  const best = rows.filter((row) => row.market === market && row.isBest);
+  return keys.flatMap((key) => {
+    const match = best.find((row) => row.selection.toLowerCase() === key);
+    return match ? [match] : [];
+  });
+}
+
+/**
+ * Compact board: best available price per 1X2 / O/U 2.5 / BTTS selection.
+ */
+export function preMatchOddsBoard(rows: MatchCenterOddsRow[]): PreMatchOddsBoard {
+  const bookmakers = new Set(
+    rows.map((row) => row.bookmaker).filter((name): name is string => Boolean(name)),
+  );
+  return {
+    oneXTwo: pickBest(rows, "1x2", ["home", "draw", "away"]),
+    overUnder25: pickBest(rows, "over_under", ["over", "under"]),
+    btts: pickBest(rows, "btts", ["yes", "no"]),
+    bookmakerCount: bookmakers.size,
+  };
 }
 
 function marketLabel(quote: ApexOddsQuote): string {

@@ -1,4 +1,5 @@
 import { Card, CardHeader } from "@/components/design-system/card";
+import { TeamLogo } from "@/components/design-system/team-logo";
 import type {
   DashboardLeagueSummary,
   DashboardTeamSummary,
@@ -62,18 +63,13 @@ export function DashboardFeaturedTeams({ teams }: DashboardFeaturedTeamsProps) {
               key={team.id}
               className="flex items-center gap-3 rounded-[var(--apex-radius-md)] border border-[var(--apex-border)] bg-[var(--apex-surface-muted)]/40 px-3 py-2"
             >
-              {team.crestUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={team.crestUrl}
-                  alt=""
-                  className="h-8 w-8 rounded-full bg-slate-800 object-contain"
-                />
-              ) : (
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--apex-accent-muted)] text-[10px] font-semibold text-[var(--apex-accent)]">
-                  {(team.shortName ?? team.name).slice(0, 3).toUpperCase()}
-                </span>
-              )}
+              <TeamLogo
+                src={team.crestUrl}
+                name={team.name}
+                shortName={team.shortName}
+                size="md"
+                rounded="full"
+              />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-[var(--apex-fg)]">
                   {team.name}

@@ -32,6 +32,15 @@ export type ApiFootballTeam = {
   winner?: boolean | null;
 };
 
+export type ApiFootballWeather = {
+  temp?: number | string | null;
+  temperature?: number | string | null;
+  condition?: string | null;
+  description?: string | null;
+  humidity?: number | string | null;
+  wind?: number | string | null;
+};
+
 export type ApiFootballFixtureItem = {
   fixture: {
     id: number;
@@ -39,6 +48,8 @@ export type ApiFootballFixtureItem = {
     timezone?: string;
     date: string;
     timestamp?: number;
+    attendance?: number | null;
+    weather?: string | ApiFootballWeather | null;
     venue?: {
       id?: number | null;
       name?: string | null;
@@ -237,6 +248,20 @@ export type ApiFootballStandingsResponse =
 export type ApiFootballLineupsResponse =
   ApiFootballListResponse<ApiFootballLineup>;
 
+/** GET /fixtures/statistics */
+export type ApiFootballFixtureStatisticRow = {
+  type: string;
+  value: number | string | null;
+};
+
+export type ApiFootballFixtureStatisticsItem = {
+  team: { id: number; name: string; logo?: string | null };
+  statistics: ApiFootballFixtureStatisticRow[];
+};
+
+export type ApiFootballFixtureStatisticsResponse =
+  ApiFootballListResponse<ApiFootballFixtureStatisticsItem>;
+
 /** GET /players */
 export type ApiFootballPlayerDetails = {
   player: {
@@ -335,6 +360,8 @@ export type ApiFootballTeamStatistics = {
       average?: { home: string; away: string; total: string };
     };
   };
+  clean_sheet?: { home: number; away: number; total: number };
+  failed_to_score?: { home: number; away: number; total: number };
 };
 
 export type ApiFootballTeamStatisticsResponse = {

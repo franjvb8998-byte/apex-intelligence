@@ -28,6 +28,11 @@ export function matchCenterHref(fixtureId: string): string {
   return `/match-center/${encodeURIComponent(id)}`;
 }
 
+export function matchAnalysisHref(fixtureId: string): string {
+  const id = vendorFixtureId(fixtureId) ?? fixtureId.trim();
+  return `/match-analysis/${encodeURIComponent(id)}`;
+}
+
 export function firstSearchParam(
   value: string | string[] | undefined,
 ): string | undefined {

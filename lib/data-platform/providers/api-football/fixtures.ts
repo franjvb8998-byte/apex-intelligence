@@ -5,6 +5,7 @@
 
 import {
   createRecordedApiFootballFixturesResponse,
+  createRecordedApiFootballOddsResponse,
   RECORDED_API_FOOTBALL_FIXTURE_ID,
 } from "@/lib/data-platform/providers/api-football/recorded-fixture";
 import type {
@@ -18,6 +19,7 @@ import type {
 
 export {
   createRecordedApiFootballFixturesResponse,
+  createRecordedApiFootballOddsResponse,
   RECORDED_API_FOOTBALL_FIXTURE_ID,
 };
 
@@ -266,6 +268,8 @@ export function createRecordedApiFootballTeamStatisticsResponse(
           average: { home: "0.6", away: "0.9", total: "0.8" },
         },
       },
+      clean_sheet: { home: 12, away: 6, total: 18 },
+      failed_to_score: { home: 2, away: 4, total: 6 },
     },
   };
 }

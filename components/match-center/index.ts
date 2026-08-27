@@ -13,4 +13,8 @@ export { RecommendationCard } from "@/components/match-center/recommendation-car
 export { OddsEvCard } from "@/components/match-center/odds-ev-card";
 export { TeamFormCard } from "@/components/match-center/team-form-card";
 export { HeadToHeadCard } from "@/components/match-center/head-to-head-card";
-export { InjuriesCard } from "@/components/match-center/injuries-card";
+export { MatchBriefingCard } from "@/components/match-center/match-briefing-card";
+export { LeagueStandingsCard } from "@/components/match-center/league-standings-card";
+export { TeamTrendsCard } from "@/components/match-center/team-trends-card";
+export { InjuriesCard, SuspensionsCard } from "@/components/match-center/injuries-card";
+export { LineupsCard } from "@/components/match-center/lineups-card";

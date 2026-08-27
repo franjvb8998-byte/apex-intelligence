@@ -6,7 +6,11 @@
  * External id: {@link RECORDED_API_FOOTBALL_FIXTURE_ID}
  */
 
-import type { ApiFootballFixturesResponse } from "@/lib/data-platform/providers/api-football/types";
+import type {
+  ApiFootballFixturesResponse,
+  ApiFootballOddsBookmaker,
+  ApiFootballOddsResponse,
+} from "@/lib/data-platform/providers/api-football/types";
 
 /** Default demo fixture id for Match Center + offline mode. */
 export const RECORDED_API_FOOTBALL_FIXTURE_ID = "1035089";
@@ -152,6 +156,103 @@ export function createRecordedApiFootballFixturesResponse(): ApiFootballFixtures
             substitutes: [],
           },
         ],
+      },
+    ],
+  };
+}
+
+function recordedBookmaker(
+  id: number,
+  name: string,
+  odds: {
+    home: string;
+    draw: string;
+    away: string;
+    over: string;
+    under: string;
+    bttsYes: string;
+    bttsNo: string;
+  },
+): ApiFootballOddsBookmaker {
+  return {
+    id,
+    name,
+    bets: [
+      {
+        id: 1,
+        name: "Match Winner",
+        values: [
+          { value: "Home", odd: odds.home },
+          { value: "Draw", odd: odds.draw },
+          { value: "Away", odd: odds.away },
+        ],
+      },
+      {
+        id: 5,
+        name: "Goals Over/Under",
+        values: [
+          { value: "Over 2.5", odd: odds.over },
+          { value: "Under 2.5", odd: odds.under },
+        ],
+      },
+      {
+        id: 8,
+        name: "Both Teams Score",
+        values: [
+          { value: "Yes", odd: odds.bttsYes },
+          { value: "No", odd: odds.bttsNo },
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * Recorded GET /odds payload for the Arsenal–Chelsea sample.
+ * Multiple bookmakers so Match Center can highlight the best available price.
+ */
+export function createRecordedApiFootballOddsResponse(): ApiFootballOddsResponse {
+  const bookmakers = [
+    recordedBookmaker(8, "Bet365", {
+      home: "1.65",
+      draw: "4.20",
+      away: "5.00",
+      over: "1.72",
+      under: "2.10",
+      bttsYes: "1.66",
+      bttsNo: "2.20",
+    }),
+    recordedBookmaker(11, "1xBet", {
+      home: "1.70",
+      draw: "4.10",
+      away: "5.20",
+      over: "1.80",
+      under: "2.00",
+      bttsYes: "1.72",
+      bttsNo: "2.15",
+    }),
+    recordedBookmaker(4, "Pinnacle", {
+      home: "1.68",
+      draw: "4.33",
+      away: "5.10",
+      over: "1.75",
+      under: "2.20",
+      bttsYes: "1.70",
+      bttsNo: "2.30",
+    }),
+  ];
+
+  return {
+    get: "odds",
+    parameters: { fixture: RECORDED_API_FOOTBALL_FIXTURE_ID },
+    errors: [],
+    results: 1,
+    paging: { current: 1, total: 1 },
+    response: [
+      {
+        league: { id: 39, name: "Premier League" },
+        fixture: { id: Number(RECORDED_API_FOOTBALL_FIXTURE_ID) },
+        bookmakers,
       },
     ],
   };

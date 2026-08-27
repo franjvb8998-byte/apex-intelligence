@@ -27,8 +27,23 @@ export type MatchAnalysisTeamStatSnapshot = {
   losses?: number;
   goalsFor?: number | null;
   goalsAgainst?: number | null;
+  goalsForAverage?: number | null;
+  goalsAgainstAverage?: number | null;
+  cleanSheets?: number | null;
+  failedToScore?: number | null;
   played?: number;
   teamName?: string;
+  homeSplit?: MatchAnalysisVenueSplit | null;
+  awaySplit?: MatchAnalysisVenueSplit | null;
+};
+
+export type MatchAnalysisVenueSplit = {
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number | null;
+  goalsAgainst: number | null;
 };
 
 export type MatchAnalysisTeamStats = {

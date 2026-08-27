@@ -9,13 +9,20 @@ import {
 } from "@/components/design-system";
 import { ExplanationPanel as DsExplanationPanel } from "@/components/design-system";
 import { HeadToHeadCard } from "@/components/match-center/head-to-head-card";
-import { InjuriesCard } from "@/components/match-center/injuries-card";
+import { InjuriesCard, SuspensionsCard } from "@/components/match-center/injuries-card";
+import { LeagueStandingsCard } from "@/components/match-center/league-standings-card";
+import { LineupsCard } from "@/components/match-center/lineups-card";
+import { MatchBriefingCard } from "@/components/match-center/match-briefing-card";
 import { OddsEvCard } from "@/components/match-center/odds-ev-card";
 import { RecommendationCard } from "@/components/match-center/recommendation-card";
 import { TeamFormCard } from "@/components/match-center/team-form-card";
+import { TeamTrendsCard } from "@/components/match-center/team-trends-card";
 import { KeyFactors } from "@/components/match-analysis/key-factors";
 import { RisksPanel } from "@/components/match-analysis/risks-panel";
-import type { MatchCenterPreviewData } from "@/lib/match-center/types";
+import type {
+  MatchCenterMeta,
+  MatchCenterPreviewData,
+} from "@/lib/match-center/types";
 
 const outcomeLabel = {
   home: "Victoria local",
@@ -31,13 +38,14 @@ const confidenceLabel = {
 
 type PreviewPhaseProps = {
   data: MatchCenterPreviewData;
+  match: MatchCenterMeta;
 };
 
 /**
  * Match Center Preview — dashboard profesional pre-partido.
  * Probabilities from Probability Engine; odds/form/H2H/injuries from Data Platform.
  */
-export function PreviewPhase({ data }: PreviewPhaseProps) {
+export function PreviewPhase({ data, match }: PreviewPhaseProps) {
   const { analysis, hybrid, dashboard } = data;
   const lead =
     analysis.predictedOutcome === "home"
@@ -53,6 +61,8 @@ export function PreviewPhase({ data }: PreviewPhaseProps) {
         <Badge>PE · {hybrid.modelVersion}</Badge>
         {data.source === "mock" && <Badge tone="warning">Elo estimado</Badge>}
       </div>
+
+      <MatchBriefingCard match={match} />
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-6 lg:col-span-3">
@@ -186,12 +196,33 @@ export function PreviewPhase({ data }: PreviewPhaseProps) {
         </div>
       </div>
 
+      <LeagueStandingsCard
+        home={dashboard.standings.home}
+        away={dashboard.standings.away}
+        leagueName={match.leagueName}
+      />
+
       <div className="grid gap-6 lg:grid-cols-2">
         <TeamFormCard home={dashboard.form.home} away={dashboard.form.away} />
         <HeadToHeadCard meetings={dashboard.h2h} />
       </div>
 
-      <InjuriesCard injuries={dashboard.injuries} />
+      <TeamTrendsCard
+        homeName={match.homeTeam.name}
+        awayName={match.awayTeam.name}
+        home={dashboard.trends.home}
+        away={dashboard.trends.away}
+      />
+
+      <LineupsCard
+        home={dashboard.lineups?.home ?? null}
+        away={dashboard.lineups?.away ?? null}
+      />
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <InjuriesCard injuries={dashboard.injuries ?? []} />
+        <SuspensionsCard suspensions={dashboard.suspensions ?? []} />
+      </div>
     </div>
   );
 }

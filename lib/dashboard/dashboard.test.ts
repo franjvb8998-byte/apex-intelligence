@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MockDataProvider } from "@/lib/data-platform/mock-provider";
 import { ApiFootballDataProvider } from "@/lib/data-platform/providers/api-football/api-football-provider";
 import { getDashboardData, loadDashboardWorkspace } from "@/lib/dashboard/load";
+import { ApiFootballError } from "@/lib/data-platform/providers/api-football/errors";
 import {
   hasFootballApiKey,
   resolveDashboardProvider,
@@ -79,6 +80,20 @@ describe("Dashboard data loader", () => {
     expect(data.leagues.some((l) => l.name === "Premier League")).toBe(true);
     expect(data.featuredTeams.some((t) => t.name === "Arsenal")).toBe(true);
     expect(data.featuredMatchId).toBeTruthy();
+    const arsenal = data.featuredTeams.find((t) => t.name === "Arsenal");
+    expect(arsenal?.crestUrl).toContain("media.api-sports.io/football/teams/42");
+    expect(
+      data.todayMatches.some(
+        (match) =>
+          match.homeTeam.logoUrl?.includes("/teams/42.png") &&
+          match.awayTeam.logoUrl?.includes("/teams/49.png"),
+      ) ||
+        data.upcomingMatches.some(
+          (match) =>
+            match.homeTeam.logoUrl?.includes("/teams/42.png") &&
+            match.awayTeam.logoUrl?.includes("/teams/49.png"),
+        ),
+    ).toBe(true);
   });
 });
 
@@ -99,8 +114,8 @@ describe("Dashboard map helpers", () => {
           kickoffAt: "2026-08-20T18:00:00.000Z",
           status: "scheduled",
           leagueName: null,
-          homeTeam: { id: "h", name: "H", shortName: "H" },
-          awayTeam: { id: "a", name: "A", shortName: "A" },
+          homeTeam: { id: "h", name: "H", shortName: "H", logoUrl: null },
+          awayTeam: { id: "a", name: "A", shortName: "A", logoUrl: null },
           score: { home: null, away: null },
         },
         new Date("2026-08-12T12:00:00.000Z"),
@@ -115,8 +130,8 @@ describe("Dashboard map helpers", () => {
           kickoffAt: "2024-01-01T18:00:00.000Z",
           status: "finished",
           leagueName: null,
-          homeTeam: { id: "h", name: "H", shortName: "H" },
-          awayTeam: { id: "a", name: "A", shortName: "A" },
+          homeTeam: { id: "h", name: "H", shortName: "H", logoUrl: null },
+          awayTeam: { id: "a", name: "A", shortName: "A", logoUrl: null },
           score: { home: 1, away: 0 },
         },
         new Date("2026-08-12T12:00:00.000Z"),
@@ -138,7 +153,7 @@ describe("Dashboard workspace", () => {
       },
     };
 
-    const { dashboard } = await loadDashboardWorkspace({
+    const { dashboard, quotaExhausted } = await loadDashboardWorkspace({
       provider,
       env: {},
       today: "2026-08-15",
@@ -147,5 +162,35 @@ describe("Dashboard workspace", () => {
 
     expect(dashboard.todayMatches).toEqual([]);
     expect(dashboard.system.displayName).toBe("Broken");
+    expect(quotaExhausted).toBe(false);
+  });
+
+  it("flags API-Football quota exhaustion instead of crashing", async () => {
+    const quota = new ApiFootballError({
+      message: "You have reached the request limit for the day",
+      code: "rate_limited",
+      status: 429,
+    });
+    const provider = {
+      id: "api-football" as const,
+      displayName: "API-Football",
+      async getMatch() {
+        throw quota;
+      },
+      async listFixtures() {
+        throw quota;
+      },
+    };
+
+    const result = await loadDashboardWorkspace({
+      provider,
+      env: { API_FOOTBALL_KEY: "test-key" },
+      today: "2026-08-15",
+      now: new Date("2026-08-12T12:00:00.000Z"),
+    });
+
+    expect(result.quotaExhausted).toBe(true);
+    expect(result.dashboard.todayMatches).toEqual([]);
+    expect(result.matchCenter).toBeNull();
   });
 });

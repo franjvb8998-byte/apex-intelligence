@@ -40,7 +40,9 @@ export function MatchCenterView({
       <MatchCenterHeader match={data.match} phase={phase} />
       <PhaseTabs active={phase} onChange={setPhase} />
 
-      {phase === "preview" && <PreviewPhase data={data.preview} />}
+      {phase === "preview" && (
+        <PreviewPhase data={data.preview} match={data.match} />
+      )}
       {phase === "live" && <LivePhase data={data.live} />}
       {phase === "post" && (
         <PostPhase

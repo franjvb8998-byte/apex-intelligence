@@ -1,6 +1,7 @@
 import {
   Badge,
   Card,
+  TeamLogo,
 } from "@/components/design-system";
 import type { MatchCenterMeta, MatchCenterPhase } from "@/lib/match-center/types";
 
@@ -80,10 +81,35 @@ export function MatchCenterHeader({
             {match.leagueName}
             <span className="mx-2 text-[var(--apex-fg-subtle)]">·</span>
             {formatKickoff(match.kickoffAt)}
+            {match.venue?.name ? (
+              <>
+                <span className="mx-2 text-[var(--apex-fg-subtle)]">·</span>
+                {match.venue.name}
+                {match.venue.city ? `, ${match.venue.city}` : ""}
+              </>
+            ) : null}
+            {match.referee ? (
+              <>
+                <span className="mx-2 text-[var(--apex-fg-subtle)]">·</span>
+                Árbitro {match.referee}
+              </>
+            ) : null}
           </p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+          <h1 className="mt-2 flex flex-wrap items-center gap-3 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+            <TeamLogo
+              src={match.homeTeam.logoUrl}
+              name={match.homeTeam.name}
+              shortName={match.homeTeam.shortName}
+              size="md"
+            />
             {match.homeTeam.name}{" "}
             <span className="text-[var(--apex-fg-subtle)]">vs</span>{" "}
+            <TeamLogo
+              src={match.awayTeam.logoUrl}
+              name={match.awayTeam.name}
+              shortName={match.awayTeam.shortName}
+              size="md"
+            />
             {match.awayTeam.name}
           </h1>
           <p className="mt-2 text-sm text-[var(--apex-fg-muted)]">
@@ -97,6 +123,7 @@ export function MatchCenterHeader({
         <TeamCell
           short={match.homeTeam.shortName}
           name={match.homeTeam.name}
+          logoUrl={match.homeTeam.logoUrl}
           align="start"
         />
         <div className="text-center">
@@ -107,6 +134,7 @@ export function MatchCenterHeader({
         <TeamCell
           short={match.awayTeam.shortName}
           name={match.awayTeam.name}
+          logoUrl={match.awayTeam.logoUrl}
           align="end"
         />
       </Card>
@@ -117,10 +145,12 @@ export function MatchCenterHeader({
 function TeamCell({
   short,
   name,
+  logoUrl,
   align,
 }: {
   short: string;
   name: string;
+  logoUrl: string | null;
   align: "start" | "end";
 }) {
   return (
@@ -131,9 +161,7 @@ function TeamCell({
           : "flex flex-col items-end gap-1 text-right"
       }
     >
-      <span className="flex h-11 w-11 items-center justify-center rounded-[var(--apex-radius-xl)] border border-[var(--apex-border)] bg-slate-950/50 font-mono text-sm font-bold text-[var(--apex-accent)]">
-        {short}
-      </span>
+      <TeamLogo src={logoUrl} name={name} shortName={short} size="lg" />
       <span className="hidden text-xs text-[var(--apex-fg-muted)] sm:block">
         {name}
       </span>

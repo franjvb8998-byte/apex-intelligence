@@ -44,11 +44,13 @@ export function matchSummaryFromBundle(
       id: home?.id ?? "unknown-home",
       name: home?.name ?? "Local",
       shortName: home?.shortName ?? null,
+      logoUrl: home?.crestUrl ?? null,
     },
     awayTeam: {
       id: away?.id ?? "unknown-away",
       name: away?.name ?? "Visitante",
       shortName: away?.shortName ?? null,
+      logoUrl: away?.crestUrl ?? null,
     },
     score: {
       home: match?.score?.home ?? null,

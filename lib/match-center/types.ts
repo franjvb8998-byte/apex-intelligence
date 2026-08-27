@@ -15,10 +15,7 @@ import type {
 } from "@/lib/intelligence/types";
 import type { TeamEloInput } from "@/lib/intelligence/modules/probability";
 import type { BothTeamsToScoreProbability } from "@/lib/intelligence/modules/probability";
-import type {
-  MatchAnalysis,
-  MatchAnalysisInjury,
-} from "@/lib/match-analysis/analysis-types";
+import type { MatchAnalysis } from "@/lib/match-analysis/analysis-types";
 import type { MatchAnalysisData } from "@/lib/match-analysis/types";
 import type {
   Recommendation,
@@ -32,6 +29,13 @@ export type MatchCenterTeam = {
   id: UUID;
   name: string;
   shortName: string;
+  logoUrl: string | null;
+};
+
+export type MatchCenterVenue = {
+  name: string | null;
+  city: string | null;
+  country: string | null;
 };
 
 export type MatchCenterMeta = {
@@ -44,6 +48,10 @@ export type MatchCenterMeta = {
   status: "scheduled" | "live" | "finished";
   homeTeam: MatchCenterTeam;
   awayTeam: MatchCenterTeam;
+  venue: MatchCenterVenue | null;
+  referee: string | null;
+  attendance: number | null;
+  weather: string | null;
   /** Provenance until Data Platform / Core wiring exists. */
   source: "mock" | "data-platform" | "intelligence-core";
   /** Human label of the IDataProvider (mock, API-Football, …). */
@@ -65,6 +73,8 @@ export type MatchCenterOddsRow = {
   modelProbability: number | null;
   expectedValue: number | null;
   bookmaker: string | null;
+  /** Highest decimal price among bookmakers for this selection. */
+  isBest: boolean;
 };
 
 export type MatchCenterFormSide = {
@@ -77,6 +87,17 @@ export type MatchCenterFormSide = {
   losses: number | null;
   goalsFor: number | null;
   goalsAgainst: number | null;
+  recentMatches: MatchCenterRecentMatch[];
+};
+
+export type MatchCenterRecentMatch = {
+  id: string;
+  kickoffAt: string;
+  opponentName: string;
+  home: boolean;
+  goalsFor: number | null;
+  goalsAgainst: number | null;
+  result: "W" | "D" | "L" | null;
 };
 
 export type MatchCenterH2HMeeting = {
@@ -88,6 +109,58 @@ export type MatchCenterH2HMeeting = {
   awayGoals: number | null;
 };
 
+export type MatchCenterStanding = {
+  teamId: string;
+  teamName: string;
+  rank: number;
+  points: number;
+  played: number | null;
+  wins: number | null;
+  draws: number | null;
+  losses: number | null;
+  goalsFor: number | null;
+  goalsAgainst: number | null;
+  goalsDiff: number | null;
+  form: string | null;
+};
+
+export type MatchCenterTeamTrends = {
+  /** Matches used for last-5 rates (BTTS / O/U / recent averages). */
+  recentSample: number;
+  goalsScoredAvg: number | null;
+  goalsConcededAvg: number | null;
+  seasonGoalsScoredAvg: number | null;
+  seasonGoalsConcededAvg: number | null;
+  cleanSheets: number | null;
+  seasonCleanSheets: number | null;
+  cleanSheetPct: number | null;
+  bttsPct: number | null;
+  over25Pct: number | null;
+};
+
+export type MatchCenterAbsence = {
+  id: string;
+  playerName: string;
+  teamId: string | null;
+  teamName: string | null;
+  detail: string;
+};
+
+export type MatchCenterLineupPlayer = {
+  id: string;
+  name: string;
+  number: number | null;
+  position: string | null;
+};
+
+export type MatchCenterLineup = {
+  teamId: string;
+  teamName: string;
+  formation: string | null;
+  startXI: MatchCenterLineupPlayer[];
+  substitutes: MatchCenterLineupPlayer[];
+};
+
 export type MatchCenterPreviewDashboard = {
   btts: BothTeamsToScoreProbability;
   odds: MatchCenterOddsRow[];
@@ -96,7 +169,20 @@ export type MatchCenterPreviewDashboard = {
     away: MatchCenterFormSide | null;
   };
   h2h: MatchCenterH2HMeeting[];
-  injuries: MatchAnalysisInjury[];
+  standings: {
+    home: MatchCenterStanding | null;
+    away: MatchCenterStanding | null;
+  };
+  trends: {
+    home: MatchCenterTeamTrends | null;
+    away: MatchCenterTeamTrends | null;
+  };
+  injuries: MatchCenterAbsence[];
+  suspensions: MatchCenterAbsence[];
+  lineups: {
+    home: MatchCenterLineup | null;
+    away: MatchCenterLineup | null;
+  };
   recommendation: Recommendation;
   valueBet: ValueOpportunity | null;
 };
@@ -118,6 +204,10 @@ export type MatchCenterPreviewData = {
 /** In-play (Live) payload — APEX Vision state, ready for realtime swap. */
 export type MatchCenterLiveData = {
   vision: VisionLiveState;
+  lineups: {
+    home: MatchCenterLineup | null;
+    away: MatchCenterLineup | null;
+  };
   source: "mock" | "realtime" | "data-platform";
 };
 

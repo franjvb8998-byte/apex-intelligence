@@ -107,23 +107,36 @@ function decimalFor(
   return null;
 }
 
+function bestDecimalAmong(
+  quotes: ApexMatchBundle["odds"],
+  keys: string[],
+): number | null {
+  let best: number | null = null;
+  for (const quote of quotes) {
+    const value = decimalFor(quote, keys);
+    if (value == null) continue;
+    if (best == null || value > best) best = value;
+  }
+  return best;
+}
+
 function extractOdds(
   bundle: ApexMatchBundle,
 ): MatchAnalysisInput["marketOdds"] | undefined {
-  const oneXTwo = bundle.odds.find((o) => o.market === "1x2");
-  const overUnder = bundle.odds.find(
+  const oneXTwo = bundle.odds.filter((o) => o.market === "1x2");
+  const overUnder = bundle.odds.filter(
     (o) => o.market === "over_under" && (o.line == null || o.line === 2.5),
   );
-  const btts = bundle.odds.find((o) => o.market === "btts");
-  if (!oneXTwo && !overUnder && !btts) return undefined;
+  const btts = bundle.odds.filter((o) => o.market === "btts");
+  if (!oneXTwo.length && !overUnder.length && !btts.length) return undefined;
 
   return {
-    home: decimalFor(oneXTwo, ["home", "1"]),
-    draw: decimalFor(oneXTwo, ["draw", "x"]),
-    away: decimalFor(oneXTwo, ["away", "2"]),
-    over25: decimalFor(overUnder, ["over"]),
-    under25: decimalFor(overUnder, ["under"]),
-    bttsYes: decimalFor(btts, ["yes", "si", "sí"]),
-    bttsNo: decimalFor(btts, ["no"]),
+    home: bestDecimalAmong(oneXTwo, ["home", "1"]),
+    draw: bestDecimalAmong(oneXTwo, ["draw", "x"]),
+    away: bestDecimalAmong(oneXTwo, ["away", "2"]),
+    over25: bestDecimalAmong(overUnder, ["over"]),
+    under25: bestDecimalAmong(overUnder, ["under"]),
+    bttsYes: bestDecimalAmong(btts, ["yes", "si", "sí"]),
+    bttsNo: bestDecimalAmong(btts, ["no"]),
   };
 }

@@ -21,8 +21,18 @@ export type DashboardMatchSummary = {
   kickoffAt: string;
   status: DashboardMatchStatus;
   leagueName: string | null;
-  homeTeam: { id: string; name: string; shortName: string | null };
-  awayTeam: { id: string; name: string; shortName: string | null };
+  homeTeam: {
+    id: string;
+    name: string;
+    shortName: string | null;
+    logoUrl: string | null;
+  };
+  awayTeam: {
+    id: string;
+    name: string;
+    shortName: string | null;
+    logoUrl: string | null;
+  };
   score: { home: number | null; away: number | null };
 };
 

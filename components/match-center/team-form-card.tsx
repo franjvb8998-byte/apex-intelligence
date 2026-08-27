@@ -1,5 +1,14 @@
 import { Card, CardHeader } from "@/components/design-system";
-import type { MatchCenterFormSide } from "@/lib/match-center/types";
+import type { MatchCenterFormSide, MatchCenterRecentMatch } from "@/lib/match-center/types";
+
+function formatDate(iso: string): string {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return "";
+  return new Date(ms).toLocaleDateString("es-ES", {
+    day: "numeric",
+    month: "short",
+  });
+}
 
 function FormLetters({ form }: { form: string }) {
   return (
@@ -26,6 +35,47 @@ function FormLetters({ form }: { form: string }) {
   );
 }
 
+function resultTone(result: MatchCenterRecentMatch["result"]): string {
+  if (result === "W") return "text-[var(--apex-accent)]";
+  if (result === "L") return "text-[var(--apex-danger)]";
+  if (result === "D") return "text-[var(--apex-fg-muted)]";
+  return "text-[var(--apex-fg-subtle)]";
+}
+
+function RecentMatches({ matches }: { matches: MatchCenterRecentMatch[] }) {
+  if (matches.length === 0) {
+    return (
+      <p className="text-xs text-[var(--apex-fg-subtle)]">
+        Sin últimos partidos en el catálogo.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="space-y-1.5">
+      {matches.map((match) => (
+        <li
+          key={match.id}
+          className="flex items-center justify-between gap-2 text-xs"
+        >
+          <span className="min-w-0 truncate text-[var(--apex-fg-muted)]">
+            <span className="mr-1.5 text-[var(--apex-fg-subtle)]">
+              {formatDate(match.kickoffAt)}
+            </span>
+            {match.home ? "L" : "V"} vs {match.opponentName}
+          </span>
+          <span className="shrink-0 font-mono tabular-nums text-[var(--apex-fg)]">
+            {match.goalsFor ?? "—"}–{match.goalsAgainst ?? "—"}
+            <span className={`ml-2 font-semibold ${resultTone(match.result)}`}>
+              {match.result ?? "—"}
+            </span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function SideStats({ side }: { side: MatchCenterFormSide }) {
   return (
     <div className="space-y-3">
@@ -35,6 +85,7 @@ function SideStats({ side }: { side: MatchCenterFormSide }) {
       ) : (
         <p className="text-xs text-[var(--apex-fg-subtle)]">Sin serie de forma</p>
       )}
+      <RecentMatches matches={side.recentMatches ?? []} />
       <dl className="grid grid-cols-3 gap-2 text-center">
         <Stat label="PJ" value={side.played} />
         <Stat label="GF" value={side.goalsFor} />
@@ -70,8 +121,8 @@ export function TeamFormCard({ home, away }: TeamFormCardProps) {
   return (
     <Card>
       <CardHeader
-        title="Forma y estadísticas"
-        description="Temporada actual del catálogo (no es un overlay simulado)"
+        title="Últimos 5 partidos"
+        description="Forma reciente y estadísticas de temporada del catálogo"
       />
       {empty ? (
         <p className="text-sm text-[var(--apex-fg-muted)]">

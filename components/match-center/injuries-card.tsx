@@ -1,36 +1,66 @@
 import { Card, CardHeader } from "@/components/design-system";
-import type { MatchAnalysisInjury } from "@/lib/match-analysis/analysis-types";
+import type { MatchCenterAbsence } from "@/lib/match-center/types";
 
-type InjuriesCardProps = {
-  injuries: MatchAnalysisInjury[];
+type AbsenceCardProps = {
+  title: string;
+  description: string;
+  empty: string;
+  items: MatchCenterAbsence[];
 };
 
-export function InjuriesCard({ injuries }: InjuriesCardProps) {
+function AbsenceCard({ title, description, empty, items }: AbsenceCardProps) {
   return (
     <Card>
-      <CardHeader
-        title="Lesiones"
-        description="Bajas reportadas por el catálogo, si existen"
-      />
-      {injuries.length === 0 ? (
-        <p className="text-sm text-[var(--apex-fg-muted)]">
-          Sin lesiones reportadas para este partido.
-        </p>
+      <CardHeader title={title} description={description} />
+      {items.length === 0 ? (
+        <p className="text-sm text-[var(--apex-fg-muted)]">{empty}</p>
       ) : (
         <ul className="space-y-2">
-          {injuries.map((injury) => (
-            <li key={injury.id} className="text-sm">
+          {items.map((item) => (
+            <li key={item.id} className="text-sm">
               <span className="font-medium text-[var(--apex-warning)]">
-                {injury.playerName}
+                {item.playerName}
               </span>
+              {item.teamName ? (
+                <span className="text-[var(--apex-fg-subtle)]">
+                  {" "}
+                  · {item.teamName}
+                </span>
+              ) : null}
               <span className="text-[var(--apex-fg-muted)]">
                 {" "}
-                · {injury.detail}
+                · {item.detail}
               </span>
             </li>
           ))}
         </ul>
       )}
     </Card>
+  );
+}
+
+export function InjuriesCard({ injuries }: { injuries: MatchCenterAbsence[] }) {
+  return (
+    <AbsenceCard
+      title="Lesiones"
+      description="Bajas reportadas por el catálogo, si existen"
+      empty="Sin lesiones reportadas para este partido."
+      items={injuries}
+    />
+  );
+}
+
+export function SuspensionsCard({
+  suspensions,
+}: {
+  suspensions: MatchCenterAbsence[];
+}) {
+  return (
+    <AbsenceCard
+      title="Suspensiones"
+      description="Sanciones y bajas disciplinarias del catálogo"
+      empty="Sin suspensiones reportadas para este partido."
+      items={suspensions}
+    />
   );
 }

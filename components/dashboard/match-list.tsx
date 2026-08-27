@@ -2,6 +2,7 @@ import Link from "next/link";
 import { EmptyState } from "@/components/app-shell/states";
 import { Badge } from "@/components/design-system/badge";
 import { Card, CardHeader } from "@/components/design-system/card";
+import { TeamLogo } from "@/components/design-system/team-logo";
 import type {
   DashboardMatchStatus,
   DashboardMatchSummary,
@@ -67,6 +68,7 @@ type MatchListSectionProps = {
   matches: DashboardMatchSummary[];
   emptyLabel: string;
   selectedFixtureId?: string | null;
+  hrefForFixture?: (fixtureId: string) => string;
 };
 
 export function DashboardMatchList({
@@ -75,6 +77,7 @@ export function DashboardMatchList({
   matches,
   emptyLabel,
   selectedFixtureId,
+  hrefForFixture = matchCenterHref,
 }: MatchListSectionProps) {
   return (
     <Card padding="md">
@@ -85,7 +88,7 @@ export function DashboardMatchList({
         <ul className="divide-y divide-[var(--apex-border)]">
           {matches.map((match) => {
             const fixtureId = fixtureIdFromMatch(match);
-            const href = fixtureId ? matchCenterHref(fixtureId) : null;
+            const href = fixtureId ? hrefForFixture(fixtureId) : null;
             const selected = matchesFixtureId(match, selectedFixtureId);
             return (
               <li
@@ -98,12 +101,24 @@ export function DashboardMatchList({
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-[var(--apex-fg)]">
-                      {match.homeTeam.name}{" "}
-                      <span className="text-[var(--apex-fg-subtle)]">
+                    <p className="flex items-center gap-2 text-sm font-medium text-[var(--apex-fg)]">
+                      <TeamLogo
+                        src={match.homeTeam.logoUrl}
+                        name={match.homeTeam.name}
+                        shortName={match.homeTeam.shortName}
+                        size="sm"
+                      />
+                      <span className="min-w-0 truncate">{match.homeTeam.name}</span>
+                      <span className="shrink-0 text-[var(--apex-fg-subtle)]">
                         {scoreLine(match)}
-                      </span>{" "}
-                      {match.awayTeam.name}
+                      </span>
+                      <TeamLogo
+                        src={match.awayTeam.logoUrl}
+                        name={match.awayTeam.name}
+                        shortName={match.awayTeam.shortName}
+                        size="sm"
+                      />
+                      <span className="min-w-0 truncate">{match.awayTeam.name}</span>
                     </p>
                     <p className="mt-1 text-xs text-[var(--apex-fg-muted)]">
                       {match.leagueName ?? "Liga"} · {formatKickoff(match.kickoffAt)}

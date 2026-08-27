@@ -5,10 +5,14 @@
 
 import { createApiFootballDataProvider, type IDataProvider } from "@/lib/data-platform";
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
+import { ignoreNonQuotaErrors } from "@/lib/data-platform/providers/api-football/quota";
 import { matchSummaryFromBundle } from "@/lib/dashboard/map";
 import { hasFootballApiKey } from "@/lib/dashboard/resolve-provider";
 import type { DashboardMatchSummary } from "@/lib/dashboard/types";
-import { enrichMatchCenterContext } from "@/lib/match-center/enrich";
+import {
+  EMPTY_MATCH_CENTER_ENRICHMENT,
+  enrichMatchCenterContext,
+} from "@/lib/match-center/enrich";
 import { vendorFixtureId } from "@/lib/match-center/fixture-id";
 import { createMatchCenterFromApexBundle } from "@/lib/match-center/from-data-platform";
 import type { MatchCenterData } from "@/lib/match-center/types";
@@ -61,7 +65,7 @@ export async function getMatchCenterData(
   try {
     enrichment = await enrichMatchCenterContext(provider, bundle);
   } catch {
-    enrichment = { h2h: [], injuries: [] };
+    enrichment = { ...EMPTY_MATCH_CENTER_ENRICHMENT };
   }
   const data = createMatchCenterFromApexBundle(bundle, { enrichment });
   data.fixtures = skipCatalogue ? [] : withSelectedFixture(fixtures, bundle);
@@ -85,25 +89,21 @@ async function loadFixtureCatalogue(
   provider: IDataProvider,
 ): Promise<ApexMatchBundle[]> {
   const today = new Date().toISOString().slice(0, 10);
-  let list: ApexMatchBundle[] = [];
-
-  try {
-    list = (await provider.listFixtures?.({ date: today })) ?? [];
-  } catch {
-    list = [];
-  }
+  let list = await ignoreNonQuotaErrors(
+    async () => (await provider.listFixtures?.({ date: today })) ?? [],
+    [],
+  );
 
   if (list.length === 0) {
-    try {
-      list =
+    list = await ignoreNonQuotaErrors(
+      async () =>
         (await provider.listFixtures?.({
           leagueId: PREMIER_LEAGUE_ID,
           season: PREMIER_LEAGUE_SEASON,
           limit: FIXTURE_LIMIT,
-        })) ?? [];
-    } catch {
-      list = [];
-    }
+        })) ?? [],
+      [],
+    );
   }
 
   return rankFixtures(list).slice(0, FIXTURE_LIMIT);

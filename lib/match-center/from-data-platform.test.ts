@@ -7,6 +7,8 @@ import {
   type IDataProvider,
 } from "@/lib/data-platform";
 import { DEMO_MATCH_EXTERNAL_ID } from "@/lib/data-platform/providers/_shared/demo-fixture";
+import { ApiFootballError } from "@/lib/data-platform/providers/api-football/errors";
+import { isApiFootballQuotaError } from "@/lib/data-platform/providers/api-football/quota";
 import {
   createMatchCenterFromApexBundle,
   getMatchCenterData,
@@ -25,13 +27,39 @@ describe("Match Center ← Data Platform", () => {
     expect(data.match.source).toBe("data-platform");
     expect(data.match.homeTeam.name).toBe("Arsenal");
     expect(data.match.awayTeam.name).toBe("Chelsea");
+    expect(data.match.homeTeam.logoUrl).toBe(
+      "https://media.api-sports.io/football/teams/42.png",
+    );
+    expect(data.match.awayTeam.logoUrl).toBe(
+      "https://media.api-sports.io/football/teams/49.png",
+    );
     expect(data.fixtures.length).toBeGreaterThan(0);
+    expect(data.fixtures[0]?.homeTeam.logoUrl).toBe(
+      "https://media.api-sports.io/football/teams/42.png",
+    );
     expect(data.preview.hybrid.btts.yes + data.preview.hybrid.btts.no).toBeCloseTo(
       1,
     );
     expect(data.preview.dashboard.recommendation.title).toBeTruthy();
     expect(data.match.providerLabel).toBe("API-Football");
     expect(data.preview.source).toBe("intelligence-core");
+    const homeOdds = data.preview.dashboard.odds.filter(
+      (row) => row.market === "1x2" && row.selection === "home",
+    );
+    expect(homeOdds.length).toBeGreaterThan(1);
+    const bestHome = homeOdds.find((row) => row.isBest);
+    expect(bestHome?.decimalOdds).toBe(1.7);
+    expect(bestHome?.bookmaker).toBe("1xBet");
+    expect(
+      data.preview.dashboard.odds.find(
+        (row) => row.market === "over_under" && row.selection === "over" && row.isBest,
+      )?.decimalOdds,
+    ).toBe(1.8);
+    expect(
+      data.preview.dashboard.odds.find(
+        (row) => row.market === "btts" && row.selection === "yes" && row.isBest,
+      )?.bookmaker,
+    ).toBe("1xBet");
     expect(data.live.source).toBe("data-platform");
     expect(data.live.vision.source).toBe("data-platform");
     expect(data.post.source).toBe("data-platform");
@@ -52,6 +80,24 @@ describe("Match Center ← Data Platform", () => {
     expect(data.preview.hybrid.btts.yes).toBeGreaterThan(0);
     expect(data.preview.dashboard.form.home?.form).toBeTruthy();
     expect(data.preview.dashboard.form.away?.teamName).toBe("Chelsea");
+    expect(data.preview.dashboard.form.home?.recentMatches.length).toBe(5);
+    expect(data.preview.dashboard.h2h.length).toBeGreaterThan(0);
+    expect(data.preview.dashboard.injuries[0]?.playerName).toBe("T. Partey");
+    expect(data.preview.dashboard.suspensions[0]?.playerName).toBe("R. James");
+    expect(data.preview.dashboard.lineups.home?.formation).toBe("4-3-3");
+    expect(data.preview.dashboard.lineups.away?.startXI[0]?.name).toBe("C. Palmer");
+    expect(data.match.venue?.name).toBe("Emirates Stadium");
+    expect(data.match.referee).toBe("M. Oliver");
+    expect(data.match.attendance).toBeNull();
+    expect(data.match.weather).toBeNull();
+    expect(data.preview.dashboard.standings.home?.rank).toBe(1);
+    expect(data.preview.dashboard.standings.away?.rank).toBe(2);
+    expect(data.preview.dashboard.trends.home?.goalsScoredAvg).toBe(1.6);
+    expect(data.preview.dashboard.trends.home?.seasonCleanSheets).toBe(18);
+    expect(data.preview.dashboard.trends.home?.bttsPct).toBe(0.6);
+    expect(data.live.lineups.home?.startXI.some((p) => p.name === "B. Saka")).toBe(
+      true,
+    );
     expect(data.aiAnalysis.recentForm.home).toBeTruthy();
   });
 
@@ -131,6 +177,8 @@ describe("Match Center ← Data Platform", () => {
     const matches = await listMatchCenterFixtures({ provider, env: {} });
     expect(matches.length).toBeGreaterThan(0);
     expect(getMatchCalls).toBe(0);
+    expect(matches[0]?.homeTeam).toHaveProperty("logoUrl");
+    expect(matches[0]?.awayTeam).toHaveProperty("logoUrl");
   });
 
   it("skips the fixture catalogue on the detail loader", async () => {
@@ -158,5 +206,28 @@ describe("Match Center ← Data Platform", () => {
     expect(listCalls).toBe(0);
     expect(data.fixtures).toEqual([]);
     expect(data.preview.source).toBe("intelligence-core");
+  });
+
+  it("does not swallow API-Football quota errors into an empty catalogue", async () => {
+    const quota = new ApiFootballError({
+      message:
+        "API-Football fixtures error: You have reached the request limit for the day",
+      code: "vendor_error",
+      status: null,
+    });
+    const provider: IDataProvider = {
+      id: "api-football",
+      displayName: "API-Football",
+      async getMatch() {
+        throw quota;
+      },
+      async listFixtures() {
+        throw quota;
+      },
+    };
+
+    await expect(
+      listMatchCenterFixtures({ provider, env: {} }),
+    ).rejects.toSatisfy(isApiFootballQuotaError);
   });
 });

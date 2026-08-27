@@ -25,7 +25,10 @@ import type { MatchOutcome } from "@/lib/intelligence/types";
 import type { MatchAnalysisTeamStatSnapshot } from "@/lib/match-analysis/analysis-types";
 import { createMatchAnalysisService } from "@/lib/match-analysis/match-analysis-service";
 import { buildPreviewDashboard } from "@/lib/match-center/dashboard";
-import type { MatchCenterEnrichment } from "@/lib/match-center/enrich";
+import {
+  absencesToAnalysisInjuries,
+  type MatchCenterEnrichment,
+} from "@/lib/match-center/enrich";
 import { buildPreviewFromEngine } from "@/lib/match-center/from-probability";
 import type {
   MatchCenterData,
@@ -307,7 +310,11 @@ function buildLiveFromBundle(
     source: "data-platform",
   };
 
-  return { vision, source: "data-platform" };
+  return {
+    vision,
+    lineups: preview.dashboard.lineups,
+    source: "data-platform",
+  };
 }
 
 function buildPostFromBundle(
@@ -433,11 +440,13 @@ export function createMatchCenterFromApexBundle(
     id: bundle.homeTeam.id,
     name: bundle.homeTeam.name,
     shortName: shortName(bundle.homeTeam.name, bundle.homeTeam.shortName),
+    logoUrl: bundle.homeTeam.crestUrl,
   };
   const awayTeam: MatchCenterTeam = {
     id: bundle.awayTeam.id,
     name: bundle.awayTeam.name,
     shortName: shortName(bundle.awayTeam.name, bundle.awayTeam.shortName),
+    logoUrl: bundle.awayTeam.crestUrl,
   };
 
   const match: MatchCenterMeta = {
@@ -448,6 +457,16 @@ export function createMatchCenterFromApexBundle(
     status,
     homeTeam,
     awayTeam,
+    venue: bundle.match.venue
+      ? {
+          name: bundle.match.venue.name,
+          city: bundle.match.venue.city,
+          country: bundle.match.venue.country,
+        }
+      : null,
+    referee: bundle.match.referee ?? null,
+    attendance: bundle.match.attendance ?? null,
+    weather: bundle.match.weather ?? null,
     source: "data-platform",
     providerLabel:
       bundle.provenance.primaryProvider === "api-football"
@@ -479,7 +498,10 @@ export function createMatchCenterFromApexBundle(
     homeElo,
     awayElo,
     teamStats: options.enrichment?.teamStats,
-    injuries: options.enrichment?.injuries,
+    injuries: absencesToAnalysisInjuries([
+      ...(options.enrichment?.injuries ?? []),
+      ...(options.enrichment?.suspensions ?? []),
+    ]),
   });
 
   const preview = buildPreviewFromEngine({
@@ -550,6 +572,11 @@ export function createMatchCenterFromApexBundle(
     teamStats: options.enrichment?.teamStats,
     h2h: options.enrichment?.h2h,
     injuries: options.enrichment?.injuries ?? aiAnalysis.injuries,
+    suspensions: options.enrichment?.suspensions,
+    recent: options.enrichment?.recent,
+    lineups: options.enrichment?.lineups,
+    standings: options.enrichment?.standings,
+    trends: options.enrichment?.trends,
     homeTeam,
     awayTeam,
   });

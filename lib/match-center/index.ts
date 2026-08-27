@@ -1,8 +1,10 @@
 export type {
+  MatchCenterAbsence,
   MatchCenterData,
   MatchCenterFormSide,
   MatchCenterH2HMeeting,
   MatchCenterLearningNote,
+  MatchCenterLineup,
   MatchCenterLiveData,
   MatchCenterMarketVerdict,
   MatchCenterMeta,
@@ -11,8 +13,12 @@ export type {
   MatchCenterPostData,
   MatchCenterPreviewDashboard,
   MatchCenterPreviewData,
+  MatchCenterRecentMatch,
   MatchCenterRecommendation,
+  MatchCenterStanding,
   MatchCenterTeam,
+  MatchCenterTeamTrends,
+  MatchCenterVenue,
 } from "@/lib/match-center/types";
 
 export {
@@ -41,6 +47,7 @@ export {
 export {
   firstSearchParam,
   fixtureIdFromMatch,
+  matchAnalysisHref,
   matchCenterHref,
   matchesFixtureId,
   vendorFixtureId,

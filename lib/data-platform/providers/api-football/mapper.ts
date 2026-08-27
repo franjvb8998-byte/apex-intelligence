@@ -18,11 +18,50 @@ import type {
   ApiFootballFixtureItem,
   ApiFootballFixturesResponse,
   ApiFootballLineup,
+  ApiFootballOddsBookmaker,
   ApiFootballOddsItem,
   ApiFootballStatusShort,
 } from "@/lib/data-platform/providers/api-football/types";
 
 const PROVIDER = "api-football" as const;
+
+function nonemptyString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function formatTemperature(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  const text = String(value).trim();
+  if (!text) return null;
+  if (/[°cCfF]|kelvin/i.test(text)) return text;
+  return `${text}°`;
+}
+
+/** Vendor weather is undocumented; keep whatever label we can read. */
+export function formatApiFootballWeather(weather: unknown): string | null {
+  if (weather == null) return null;
+  const asString = nonemptyString(weather);
+  if (asString) return asString;
+  if (typeof weather !== "object") return null;
+  const record = weather as Record<string, unknown>;
+  const parts = [
+    formatTemperature(record.temp ?? record.temperature),
+    nonemptyString(record.condition) ??
+      nonemptyString(record.description) ??
+      nonemptyString(record.weather),
+    record.humidity != null && String(record.humidity).trim()
+      ? `Humedad ${String(record.humidity).trim()}${
+          String(record.humidity).includes("%") ? "" : "%"
+        }`
+      : null,
+    record.wind != null && String(record.wind).trim()
+      ? `Viento ${String(record.wind).trim()}`
+      : null,
+  ].filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
 
 export function isApiFootballFixturesPayload(
   payload: unknown,
@@ -236,8 +275,19 @@ function mapOdds(
 ): ApexOddsQuote[] {
   if (!oddsItems?.length) return [];
   const quotes: ApexOddsQuote[] = [];
-  const bookmaker = oddsItems[0]?.bookmakers?.[0];
-  if (!bookmaker) return quotes;
+  for (const item of oddsItems) {
+    for (const bookmaker of item.bookmakers ?? []) {
+      quotes.push(...mapBookmakerOdds(matchId, bookmaker));
+    }
+  }
+  return quotes;
+}
+
+function mapBookmakerOdds(
+  matchId: string,
+  bookmaker: ApiFootballOddsBookmaker,
+): ApexOddsQuote[] {
+  const quotes: ApexOddsQuote[] = [];
 
   for (const bet of bookmaker.bets ?? []) {
     const name = bet.name.toLowerCase();
@@ -427,6 +477,13 @@ export function mapApiFootballFixtureItemToApexBundle(
             country: item.league.country ?? null,
           }
         : null,
+      referee: nonemptyString(item.fixture.referee),
+      attendance:
+        typeof item.fixture.attendance === "number" &&
+        Number.isFinite(item.fixture.attendance)
+          ? item.fixture.attendance
+          : null,
+      weather: formatApiFootballWeather(item.fixture.weather),
       minute: item.fixture.status.elapsed ?? null,
       externalRefs: [{ provider: PROVIDER, externalId: externalMatchId }],
       ingestedAt,

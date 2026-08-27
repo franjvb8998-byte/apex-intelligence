@@ -21,11 +21,13 @@ export function getMockMatchAnalysis(): MatchAnalysisData {
       id: "apex:mock:team:home",
       name: "Northbridge FC",
       shortName: "NOR",
+      logoUrl: null,
     },
     awayTeam: {
       id: "apex:mock:team:away",
       name: "Southport United",
       shortName: "SOU",
+      logoUrl: null,
     },
     oneXTwo: {
       home: 0.48,
@@ -156,5 +158,14 @@ export function getMockMatchAnalysis(): MatchAnalysisData {
     explainable,
     modelVersion: "elo-poisson-hybrid-0.1.0+mock-ui",
     source: "mock",
+    leaguePosition: { home: null, away: null },
+    recentMatches: { home: [], away: [] },
+    h2h: [],
+    venueSplit: {
+      home: { home: null, away: null },
+      away: { home: null, away: null },
+    },
+    matchMetrics: { home: null, away: null },
+    expectedGoals: { home: 1.55, away: 1.1, total: 2.65 },
   };
 }

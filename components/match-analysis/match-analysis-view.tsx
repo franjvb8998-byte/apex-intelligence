@@ -1,4 +1,12 @@
 import { ApexScoreCard } from "@/components/match-analysis/apex-score-card";
+import {
+  FormChart,
+  GoalsChart,
+  HeadToHeadChart,
+  LeaguePositionChart,
+  MatchMetricsChart,
+  VenueSplitChart,
+} from "@/components/match-analysis/analysis-charts";
 import { ExplanationPanel } from "@/components/match-analysis/explanation-panel";
 import { KeyFactors } from "@/components/match-analysis/key-factors";
 import { MarketsPanel } from "@/components/match-analysis/markets-panel";
@@ -20,7 +28,6 @@ type MatchAnalysisViewProps = {
 
 /**
  * Presentational composition for Match Analysis.
- * Pass Core-mapped `MatchAnalysisData` when the pipeline is wired.
  */
 export function MatchAnalysisView({ data }: MatchAnalysisViewProps) {
   return (
@@ -31,9 +38,51 @@ export function MatchAnalysisView({ data }: MatchAnalysisViewProps) {
         status={data.status}
         homeName={data.homeTeam.name}
         homeShort={data.homeTeam.shortName}
+        homeLogoUrl={data.homeTeam.logoUrl}
         awayName={data.awayTeam.name}
         awayShort={data.awayTeam.shortName}
+        awayLogoUrl={data.awayTeam.logoUrl}
         source={data.source}
+      />
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <LeaguePositionChart
+          home={data.leaguePosition.home}
+          away={data.leaguePosition.away}
+          homeName={data.homeTeam.name}
+          awayName={data.awayTeam.name}
+        />
+        <FormChart
+          homeName={data.homeTeam.name}
+          awayName={data.awayTeam.name}
+          home={data.recentMatches.home}
+          away={data.recentMatches.away}
+        />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <HeadToHeadChart meetings={data.h2h} />
+        <GoalsChart
+          homeName={data.homeTeam.name}
+          awayName={data.awayTeam.name}
+          home={data.recentMatches.home}
+          away={data.recentMatches.away}
+        />
+      </div>
+
+      <VenueSplitChart
+        homeName={data.homeTeam.name}
+        awayName={data.awayTeam.name}
+        home={data.venueSplit.home}
+        away={data.venueSplit.away}
+      />
+
+      <MatchMetricsChart
+        homeName={data.homeTeam.name}
+        awayName={data.awayTeam.name}
+        home={data.matchMetrics.home}
+        away={data.matchMetrics.away}
+        modelXg={data.expectedGoals}
       />
 
       <div className="grid gap-6 lg:grid-cols-5">

@@ -21,6 +21,10 @@ import {
   type ApiFootballClient,
 } from "@/lib/data-platform/providers/api-football/client";
 import {
+  API_FOOTBALL_CACHE_TTL_MS,
+  isApiFootballRateLimitMessage,
+} from "@/lib/data-platform/providers/api-football/cache-policy";
+import {
   readApiFootballConfig,
   type ApiFootballConfig,
 } from "@/lib/data-platform/providers/api-football/config";
@@ -59,7 +63,10 @@ export type ApiFootballDataProviderOptions = {
 };
 
 /** Process-wide HTTP cache so Dashboard and Match Center share fixture responses. */
-const sharedApiFootballCache = createTtlCache({ defaultTtlMs: 60_000 });
+const sharedApiFootballCache = createTtlCache({
+  defaultTtlMs: API_FOOTBALL_CACHE_TTL_MS.match,
+  maxEntries: 1_000,
+});
 
 function vendorErrorMessage(payload: { errors?: unknown }): string | null {
   const errors = payload.errors;
@@ -76,6 +83,20 @@ function vendorErrorMessage(payload: { errors?: unknown }): string | null {
     return errors.map(String).join("; ");
   }
   return null;
+}
+
+function throwVendorError(
+  scope: "fixture" | "fixtures",
+  vendorError: string,
+  details: unknown,
+): never {
+  const rateLimited = isApiFootballRateLimitMessage(vendorError);
+  throw new ApiFootballError({
+    message: `API-Football ${scope} error: ${vendorError}`,
+    code: rateLimited ? "rate_limited" : "vendor_error",
+    status: rateLimited ? 429 : null,
+    details,
+  });
 }
 
 function toEnvelope(
@@ -112,13 +133,14 @@ export class ApiFootballDataProvider implements IDataProvider {
     const env = options.env ?? process.env;
     const config = readApiFootballConfig(env);
     const fallback = options.fallback ?? "recorded";
-    const cacheTtlMs = options.cacheTtlMs ?? 60_000;
     const cache = options.cache ?? sharedApiFootballCache;
     const useCache = options.useCache !== false;
 
     const wrap = (client: ApiFootballClient) =>
       useCache
-        ? withApiFootballClientCache(client, cache, cacheTtlMs)
+        ? withApiFootballClientCache(client, cache, {
+            ttlMs: options.cacheTtlMs,
+          })
         : client;
 
     if (options.client) {
@@ -185,11 +207,7 @@ export class ApiFootballDataProvider implements IDataProvider {
     const payload = await this.client.getFixture(matchId);
     const vendorError = vendorErrorMessage(payload);
     if (vendorError) {
-      throw new ApiFootballError({
-        message: `API-Football fixture error: ${vendorError}`,
-        code: "vendor_error",
-        details: payload.errors,
-      });
+      throwVendorError("fixture", vendorError, payload.errors);
     }
     if (!payload.response?.length) {
       // Offline convenience: unknown ids fall back to the recorded sample.
@@ -254,11 +272,7 @@ export class ApiFootballDataProvider implements IDataProvider {
           );
     const vendorError = vendorErrorMessage(payload);
     if (vendorError) {
-      throw new ApiFootballError({
-        message: `API-Football fixtures error: ${vendorError}`,
-        code: "vendor_error",
-        details: payload.errors,
-      });
+      throwVendorError("fixtures", vendorError, payload.errors);
     }
 
     let items = payload.response ?? [];

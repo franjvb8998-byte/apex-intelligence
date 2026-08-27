@@ -11,14 +11,71 @@ import type {
   MatchAnalysisInjury,
   MatchAnalysisTeamStatSnapshot,
   MatchAnalysisTeamStats,
+  MatchAnalysisVenueSplit,
 } from "@/lib/match-analysis/analysis-types";
-import type { MatchCenterH2HMeeting } from "@/lib/match-center/types";
+import {
+  absencesFromInjuries,
+  h2hFromFixtures,
+  lineupsFromVendor,
+  recentMatchesFromFixtures,
+} from "@/lib/match-center/team-context";
+import {
+  mergeTeamTrends,
+  parseStatAverage,
+  standingFromTable,
+} from "@/lib/match-center/prematch";
+import type {
+  MatchCenterAbsence,
+  MatchCenterH2HMeeting,
+  MatchCenterLineup,
+  MatchCenterRecentMatch,
+  MatchCenterStanding,
+  MatchCenterTeamTrends,
+} from "@/lib/match-center/types";
 
 export type MatchCenterEnrichment = {
   teamStats?: MatchAnalysisTeamStats;
   h2h: MatchCenterH2HMeeting[];
-  injuries: MatchAnalysisInjury[];
+  injuries: MatchCenterAbsence[];
+  suspensions: MatchCenterAbsence[];
+  recent: {
+    home: MatchCenterRecentMatch[];
+    away: MatchCenterRecentMatch[];
+  };
+  lineups: {
+    home: MatchCenterLineup | null;
+    away: MatchCenterLineup | null;
+  };
+  standings: {
+    home: MatchCenterStanding | null;
+    away: MatchCenterStanding | null;
+  };
+  trends: {
+    home: MatchCenterTeamTrends | null;
+    away: MatchCenterTeamTrends | null;
+  };
 };
+
+export const EMPTY_MATCH_CENTER_ENRICHMENT: MatchCenterEnrichment = {
+  h2h: [],
+  injuries: [],
+  suspensions: [],
+  recent: { home: [], away: [] },
+  lineups: { home: null, away: null },
+  standings: { home: null, away: null },
+  trends: { home: null, away: null },
+};
+
+export function absencesToAnalysisInjuries(
+  absences: MatchCenterAbsence[],
+): MatchAnalysisInjury[] {
+  return absences.map(({ id, playerName, teamId, detail }) => ({
+    id,
+    playerName,
+    teamId,
+    detail,
+  }));
+}
 
 function externalId(
   refs: Array<{ externalId: string }> | undefined,
@@ -40,6 +97,27 @@ async function safe<T>(run: () => Promise<T>, fallback: T): Promise<T> {
   }
 }
 
+function venueSplitFromTotals(
+  played?: number,
+  wins?: number,
+  draws?: number,
+  losses?: number,
+  goalsFor?: number,
+  goalsAgainst?: number,
+): MatchAnalysisVenueSplit | null {
+  if (played == null && wins == null && draws == null && losses == null) {
+    return null;
+  }
+  return {
+    played: played ?? 0,
+    wins: wins ?? 0,
+    draws: draws ?? 0,
+    losses: losses ?? 0,
+    goalsFor: goalsFor ?? null,
+    goalsAgainst: goalsAgainst ?? null,
+  };
+}
+
 function snapshotFromTeamStatistics(
   payload: { response?: unknown } | null,
 ): MatchAnalysisTeamStatSnapshot | undefined {
@@ -57,6 +135,26 @@ function snapshotFromTeamStatistics(
       stats as Parameters<typeof adaptApiFootballTeamStatistics>[0],
     );
     if (!adapted) return undefined;
+    const fixtures = stats as {
+      fixtures?: {
+        played?: { home?: number; away?: number };
+        wins?: { home?: number; away?: number };
+        draws?: { home?: number; away?: number };
+        loses?: { home?: number; away?: number };
+      };
+      goals?: {
+        for?: {
+          total?: { home?: number; away?: number };
+          average?: { total?: unknown };
+        };
+        against?: {
+          total?: { home?: number; away?: number };
+          average?: { total?: unknown };
+        };
+      };
+      clean_sheet?: { total?: number };
+      failed_to_score?: { total?: number };
+    };
     return {
       form: adapted.form,
       wins: adapted.wins,
@@ -64,8 +162,30 @@ function snapshotFromTeamStatistics(
       losses: adapted.losses,
       goalsFor: adapted.goalsFor,
       goalsAgainst: adapted.goalsAgainst,
+      goalsForAverage: parseStatAverage(fixtures.goals?.for?.average?.total),
+      goalsAgainstAverage: parseStatAverage(
+        fixtures.goals?.against?.average?.total,
+      ),
+      cleanSheets: fixtures.clean_sheet?.total ?? null,
+      failedToScore: fixtures.failed_to_score?.total ?? null,
       played: adapted.played,
       teamName: adapted.teamName,
+      homeSplit: venueSplitFromTotals(
+        fixtures.fixtures?.played?.home,
+        fixtures.fixtures?.wins?.home,
+        fixtures.fixtures?.draws?.home,
+        fixtures.fixtures?.loses?.home,
+        fixtures.goals?.for?.total?.home,
+        fixtures.goals?.against?.total?.home,
+      ),
+      awaySplit: venueSplitFromTotals(
+        fixtures.fixtures?.played?.away,
+        fixtures.fixtures?.wins?.away,
+        fixtures.fixtures?.draws?.away,
+        fixtures.fixtures?.loses?.away,
+        fixtures.goals?.for?.total?.away,
+        fixtures.goals?.against?.total?.away,
+      ),
     };
   } catch {
     return undefined;
@@ -73,14 +193,15 @@ function snapshotFromTeamStatistics(
 }
 
 /**
- * Pull team statistics, H2H and injuries when the configured provider exposes them.
+ * Pull team statistics, last-5 form, H2H, standings, injuries, suspensions
+ * and lineups when the configured provider exposes them.
  */
 export async function enrichMatchCenterContext(
   provider: IDataProvider,
   bundle: ApexMatchBundle,
 ): Promise<MatchCenterEnrichment> {
   if (!(provider instanceof ApiFootballDataProvider)) {
-    return { h2h: [], injuries: [] };
+    return { ...EMPTY_MATCH_CENTER_ENRICHMENT };
   }
 
   const homeId = externalId(bundle.homeTeam.externalRefs);
@@ -89,7 +210,16 @@ export async function enrichMatchCenterContext(
   const season = seasonYear(bundle.league?.season);
   const fixtureId = externalId(bundle.match.externalRefs);
 
-  const [homeStats, awayStats, h2hPayload, injuriesPayload] = await Promise.all([
+  const [
+    homeStats,
+    awayStats,
+    h2hPayload,
+    injuriesPayload,
+    homeRecentPayload,
+    awayRecentPayload,
+    lineupsPayload,
+    standingsPayload,
+  ] = await Promise.all([
     homeId && leagueId && season
       ? safe(
           () => provider.http.getTeamStatistics(homeId, leagueId, season),
@@ -108,6 +238,18 @@ export async function enrichMatchCenterContext(
     fixtureId
       ? safe(() => provider.http.getInjuries({ fixture: fixtureId }), null)
       : Promise.resolve(null),
+    homeId
+      ? safe(() => provider.http.getTeamLastFixtures(homeId, 5), null)
+      : Promise.resolve(null),
+    awayId
+      ? safe(() => provider.http.getTeamLastFixtures(awayId, 5), null)
+      : Promise.resolve(null),
+    fixtureId
+      ? safe(() => provider.http.getLineups(fixtureId), null)
+      : Promise.resolve(null),
+    leagueId && season
+      ? safe(() => provider.http.getStandings(leagueId, season), null)
+      : Promise.resolve(null),
   ]);
 
   const teamStats: MatchAnalysisTeamStats = {};
@@ -119,37 +261,48 @@ export async function enrichMatchCenterContext(
   const h2hItems = Array.isArray(h2hPayload?.response)
     ? h2hPayload.response
     : [];
-  const h2h: MatchCenterH2HMeeting[] = h2hItems
-    .filter((item) => item?.fixture?.id != null && String(item.fixture.id) !== fixtureId)
-    .slice(0, 5)
-    .map((item) => ({
-      id: String(item.fixture.id),
-      kickoffAt: item.fixture.date,
-      homeTeamName: item.teams?.home?.name ?? "Local",
-      awayTeamName: item.teams?.away?.name ?? "Visitante",
-      homeGoals: item.goals?.home ?? null,
-      awayGoals: item.goals?.away ?? null,
-    }));
-
   const injuryItems = Array.isArray(injuriesPayload?.response)
     ? injuriesPayload.response
     : [];
-  const injuries: MatchAnalysisInjury[] = injuryItems.map((item, index) => ({
-    id: `inj-${item.player?.id ?? index}`,
-    playerName: item.player?.name ?? "Jugador",
-    teamId:
-      item.team?.id != null
-        ? `apex:api-football:team:${item.team.id}`
-        : null,
-    detail:
-      [item.player?.type, item.player?.reason].filter(Boolean).join(" · ") ||
-      "Lesión reportada por el proveedor.",
-  }));
+  const absences = absencesFromInjuries(injuryItems);
+  const homeRecentItems = Array.isArray(homeRecentPayload?.response)
+    ? homeRecentPayload.response
+    : [];
+  const awayRecentItems = Array.isArray(awayRecentPayload?.response)
+    ? awayRecentPayload.response
+    : [];
+  const lineupItems = Array.isArray(lineupsPayload?.response)
+    ? lineupsPayload.response
+    : [];
+  const standings = Array.isArray(standingsPayload?.response)
+    ? standingsPayload.response
+    : [];
+  const recent = {
+    home: homeId
+      ? recentMatchesFromFixtures(homeRecentItems, homeId, fixtureId)
+      : [],
+    away: awayId
+      ? recentMatchesFromFixtures(awayRecentItems, awayId, fixtureId)
+      : [],
+  };
 
   return {
-    teamStats:
-      teamStats.home || teamStats.away ? teamStats : undefined,
-    h2h,
-    injuries,
+    teamStats: teamStats.home || teamStats.away ? teamStats : undefined,
+    h2h: h2hFromFixtures(h2hItems, fixtureId),
+    injuries: absences.injuries,
+    suspensions: absences.suspensions,
+    recent,
+    lineups:
+      homeId && awayId
+        ? lineupsFromVendor(lineupItems, homeId, awayId)
+        : { home: null, away: null },
+    standings: {
+      home: homeId ? standingFromTable(standings, homeId) : null,
+      away: awayId ? standingFromTable(standings, awayId) : null,
+    },
+    trends: {
+      home: mergeTeamTrends(recent.home, homeSnapshot),
+      away: mergeTeamTrends(recent.away, awaySnapshot),
+    },
   };
 }

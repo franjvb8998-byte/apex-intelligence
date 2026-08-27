@@ -208,7 +208,16 @@ export function mapHybridToMatchAnalysis(
       confidence,
     }),
     modelVersion: result.meta.modelVersion,
-    source: context.source === "intelligence-core" ? "intelligence-core" : "mock",
+    source: context.source === "intelligence-core" ? "intelligence-core" : context.source === "data-platform" ? "data-platform" : "mock",
+    leaguePosition: { home: null, away: null },
+    recentMatches: { home: [], away: [] },
+    h2h: [],
+    venueSplit: {
+      home: { home: null, away: null },
+      away: { home: null, away: null },
+    },
+    matchMetrics: { home: null, away: null },
+    expectedGoals: result.expectedGoals,
   };
 }
 

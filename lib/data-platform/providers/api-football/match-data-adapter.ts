@@ -18,6 +18,7 @@ import type { ProviderRawEnvelope } from "@/lib/data-platform/types/provider";
 import {
   createApiFootballClient,
   tryCreateApiFootballClientFromEnv,
+  withApiFootballClientCache,
   type ApiFootballClient,
 } from "@/lib/data-platform/providers/api-football/client";
 import { readApiFootballEnv } from "@/lib/data-platform/providers/api-football/config";
@@ -73,28 +74,34 @@ export class ApiFootballProvider implements MatchDataProvider {
     const apiKey =
       options.apiKey === undefined ? env.apiKey : options.apiKey;
 
-    if (options.client !== undefined) {
-      this.client = options.client;
-    } else if (apiKey) {
-      this.client = createApiFootballClient({
-        apiKey,
-        baseUrl: options.baseUrl ?? env.baseUrl,
-        fetchImpl: options.fetchImpl,
-      });
-    } else if (options.apiKey === undefined) {
-      this.client = tryCreateApiFootballClientFromEnv(process.env, {
-        fetchImpl: options.fetchImpl,
-      });
-    } else {
-      this.client = null;
-    }
-
-    this.cache = options.cache ?? createTtlCache({ defaultTtlMs: 60_000 });
+    this.cache = options.cache ?? createTtlCache({ maxEntries: 1_000 });
     this.cacheTtlMs = options.cacheTtlMs ?? 60_000;
     this.fallback = options.fallback ?? "recorded";
     this.recordedPayload =
       options.recordedPayload ?? createRecordedApiFootballFixturesResponse();
     this.includeEvents = options.includeEvents ?? true;
+
+    if (options.client !== undefined) {
+      this.client = options.client;
+    } else if (apiKey) {
+      this.client = withApiFootballClientCache(
+        createApiFootballClient({
+          apiKey,
+          baseUrl: options.baseUrl ?? env.baseUrl,
+          fetchImpl: options.fetchImpl,
+        }),
+        this.cache,
+      );
+    } else if (options.apiKey === undefined) {
+      const fromEnv = tryCreateApiFootballClientFromEnv(process.env, {
+        fetchImpl: options.fetchImpl,
+      });
+      this.client = fromEnv
+        ? withApiFootballClientCache(fromEnv, this.cache)
+        : null;
+    } else {
+      this.client = null;
+    }
   }
 
   capabilities(): ProviderCapabilities {

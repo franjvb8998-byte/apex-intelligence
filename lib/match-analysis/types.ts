@@ -12,11 +12,19 @@ import type {
 } from "@/lib/intelligence/types";
 import type { ExplanationFactor } from "@/lib/intelligence/types/engine";
 import type { ExplainablePrediction } from "@/lib/explainable-ai/types";
+import type {
+  MatchAnalysisVenueSplit,
+} from "@/lib/match-analysis/analysis-types";
+import type {
+  MatchCenterH2HMeeting,
+  MatchCenterRecentMatch,
+} from "@/lib/match-center/types";
 
 export type MatchAnalysisTeam = {
   id: UUID;
   name: string;
   shortName: string;
+  logoUrl: string | null;
 };
 
 export type MatchAnalysisMarket = {
@@ -62,8 +70,22 @@ export type MatchAnalysisExplanation = {
 };
 
 /**
- * Full screen payload. Replace `getMockMatchAnalysis()` with a Core adapter later.
+ * Full screen payload. Maps Data Platform + Probability Engine (no mock page path).
  */
+export type MatchAnalysisLeaguePosition = {
+  rank: number;
+  points: number;
+  played: number | null;
+  teamName: string;
+};
+
+export type MatchAnalysisMatchMetrics = {
+  possession: number | null;
+  shots: number | null;
+  shotsOnTarget: number | null;
+  expectedGoals: number | null;
+};
+
 export type MatchAnalysisData = {
   matchId: UUID;
   leagueName: string;
@@ -82,6 +104,33 @@ export type MatchAnalysisData = {
   /** Sprint 10 — structured Explainable AI (rules). */
   explainable: ExplainablePrediction;
   modelVersion: string;
-  /** Provenance flag until live Core wiring exists. */
-  source: "mock" | "intelligence-core";
+  source: "mock" | "intelligence-core" | "data-platform";
+  leaguePosition: {
+    home: MatchAnalysisLeaguePosition | null;
+    away: MatchAnalysisLeaguePosition | null;
+  };
+  recentMatches: {
+    home: MatchCenterRecentMatch[];
+    away: MatchCenterRecentMatch[];
+  };
+  h2h: MatchCenterH2HMeeting[];
+  venueSplit: {
+    home: {
+      home: MatchAnalysisVenueSplit | null;
+      away: MatchAnalysisVenueSplit | null;
+    };
+    away: {
+      home: MatchAnalysisVenueSplit | null;
+      away: MatchAnalysisVenueSplit | null;
+    };
+  };
+  matchMetrics: {
+    home: MatchAnalysisMatchMetrics | null;
+    away: MatchAnalysisMatchMetrics | null;
+  };
+  expectedGoals: {
+    home: number;
+    away: number;
+    total: number;
+  };
 };

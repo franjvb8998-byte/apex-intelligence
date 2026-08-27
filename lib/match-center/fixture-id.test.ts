@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   firstSearchParam,
   fixtureIdFromMatch,
+  matchAnalysisHref,
   matchCenterHref,
   matchesFixtureId,
   vendorFixtureId,
@@ -28,6 +29,12 @@ describe("matchCenterHref", () => {
     expect(matchCenterHref("apex:api-football:match:99")).toBe(
       "/match-center/99",
     );
+  });
+});
+
+describe("matchAnalysisHref", () => {
+  it("builds a path-based Match Analysis URL", () => {
+    expect(matchAnalysisHref("1635059")).toBe("/match-analysis/1635059");
   });
 });
 

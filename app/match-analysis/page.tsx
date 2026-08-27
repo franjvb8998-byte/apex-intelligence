@@ -1,23 +1,60 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { ApiQuotaCard } from "@/components/app-shell/api-quota-card";
 import { ProductShell } from "@/components/app-shell/product-shell";
-import { MatchAnalysisView } from "@/components/match-analysis";
+import { DashboardMatchList } from "@/components/dashboard";
 import { getShellUser } from "@/lib/auth/get-shell-user";
-import { getMockMatchAnalysis } from "@/lib/match-analysis";
+import { loadUnlessQuota } from "@/lib/data-platform/providers/api-football/quota";
+import { listMatchAnalysisFixtures } from "@/lib/match-analysis/load";
+import {
+  firstSearchParam,
+  matchAnalysisHref,
+} from "@/lib/match-center/fixture-id";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Match Analysis — APEX Intelligence",
   description:
-    "Probabilidades 1X2, mercados, APEX Score y explicación del modelo.",
+    "Análisis del fixture seleccionado: clasificación, forma, H2H, goles y métricas.",
 };
 
-export default async function MatchAnalysisPage() {
+type MatchAnalysisPageProps = {
+  searchParams: Promise<{
+    fixture?: string | string[];
+    matchId?: string | string[];
+  }>;
+};
+
+export default async function MatchAnalysisPage({
+  searchParams,
+}: MatchAnalysisPageProps) {
+  const params = await searchParams;
+  const fromQuery =
+    firstSearchParam(params.fixture) ?? firstSearchParam(params.matchId);
+  if (fromQuery) {
+    redirect(matchAnalysisHref(fromQuery));
+  }
+
   const user = await getShellUser();
-  const data = getMockMatchAnalysis();
+  const loaded = await loadUnlessQuota(() =>
+    listMatchAnalysisFixtures({ requireProvider: true }),
+  );
 
   return (
     <ProductShell user={user}>
-      <div className="w-full">
-        <MatchAnalysisView data={data} />
+      <div className="w-full space-y-6">
+        {loaded.ok ? (
+          <DashboardMatchList
+            title="Match Analysis"
+            description="Elige un fixture de API-Football para ver clasificación, forma, H2H y métricas."
+            matches={loaded.data}
+            emptyLabel="API-Football no devolvió fixtures para hoy ni Premier League 2025."
+            hrefForFixture={matchAnalysisHref}
+          />
+        ) : (
+          <ApiQuotaCard />
+        )}
       </div>
     </ProductShell>
   );

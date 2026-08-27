@@ -36,12 +36,14 @@ const HOME = {
   id: "apex:mock:team:home",
   name: "Northbridge FC",
   shortName: "NOR",
+  logoUrl: null,
 } as const;
 
 const AWAY = {
   id: "apex:mock:team:away",
   name: "Southport United",
   shortName: "SOU",
+  logoUrl: null,
 } as const;
 
 /** Simulated Elo pair — replace with EloRatingProvider later. */
@@ -150,7 +152,7 @@ function buildLive(): MatchCenterLiveData {
     homeTeam: { ...HOME },
     awayTeam: { ...AWAY },
   };
-  return { vision, source: "mock" };
+  return { vision, lineups: { home: null, away: null }, source: "mock" };
 }
 
 function buildPost(
@@ -261,6 +263,10 @@ export function getMockMatchCenter(
     status,
     homeTeam: { ...HOME },
     awayTeam: { ...AWAY },
+    venue: null,
+    referee: null,
+    attendance: null,
+    weather: null,
     source: "mock",
   };
 

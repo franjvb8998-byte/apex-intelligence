@@ -6,3 +6,11 @@ export { ApexScoreCard, ConfidenceBadge } from "@/components/match-analysis/apex
 export { KeyFactors } from "@/components/match-analysis/key-factors";
 export { RisksPanel } from "@/components/match-analysis/risks-panel";
 export { ExplanationPanel } from "@/components/match-analysis/explanation-panel";
+export {
+  FormChart,
+  GoalsChart,
+  HeadToHeadChart,
+  LeaguePositionChart,
+  MatchMetricsChart,
+  VenueSplitChart,
+} from "@/components/match-analysis/analysis-charts";

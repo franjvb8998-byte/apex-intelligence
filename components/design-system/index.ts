@@ -22,3 +22,8 @@ export { ScoreGauge } from "@/components/design-system/score-gauge";
 export { Timeline, type TimelineItem } from "@/components/design-system/timeline";
 export { HeatmapPlaceholder } from "@/components/design-system/heatmap-placeholder";
 export { ExplanationPanel } from "@/components/design-system/explanation-panel";
+export {
+  TeamLogo,
+  teamLogoSrc,
+  type TeamLogoSize,
+} from "@/components/design-system/team-logo";
