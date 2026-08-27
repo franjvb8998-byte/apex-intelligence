@@ -5,6 +5,8 @@ import {
 import type { MatchCenterMeta, MatchCenterPhase } from "@/lib/match-center/types";
 
 function formatKickoff(iso: string): string {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return iso;
   try {
     return new Intl.DateTimeFormat("es-ES", {
       weekday: "short",
@@ -12,8 +14,9 @@ function formatKickoff(iso: string): string {
       month: "short",
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "UTC",
       timeZoneName: "short",
-    }).format(new Date(iso));
+    }).format(new Date(ms));
   } catch {
     return iso;
   }
@@ -73,7 +76,7 @@ export function MatchCenterHeader({
         </div>
 
         <div>
-          <p className="text-sm text-[var(--apex-fg-muted)]">
+          <p className="text-sm text-[var(--apex-fg-muted)]" suppressHydrationWarning>
             {match.leagueName}
             <span className="mx-2 text-[var(--apex-fg-subtle)]">·</span>
             {formatKickoff(match.kickoffAt)}

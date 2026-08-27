@@ -32,12 +32,16 @@ export {
 
 export {
   getMatchCenterData,
+  listMatchCenterFixtures,
   loadMatchCenterFromApiFootball,
   resolveMatchCenterProvider,
   type LoadMatchCenterOptions,
 } from "@/lib/match-center/load";
 
 export {
-  getMockMatchCenter,
-  MOCK_MATCH_CENTER_ELO,
-} from "@/lib/match-center/mock-data";
+  firstSearchParam,
+  fixtureIdFromMatch,
+  matchCenterHref,
+  matchesFixtureId,
+  vendorFixtureId,
+} from "@/lib/match-center/fixture-id";

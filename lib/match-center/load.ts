@@ -9,6 +9,7 @@ import { matchSummaryFromBundle } from "@/lib/dashboard/map";
 import { hasFootballApiKey } from "@/lib/dashboard/resolve-provider";
 import type { DashboardMatchSummary } from "@/lib/dashboard/types";
 import { enrichMatchCenterContext } from "@/lib/match-center/enrich";
+import { vendorFixtureId } from "@/lib/match-center/fixture-id";
 import { createMatchCenterFromApexBundle } from "@/lib/match-center/from-data-platform";
 import type { MatchCenterData } from "@/lib/match-center/types";
 
@@ -50,10 +51,10 @@ export async function getMatchCenterData(
 ): Promise<MatchCenterData> {
   const env = options.env ?? process.env;
   const provider = options.provider ?? resolveMatchCenterProvider(env);
-  const requested = options.externalMatchId?.trim();
+  const requested = vendorFixtureId(options.externalMatchId);
   const skipCatalogue = options.includeFixtureList === false && Boolean(requested);
   const fixtures = skipCatalogue ? [] : await loadFixtureCatalogue(provider);
-  const matchId = resolveSelectedFixtureId(fixtures, requested);
+  const matchId = resolveSelectedFixtureId(fixtures, requested ?? undefined);
 
   const bundle = await provider.getMatch({ matchId });
   let enrichment;
@@ -63,8 +64,21 @@ export async function getMatchCenterData(
     enrichment = { h2h: [], injuries: [] };
   }
   const data = createMatchCenterFromApexBundle(bundle, { enrichment });
-  data.fixtures = withSelectedFixture(fixtures, bundle);
+  data.fixtures = skipCatalogue ? [] : withSelectedFixture(fixtures, bundle);
   return data;
+}
+
+/**
+ * Catalogue only — no match analysis, PE, or enrichment.
+ * Used by `/match-center` so opening the list does not load a fixture.
+ */
+export async function listMatchCenterFixtures(
+  options: LoadMatchCenterOptions = {},
+): Promise<DashboardMatchSummary[]> {
+  const env = options.env ?? process.env;
+  const provider = options.provider ?? resolveMatchCenterProvider(env);
+  const fixtures = await loadFixtureCatalogue(provider);
+  return fixtures.map(matchSummaryFromBundle);
 }
 
 async function loadFixtureCatalogue(
@@ -110,18 +124,28 @@ function rankFixtures(items: ApexMatchBundle[]): ApexMatchBundle[] {
 }
 
 function externalId(bundle: ApexMatchBundle): string | null {
-  return bundle.match.externalRefs[0]?.externalId ?? null;
+  return vendorFixtureId(bundle.match.externalRefs[0]?.externalId) ??
+    vendorFixtureId(bundle.match.id);
+}
+
+function bundleLookupIds(bundle: ApexMatchBundle): string[] {
+  return [
+    ...new Set(
+      [bundle.match.id, bundle.match.externalRefs[0]?.externalId]
+        .map(vendorFixtureId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
 }
 
 function resolveSelectedFixtureId(
   fixtures: ApexMatchBundle[],
   requestedId?: string,
 ): string {
-  const requested = requestedId?.trim();
+  const requested = vendorFixtureId(requestedId);
   if (requested) {
-    const hit = fixtures.find(
-      (bundle) =>
-        externalId(bundle) === requested || bundle.match.id === requested,
+    const hit = fixtures.find((bundle) =>
+      bundleLookupIds(bundle).includes(requested),
     );
     if (hit) return externalId(hit) ?? requested;
     return requested;

@@ -21,6 +21,12 @@ describe("Release 0.1 navigation", () => {
     expect(breadcrumbsForPath("/match-center").at(-1)?.label).toContain(
       "Match Center",
     );
+    expect(breadcrumbsForPath("/match-center/1635059")).toEqual([
+      { label: "Dashboard", href: "/dashboard" },
+      { label: "Match Center™", href: "/match-center" },
+      { label: "Partido" },
+    ]);
+    expect(titleForPath("/match-center/1635059")).toBe("Match Center");
     expect(titleForPath("/copilot")).toBe("Copilot");
   });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AiMatchAnalysisPanel } from "@/components/match-center/ai-match-analysis-panel";
 import { MatchCenterHeader } from "@/components/match-center/match-center-header";
 import { PhaseTabs } from "@/components/match-center/phase-tabs";
@@ -30,6 +30,10 @@ export function MatchCenterView({
   const [phase, setPhase] = useState<MatchCenterPhase>(
     initialPhase ?? data.defaultPhase,
   );
+
+  useEffect(() => {
+    setPhase(initialPhase ?? data.defaultPhase);
+  }, [data.match.matchId, data.defaultPhase, initialPhase]);
 
   return (
     <div className="w-full space-y-8">

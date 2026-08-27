@@ -4,15 +4,29 @@
  * Does not modify PE or Learning Engine.
  */
 
-import { createInitialVisionState } from "@/lib/apex-vision";
-import type { VisionLiveState } from "@/lib/apex-vision/types";
+import {
+  buildProbabilityImpact,
+  buildTimelineIntelligence,
+} from "@/lib/apex-vision";
+import type {
+  PitchPoint,
+  VisionEventType,
+  VisionLiveEvent,
+  VisionLiveState,
+  VisionMarkets,
+  VisionPlayer,
+  VisionSide,
+} from "@/lib/apex-vision/types";
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
+import type { ApexMatchEvent } from "@/lib/data-platform/types/event";
 import type { ApexMatchStatus } from "@/lib/data-platform/types/match";
+import type { ApexPlayer } from "@/lib/data-platform/types/team";
 import type { MatchOutcome } from "@/lib/intelligence/types";
+import type { MatchAnalysisTeamStatSnapshot } from "@/lib/match-analysis/analysis-types";
 import { createMatchAnalysisService } from "@/lib/match-analysis/match-analysis-service";
 import { buildPreviewDashboard } from "@/lib/match-center/dashboard";
-import { buildPreviewFromEngine } from "@/lib/match-center/from-probability";
 import type { MatchCenterEnrichment } from "@/lib/match-center/enrich";
+import { buildPreviewFromEngine } from "@/lib/match-center/from-probability";
 import type {
   MatchCenterData,
   MatchCenterLiveData,
@@ -64,8 +78,185 @@ export function estimateEloFromTeamId(teamId: string, base = 1500): number {
   return base + (hash % 251) - 125;
 }
 
-function buildLiveFromBundle(bundle: ApexMatchBundle): MatchCenterLiveData {
-  const seed = createInitialVisionState();
+function hasPlayed(snapshot?: MatchAnalysisTeamStatSnapshot | null): boolean {
+  return snapshot != null && snapshot.played != null && snapshot.played > 0;
+}
+
+function eloFromCatalogue(
+  snapshot: MatchAnalysisTeamStatSnapshot | null | undefined,
+  teamId: string,
+  base: number,
+): number {
+  if (!hasPlayed(snapshot)) return estimateEloFromTeamId(teamId, base);
+  const played = snapshot!.played!;
+  const winRate = (snapshot!.wins ?? 0) / played;
+  const goalDiff =
+    (snapshot!.goalsFor ?? 0) - (snapshot!.goalsAgainst ?? 0);
+  const clampedDiff = Math.max(-30, Math.min(30, goalDiff));
+  return Math.round(base - 80 + winRate * 220 + clampedDiff * 2.5);
+}
+
+const HOME_SLOTS: PitchPoint[] = [
+  { x: 8, y: 50 },
+  { x: 22, y: 18 },
+  { x: 20, y: 38 },
+  { x: 20, y: 62 },
+  { x: 22, y: 82 },
+  { x: 35, y: 30 },
+  { x: 34, y: 50 },
+  { x: 35, y: 70 },
+  { x: 48, y: 22 },
+  { x: 52, y: 50 },
+  { x: 48, y: 78 },
+];
+
+const AWAY_SLOTS: PitchPoint[] = [
+  { x: 92, y: 50 },
+  { x: 78, y: 18 },
+  { x: 80, y: 38 },
+  { x: 80, y: 62 },
+  { x: 78, y: 82 },
+  { x: 65, y: 30 },
+  { x: 66, y: 50 },
+  { x: 65, y: 70 },
+  { x: 52, y: 22 },
+  { x: 55, y: 48 },
+  { x: 52, y: 78 },
+];
+
+function positionRank(position: ApexPlayer["position"]): number {
+  if (position === "goalkeeper") return 0;
+  if (position === "defender") return 1;
+  if (position === "midfielder") return 2;
+  if (position === "forward") return 3;
+  return 4;
+}
+
+function visionPlayersFromBundle(bundle: ApexMatchBundle): VisionPlayer[] {
+  const place = (
+    side: VisionSide,
+    teamId: string,
+    slots: PitchPoint[],
+  ): VisionPlayer[] => {
+    const squad = bundle.players
+      .filter((player) => player.teamId === teamId)
+      .sort((a, b) => positionRank(a.position) - positionRank(b.position))
+      .slice(0, 11);
+    return squad.map((player, index) => ({
+      id: player.id,
+      side,
+      number: player.shirtNumber ?? index + 1,
+      name: player.name,
+      position: slots[index] ?? { x: side === "home" ? 30 : 70, y: 50 },
+    }));
+  };
+
+  return [
+    ...place("home", bundle.homeTeam.id, HOME_SLOTS),
+    ...place("away", bundle.awayTeam.id, AWAY_SLOTS),
+  ];
+}
+
+function visionEventType(type: ApexMatchEvent["type"]): VisionEventType {
+  switch (type) {
+    case "goal":
+    case "own_goal":
+    case "penalty_goal":
+    case "penalty_miss":
+      return "disparo";
+    case "yellow_card":
+    case "red_card":
+      return "tarjeta";
+    case "substitution":
+      return "cambio";
+    case "var":
+      return "falta";
+    default:
+      return "pase";
+  }
+}
+
+function eventLabel(type: ApexMatchEvent["type"]): string {
+  switch (type) {
+    case "goal":
+      return "Gol";
+    case "own_goal":
+      return "Gol en propia";
+    case "penalty_goal":
+      return "Penalti";
+    case "penalty_miss":
+      return "Penalti fallado";
+    case "yellow_card":
+      return "Amarilla";
+    case "red_card":
+      return "Roja";
+    case "substitution":
+      return "Cambio";
+    case "var":
+      return "VAR";
+    default:
+      return type.replaceAll("_", " ");
+  }
+}
+
+function marketsFromPreview(
+  preview: MatchCenterData["preview"],
+): VisionMarkets {
+  return {
+    homeWin: preview.analysis.oneXTwo.home,
+    draw: preview.analysis.oneXTwo.draw,
+    awayWin: preview.analysis.oneXTwo.away,
+    over25: preview.hybrid.overUnder25.over,
+    btts: preview.hybrid.btts.yes,
+  };
+}
+
+function visionEventsFromBundle(
+  bundle: ApexMatchBundle,
+  markets: VisionMarkets,
+): VisionLiveEvent[] {
+  return bundle.events.slice(-12).map((event) => {
+    const side: VisionSide =
+      event.teamId === bundle.awayTeam.id ? "away" : "home";
+    const type = visionEventType(event.type);
+    const momentumDelta =
+      type === "disparo" ? 6 : type === "tarjeta" ? -3 : type === "cambio" ? 1 : 2;
+    const signed = side === "home" ? momentumDelta : -momentumDelta;
+    const intel = buildTimelineIntelligence({
+      type,
+      side,
+      homeName: bundle.homeTeam.name,
+      awayName: bundle.awayTeam.name,
+      momentumDelta: signed,
+      before: markets,
+      after: markets,
+    });
+    const playerName =
+      typeof event.payload.playerName === "string"
+        ? event.payload.playerName
+        : null;
+    return {
+      id: event.id,
+      minute: event.minute ?? 0,
+      type,
+      side,
+      label: eventLabel(event.type),
+      detail: playerName ?? eventLabel(event.type),
+      ballTo:
+        side === "home" ? { x: 72, y: 42 } : { x: 28, y: 58 },
+      aiExplanation: intel.aiExplanation,
+      momentumDelta: signed,
+      probabilityImpact: buildProbabilityImpact(markets, markets),
+      marketsAfter: markets,
+      whyChanged: intel.whyChanged,
+    };
+  });
+}
+
+function buildLiveFromBundle(
+  bundle: ApexMatchBundle,
+  preview: MatchCenterData["preview"],
+): MatchCenterLiveData {
   const homeShort = shortName(
     bundle.homeTeam.name,
     bundle.homeTeam.shortName,
@@ -74,9 +265,12 @@ function buildLiveFromBundle(bundle: ApexMatchBundle): MatchCenterLiveData {
     bundle.awayTeam.name,
     bundle.awayTeam.shortName,
   );
-
+  const markets = marketsFromPreview(preview);
+  const events = visionEventsFromBundle(bundle, markets);
+  const homeGoals = bundle.match.score.home ?? 0;
+  const awayGoals = bundle.match.score.away ?? 0;
+  const lastEvent = events[events.length - 1];
   const vision: VisionLiveState = {
-    ...seed,
     matchId: bundle.match.id,
     leagueName: bundle.league?.name ?? "Football",
     homeTeam: {
@@ -89,55 +283,31 @@ function buildLiveFromBundle(bundle: ApexMatchBundle): MatchCenterLiveData {
       name: bundle.awayTeam.name,
       shortName: awayShort,
     },
-    score: {
-      home: bundle.match.score.home ?? 0,
-      away: bundle.match.score.away ?? 0,
-    },
-    minute: bundle.match.minute ?? seed.minute,
-    events:
-      bundle.events.length > 0
-        ? bundle.events.slice(-8).map((event, index) => ({
-            id: event.id,
-            minute: event.minute ?? 0,
-            type: "pase" as const,
-            side:
-              event.teamId === bundle.homeTeam.id
-                ? ("home" as const)
-                : ("away" as const),
-            label: event.type.replaceAll("_", " "),
-            detail:
-              typeof event.payload.playerName === "string"
-                ? String(event.payload.playerName)
-                : event.type,
-            ballTo: seed.ball,
-            aiExplanation: `Evento ${event.type} (Data Platform).`,
-            momentumDelta: 0,
-            probabilityImpact: {
-              homeWin: 0,
-              draw: 0,
-              awayWin: 0,
-              over25: 0,
-              btts: 0,
-            },
-            marketsAfter: seed.markets,
-            whyChanged: [
-              {
-                id: `dp-${index}`,
-                label: "Fuente",
-                direction: "neutral" as const,
-                detail: `Provider ${event.sourceProvider}`,
-              },
-            ],
-          }))
-        : seed.events,
+    score: { home: homeGoals, away: awayGoals },
+    minute: bundle.match.minute ?? lastEvent?.minute ?? 0,
+    players: visionPlayersFromBundle(bundle),
+    ball: lastEvent?.ballTo ?? { x: 50, y: 50 },
+    momentum: Math.max(-100, Math.min(100, (homeGoals - awayGoals) * 22)),
+    pressure: Math.max(20, Math.min(80, 50 + (homeGoals - awayGoals) * 12)),
+    pressureSide: homeGoals >= awayGoals ? "home" : "away",
+    possessionHome: Math.max(35, Math.min(65, 50 + (homeGoals - awayGoals) * 5)),
+    markets,
+    confidence: preview.analysis.confidence.value,
+    risk: preview.analysis.confidence.band === "low" ? "high" : preview.analysis.confidence.band,
+    riskLabel: preview.analysis.predictedOutcome === "home"
+      ? `Lectura PE: ${bundle.homeTeam.name}`
+      : preview.analysis.predictedOutcome === "away"
+        ? `Lectura PE: ${bundle.awayTeam.name}`
+        : "Lectura PE: empate",
     aiInsight:
       bundle.events.length > 0
         ? `Timeline con ${bundle.events.length} eventos desde ${bundle.provenance.primaryProvider}.`
-        : seed.aiInsight,
-    source: "mock",
+        : `Sin eventos de timeline en ${bundle.provenance.primaryProvider}. Probabilidades del Probability Engine.`,
+    events,
+    source: "data-platform",
   };
 
-  return { vision, source: "mock" };
+  return { vision, source: "data-platform" };
 }
 
 function buildPostFromBundle(
@@ -160,6 +330,18 @@ function buildPostFromBundle(
     (oneXTwo.home - observed.home) ** 2 +
     (oneXTwo.draw - observed.draw) ** 2 +
     (oneXTwo.away - observed.away) ** 2;
+
+  const eventNotes = bundle.events.slice(-4).map((event, index) => ({
+    id: `dp-evt-${index}`,
+    severity: (event.type === "red_card" || event.type === "goal"
+      ? "medium"
+      : "low") as "low" | "medium" | "high",
+    title: eventLabel(event.type),
+    detail:
+      typeof event.payload.playerName === "string"
+        ? `${event.payload.playerName} · min ${event.minute ?? "—"}`
+        : `Min ${event.minute ?? "—"} · ${bundle.provenance.primaryProvider}`,
+  }));
 
   return {
     finishedAt: bundle.match.updatedAt,
@@ -186,6 +368,20 @@ function buildPostFromBundle(
         preMatchProbability: oneXTwo[predictedOutcome],
         hit: outcomeHit,
       },
+      {
+        id: "mv-ou25",
+        market: "over_under",
+        label: "Over / Under 2.5",
+        selection: preview.hybrid.overUnder25.over >= 0.5 ? "Over 2.5" : "Under 2.5",
+        preMatchProbability: Math.max(
+          preview.hybrid.overUnder25.over,
+          preview.hybrid.overUnder25.under,
+        ),
+        hit:
+          preview.hybrid.overUnder25.over >= 0.5
+            ? home + away > 2.5
+            : home + away <= 2.5,
+      },
     ],
     metrics: {
       brierScore: Number(brierScore.toFixed(3)),
@@ -201,17 +397,19 @@ function buildPostFromBundle(
         title: "Fuente de datos",
         detail: `Partido ingerido vía ${bundle.provenance.primaryProvider}. Trust: ${bundle.trustScore?.band ?? "n/a"}.`,
       },
+      ...eventNotes,
     ],
     recommendations: [
       {
         id: "dp-rec-1",
-        priority: "medium",
-        title: "Conectar Learning Engine",
-        detail:
-          "Cuando el Learning Engine esté cableado, este cierre alimentará biases y calibración automáticamente.",
+        priority: outcomeHit ? "low" : "medium",
+        title: outcomeHit ? "Señal PE confirmada" : "Desvío vs PE",
+        detail: outcomeHit
+          ? "El Probability Engine acertó el 1X2 con el catálogo API-Football."
+          : "El resultado real no coincidió con el 1X2 del Probability Engine. Usar el error de Brier para el siguiente ciclo.",
       },
     ],
-    source: "mock",
+    source: "data-platform",
   };
 }
 
@@ -244,6 +442,7 @@ export function createMatchCenterFromApexBundle(
 
   const match: MatchCenterMeta = {
     matchId: bundle.match.id,
+    externalId: bundle.match.externalRefs[0]?.externalId ?? null,
     leagueName: bundle.league?.name ?? "Football",
     kickoffAt: bundle.match.kickoffAt,
     status,
@@ -259,9 +458,22 @@ export function createMatchCenterFromApexBundle(
   };
 
   const homeElo =
-    options.homeElo ?? estimateEloFromTeamId(bundle.homeTeam.id, 1580);
+    options.homeElo ??
+    eloFromCatalogue(
+      options.enrichment?.teamStats?.home,
+      bundle.homeTeam.id,
+      1580,
+    );
   const awayElo =
-    options.awayElo ?? estimateEloFromTeamId(bundle.awayTeam.id, 1520);
+    options.awayElo ??
+    eloFromCatalogue(
+      options.enrichment?.teamStats?.away,
+      bundle.awayTeam.id,
+      1520,
+    );
+  const eloFromStats =
+    hasPlayed(options.enrichment?.teamStats?.home) ||
+    hasPlayed(options.enrichment?.teamStats?.away);
 
   const aiAnalysis = createMatchAnalysisService().analyzeBundle(bundle, {
     homeElo,
@@ -300,13 +512,17 @@ export function createMatchCenterFromApexBundle(
           title: `Riesgo ${aiAnalysis.riskLevel}`,
           detail: aiAnalysis.recommendation.rationale,
         },
-        {
-          id: "r-elo-est",
-          severity: "medium" as const,
-          title: "Elo estimado",
-          detail:
-            "Ratings Elo aún no vienen del catálogo; se estiman del team id hasta cablear EloRatingProvider.",
-        },
+        ...(!eloFromStats
+          ? [
+              {
+                id: "r-elo-est",
+                severity: "medium" as const,
+                title: "Elo estimado",
+                detail:
+                  "Ratings Elo se derivan del catálogo cuando hay estadísticas de equipo; si no, se estiman del team id.",
+              },
+            ]
+          : []),
       ],
       explanation: {
         summary: aiAnalysis.explainability.summary,
@@ -321,12 +537,9 @@ export function createMatchCenterFromApexBundle(
         narrative: aiAnalysis.explainability.narrative ?? "",
       },
     },
-    source: "mock",
+    source: "intelligence-core",
   });
 
-  // Mark analysis source as intelligence-core-shaped but data from platform;
-  // keep preview.source as mock for Elo until ratings provider exists.
-  preview.analysis.source = "mock";
   preview.analysis.modelVersion = `${preview.hybrid.modelVersion}+data-platform`;
   preview.dashboard = buildPreviewDashboard({
     btts: preview.hybrid.btts,
@@ -341,7 +554,7 @@ export function createMatchCenterFromApexBundle(
     awayTeam,
   });
 
-  const live = buildLiveFromBundle(bundle);
+  const live = buildLiveFromBundle(bundle, preview);
   const post = buildPostFromBundle(bundle, preview);
 
   return {

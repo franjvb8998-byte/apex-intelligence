@@ -1,4 +1,8 @@
 export { MatchCenterView } from "@/components/match-center/match-center-view";
+export {
+  MatchCenterDetail,
+  MatchCenterList,
+} from "@/components/match-center/match-center-screen";
 export { MatchCenterHeader } from "@/components/match-center/match-center-header";
 export { AiMatchAnalysisPanel } from "@/components/match-center/ai-match-analysis-panel";
 export { PhaseTabs } from "@/components/match-center/phase-tabs";

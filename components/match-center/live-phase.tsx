@@ -49,9 +49,9 @@ export function LivePhase({ data }: LivePhaseProps) {
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="danger">Live</Badge>
           <Badge tone="accent">APEX Vision</Badge>
-          {data.source === "mock" && (
-            <Badge>Mock · {TICK_MS / 1000}s</Badge>
-          )}
+        {data.source === "data-platform" && (
+          <Badge>API-Football</Badge>
+        )}
         </div>
         <Card padding="sm" className="min-w-[10rem] text-center">
           <p className="font-mono text-2xl font-bold tabular-nums text-white">

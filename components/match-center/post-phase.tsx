@@ -62,6 +62,9 @@ export function PostPhase({ data, homeShort, awayShort }: PostPhaseProps) {
         {data.source === "mock" && (
           <Badge tone="warning">Learning simulado</Badge>
         )}
+        {data.source === "data-platform" && (
+          <Badge>API-Football</Badge>
+        )}
         <Badge tone={data.outcomeHit ? "accent" : "danger"}>
           {data.outcomeHit ? "Hit" : "Miss"}
         </Badge>

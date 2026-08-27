@@ -36,6 +36,8 @@ export type MatchCenterTeam = {
 
 export type MatchCenterMeta = {
   matchId: UUID;
+  /** Vendor fixture id (API-Football) when loaded from Data Platform. */
+  externalId?: string | null;
   leagueName: string;
   kickoffAt: string;
   /** Canonical match status from the catalogue layer. */
@@ -110,13 +112,13 @@ export type MatchCenterPreviewData = {
     btts: BothTeamsToScoreProbability;
   };
   dashboard: MatchCenterPreviewDashboard;
-  source: "mock" | "intelligence-core";
+  source: "mock" | "intelligence-core" | "data-platform";
 };
 
 /** In-play (Live) payload — APEX Vision state, ready for realtime swap. */
 export type MatchCenterLiveData = {
   vision: VisionLiveState;
-  source: "mock" | "realtime";
+  source: "mock" | "realtime" | "data-platform";
 };
 
 export type MatchCenterMarketVerdict = {
@@ -166,16 +168,16 @@ export type MatchCenterPostData = {
   learningSummary: string;
   notes: MatchCenterLearningNote[];
   recommendations: MatchCenterRecommendation[];
-  source: "mock" | "learning-engine";
+  source: "mock" | "learning-engine" | "data-platform";
 };
 
 /**
  * Full Match Center screen payload.
- * Replace `getMockMatchCenter()` with Core / Vision / Learning adapters later.
+ * Preview / Live / Post are built from the selected Data Platform fixture.
  */
 export type MatchCenterData = {
   match: MatchCenterMeta;
-  /** Phase highlighted on first paint (derived from match.status in mock). */
+  /** Phase highlighted on first paint (derived from match.status). */
   defaultPhase: MatchCenterPhase;
   preview: MatchCenterPreviewData;
   live: MatchCenterLiveData;

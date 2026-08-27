@@ -107,5 +107,5 @@ export type VisionLiveState = {
   riskLabel: string;
   aiInsight: string;
   events: VisionLiveEvent[];
-  source: "mock";
+  source: "mock" | "data-platform" | "realtime";
 };
