@@ -10,6 +10,11 @@ export type ScoreMatrixMarginals = {
   coveredMass: number;
 };
 
+export type BothTeamsToScoreProbability = {
+  yes: number;
+  no: number;
+};
+
 /**
  * Build a truncated independent-Poisson score grid and marginalize.
  *
@@ -77,4 +82,35 @@ export function marginalizePoissonScoreGrid(input: {
     },
     coveredMass,
   };
+}
+
+/**
+ * P(home ≥ 1 and away ≥ 1) from independent Poisson lambdas.
+ * Uses the same truncated score grid as 1X2 / O/U — not a separate engine.
+ */
+export function bothTeamsToScoreFromLambdas(input: {
+  lambdaHome: number;
+  lambdaAway: number;
+  maxGoals: number;
+}): BothTeamsToScoreProbability {
+  const { lambdaHome, lambdaAway, maxGoals } = input;
+  let yes = 0;
+  let no = 0;
+  let coveredMass = 0;
+
+  for (let i = 0; i <= maxGoals; i += 1) {
+    for (let j = 0; j <= maxGoals; j += 1) {
+      const p = scorelineProbability(i, j, lambdaHome, lambdaAway);
+      coveredMass += p;
+      if (i >= 1 && j >= 1) yes += p;
+      else no += p;
+    }
+  }
+
+  if (coveredMass <= 0) {
+    throw new Error("Poisson score grid produced zero probability mass");
+  }
+
+  const binary = normalizeBinary(yes / coveredMass, no / coveredMass);
+  return { yes: binary.over, no: binary.under };
 }

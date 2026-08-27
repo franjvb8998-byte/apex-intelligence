@@ -97,7 +97,7 @@ export function DashboardMatchList({
                   </Badge>
                   {match.externalId && (
                     <Link
-                      href="/match-center"
+                      href={`/match-center?matchId=${encodeURIComponent(match.externalId)}`}
                       className="text-xs text-[var(--apex-accent)] hover:text-[var(--apex-accent-hover)]"
                     >
                       Ver

@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
+import { PasswordRecoveryRedirect } from "@/components/auth/password-recovery-redirect";
+import { PASSWORD_RECOVERY_BOOTSTRAP_SCRIPT } from "@/lib/auth/password-recovery";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -24,7 +27,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <Script id="password-recovery-redirect" strategy="beforeInteractive">
+          {PASSWORD_RECOVERY_BOOTSTRAP_SCRIPT}
+        </Script>
+        <PasswordRecoveryRedirect />
+        {children}
+      </body>
     </html>
   );
 }

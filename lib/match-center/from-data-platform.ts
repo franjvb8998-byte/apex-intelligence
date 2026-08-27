@@ -10,7 +10,9 @@ import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
 import type { ApexMatchStatus } from "@/lib/data-platform/types/match";
 import type { MatchOutcome } from "@/lib/intelligence/types";
 import { createMatchAnalysisService } from "@/lib/match-analysis/match-analysis-service";
+import { buildPreviewDashboard } from "@/lib/match-center/dashboard";
 import { buildPreviewFromEngine } from "@/lib/match-center/from-probability";
+import type { MatchCenterEnrichment } from "@/lib/match-center/enrich";
 import type {
   MatchCenterData,
   MatchCenterLiveData,
@@ -217,6 +219,8 @@ export type MatchCenterFromBundleOptions = {
   /** Override default Elo derivation. */
   homeElo?: number;
   awayElo?: number;
+  /** Catalogue extras (form, H2H, injuries) from the data layer. */
+  enrichment?: MatchCenterEnrichment;
 };
 
 /**
@@ -246,6 +250,12 @@ export function createMatchCenterFromApexBundle(
     homeTeam,
     awayTeam,
     source: "data-platform",
+    providerLabel:
+      bundle.provenance.primaryProvider === "api-football"
+        ? "API-Football"
+        : bundle.provenance.primaryProvider === "mock"
+          ? "Mock"
+          : bundle.provenance.primaryProvider,
   };
 
   const homeElo =
@@ -256,6 +266,8 @@ export function createMatchCenterFromApexBundle(
   const aiAnalysis = createMatchAnalysisService().analyzeBundle(bundle, {
     homeElo,
     awayElo,
+    teamStats: options.enrichment?.teamStats,
+    injuries: options.enrichment?.injuries,
   });
 
   const preview = buildPreviewFromEngine({
@@ -316,6 +328,18 @@ export function createMatchCenterFromApexBundle(
   // keep preview.source as mock for Elo until ratings provider exists.
   preview.analysis.source = "mock";
   preview.analysis.modelVersion = `${preview.hybrid.modelVersion}+data-platform`;
+  preview.dashboard = buildPreviewDashboard({
+    btts: preview.hybrid.btts,
+    oneXTwo: preview.analysis.oneXTwo,
+    overUnder25: preview.hybrid.overUnder25,
+    odds: bundle.odds,
+    analysis: aiAnalysis,
+    teamStats: options.enrichment?.teamStats,
+    h2h: options.enrichment?.h2h,
+    injuries: options.enrichment?.injuries ?? aiAnalysis.injuries,
+    homeTeam,
+    awayTeam,
+  });
 
   const live = buildLiveFromBundle(bundle);
   const post = buildPostFromBundle(bundle, preview);

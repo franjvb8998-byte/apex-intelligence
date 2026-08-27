@@ -194,6 +194,42 @@ function mapEvents(
     .map((event, index) => ({ ...event, sequence: index + 1 }));
 }
 
+function parseDecimalOdds(raw: string): number | null {
+  const decimalOdds = Number.parseFloat(raw);
+  return Number.isFinite(decimalOdds) ? decimalOdds : null;
+}
+
+function impliedFromDecimal(decimalOdds: number | null): number | null {
+  return decimalOdds != null && decimalOdds > 0 ? 1 / decimalOdds : null;
+}
+
+function mapOneXTwoKey(value: string): string {
+  const normalized = value.toLowerCase();
+  if (normalized === "home" || value === "1") return "home";
+  if (normalized === "away" || value === "2") return "away";
+  return "draw";
+}
+
+function parseOverUnder(value: string): { key: "over" | "under"; line: number } | null {
+  const match = value.trim().match(/^(over|under)\s+([0-9]+(?:\.[0-9]+)?)/i);
+  if (!match) return null;
+  const line = Number.parseFloat(match[2]!);
+  if (!Number.isFinite(line)) return null;
+  return {
+    key: match[1]!.toLowerCase() === "over" ? "over" : "under",
+    line,
+  };
+}
+
+function mapBttsKey(value: string): "yes" | "no" | null {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "yes" || normalized === "si" || normalized === "sí") {
+    return "yes";
+  }
+  if (normalized === "no") return "no";
+  return null;
+}
+
 function mapOdds(
   matchId: string,
   oddsItems: ApiFootballOddsItem[] | null | undefined,
@@ -207,27 +243,103 @@ function mapOdds(
     const name = bet.name.toLowerCase();
     if (name.includes("match winner") || name === "1x2") {
       const selections = bet.values.map((value) => {
-        const decimalOdds = Number.parseFloat(value.odd);
-        const key =
-          value.value.toLowerCase() === "home" || value.value === "1"
-            ? "home"
-            : value.value.toLowerCase() === "away" || value.value === "2"
-              ? "away"
-              : "draw";
+        const decimalOdds = parseDecimalOdds(value.odd);
         return {
-          key,
+          key: mapOneXTwoKey(value.value),
           label: value.value,
-          decimalOdds: Number.isFinite(decimalOdds) ? decimalOdds : null,
-          impliedProbability:
-            Number.isFinite(decimalOdds) && decimalOdds > 0
-              ? 1 / decimalOdds
-              : null,
+          decimalOdds,
+          impliedProbability: impliedFromDecimal(decimalOdds),
         };
       });
       quotes.push({
         id: apexIdFor(PROVIDER, "odds", `${matchId}-1x2-${bookmaker.id}`),
         matchId,
         market: "1x2",
+        line: null,
+        bookmaker: bookmaker.name,
+        selections,
+        capturedAt: nowIso(),
+        sourceProvider: PROVIDER,
+        externalRefs: [
+          { provider: PROVIDER, externalId: `bet-${bet.id}` },
+        ],
+      });
+      continue;
+    }
+
+    if (
+      name.includes("goals over/under") ||
+      name.includes("over/under") ||
+      name === "goals over/under"
+    ) {
+      const byLine = new Map<
+        number,
+        Array<{
+          key: string;
+          label: string;
+          decimalOdds: number | null;
+          impliedProbability: number | null;
+        }>
+      >();
+      for (const value of bet.values) {
+        const parsed = parseOverUnder(value.value);
+        if (!parsed) continue;
+        const decimalOdds = parseDecimalOdds(value.odd);
+        const list = byLine.get(parsed.line) ?? [];
+        list.push({
+          key: parsed.key,
+          label: value.value,
+          decimalOdds,
+          impliedProbability: impliedFromDecimal(decimalOdds),
+        });
+        byLine.set(parsed.line, list);
+      }
+      for (const [line, selections] of byLine) {
+        if (selections.length === 0) continue;
+        quotes.push({
+          id: apexIdFor(
+            PROVIDER,
+            "odds",
+            `${matchId}-ou-${line}-${bookmaker.id}`,
+          ),
+          matchId,
+          market: "over_under",
+          line,
+          bookmaker: bookmaker.name,
+          selections,
+          capturedAt: nowIso(),
+          sourceProvider: PROVIDER,
+          externalRefs: [
+            { provider: PROVIDER, externalId: `bet-${bet.id}-${line}` },
+          ],
+        });
+      }
+      continue;
+    }
+
+    if (
+      name.includes("both teams score") ||
+      name.includes("both teams to score") ||
+      name === "btts"
+    ) {
+      const selections = bet.values.flatMap((value) => {
+        const key = mapBttsKey(value.value);
+        if (!key) return [];
+        const decimalOdds = parseDecimalOdds(value.odd);
+        return [
+          {
+            key,
+            label: value.value,
+            decimalOdds,
+            impliedProbability: impliedFromDecimal(decimalOdds),
+          },
+        ];
+      });
+      if (selections.length === 0) continue;
+      quotes.push({
+        id: apexIdFor(PROVIDER, "odds", `${matchId}-btts-${bookmaker.id}`),
+        matchId,
+        market: "btts",
         line: null,
         bookmaker: bookmaker.name,
         selections,

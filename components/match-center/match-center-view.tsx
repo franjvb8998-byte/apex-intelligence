@@ -49,7 +49,7 @@ export function MatchCenterView({
       <Card padding="lg">
         <CardHeader
           title="AI Match Analysis"
-          description="Flujo completo: Data Platform · Probability Engine · Reasoning (reglas)."
+          description="Data Platform · Probability Engine · Reasoning (reglas, sin LLM)."
         />
         <AiMatchAnalysisPanel analysis={data.aiAnalysis} />
       </Card>

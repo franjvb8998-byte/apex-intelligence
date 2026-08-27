@@ -4,6 +4,7 @@
  */
 
 import {
+  createApiFootballDataProvider,
   createApiFootballProvider,
   createDataPlatform,
   createDataProviderFromEnv,
@@ -12,6 +13,7 @@ import {
   RECORDED_API_FOOTBALL_FIXTURE_ID,
   type IDataProvider,
 } from "@/lib/data-platform";
+import { enrichMatchCenterContext } from "@/lib/match-center/enrich";
 import { createMatchCenterFromApexBundle } from "@/lib/match-center/from-data-platform";
 import { getMockMatchCenter } from "@/lib/match-center/mock-data";
 import type { MatchCenterData } from "@/lib/match-center/types";
@@ -35,7 +37,8 @@ export async function getMatchCenterData(
     const provider = options.provider ?? createDataProviderFromEnv();
     const matchId = options.externalMatchId ?? getDefaultMatchId();
     const bundle = await provider.getMatch({ matchId });
-    return createMatchCenterFromApexBundle(bundle);
+    const enrichment = await enrichMatchCenterContext(provider, bundle);
+    return createMatchCenterFromApexBundle(bundle, { enrichment });
   } catch (error) {
     if (options.requireProvider) throw error;
     console.error(
@@ -68,5 +71,9 @@ export async function loadMatchCenterFromApiFootball(
     externalMatchId,
   });
 
-  return createMatchCenterFromApexBundle(bundle);
+  const provider =
+    options.provider ??
+    createApiFootballDataProvider({ apiKey: null, env: {}, useCache: false });
+  const enrichment = await enrichMatchCenterContext(provider, bundle);
+  return createMatchCenterFromApexBundle(bundle, { enrichment });
 }

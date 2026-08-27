@@ -22,6 +22,15 @@ describe("Match Center ← Data Platform", () => {
     expect(data.match.source).toBe("data-platform");
     expect(data.match.homeTeam.name).toBe("Northbridge FC");
     expect(data.match.awayTeam.name).toBe("Southport United");
+    expect(data.preview.hybrid.btts.yes + data.preview.hybrid.btts.no).toBeCloseTo(
+      1,
+    );
+    expect(data.preview.dashboard.odds.length).toBeGreaterThan(0);
+    expect(
+      data.preview.dashboard.odds.some((row) => row.market === "1x2"),
+    ).toBe(true);
+    expect(data.preview.dashboard.recommendation.title).toBeTruthy();
+    expect(data.match.providerLabel).toBe("Mock");
   });
 
   it("builds MatchCenterData from API-Football recorded match (legacy path)", async () => {
@@ -36,6 +45,10 @@ describe("Match Center ← Data Platform", () => {
     expect(data.defaultPhase).toBe("post");
     expect(data.post.finalScore).toEqual({ home: 2, away: 1 });
     expect(data.preview.analysis.oneXTwo.home).toBeGreaterThan(0);
+    expect(data.preview.hybrid.btts.yes).toBeGreaterThan(0);
+    expect(data.preview.dashboard.form.home?.form).toBeTruthy();
+    expect(data.preview.dashboard.form.away?.teamName).toBe("Chelsea");
+    expect(data.aiAnalysis.recentForm.home).toBeTruthy();
   });
 
   it("maps ingested bundle via createMatchCenterFromApexBundle", async () => {
@@ -50,5 +63,18 @@ describe("Match Center ← Data Platform", () => {
     const center = createMatchCenterFromApexBundle(bundle);
     expect(center.match.leagueName).toBe("Premier League");
     expect(center.live.vision.homeTeam.name).toBe("Arsenal");
+  });
+
+  it("joins mock catalogue odds into EV rows", async () => {
+    const data = await getMatchCenterData({
+      externalMatchId: DEMO_MATCH_EXTERNAL_ID,
+      requireProvider: true,
+    });
+    const home = data.preview.dashboard.odds.find(
+      (row) => row.market === "1x2" && row.selection === "home",
+    );
+    expect(home?.decimalOdds).toBe(2.1);
+    expect(home?.modelProbability).toBeGreaterThan(0);
+    expect(home?.expectedValue).not.toBeNull();
   });
 });

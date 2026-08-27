@@ -31,7 +31,7 @@ const features = [
 export default function Home() {
   return (
     <PageShell>
-      <div className="w-full">
+        <div className="w-full">
         <section className="mx-auto max-w-3xl text-center">
           <div className="mb-6 inline-flex items-center rounded-full border border-[#00D4AA]/20 bg-[#00D4AA]/10 px-4 py-1.5 text-sm text-[#00D4AA]">
             Plataforma de análisis deportivo · Release 0.1

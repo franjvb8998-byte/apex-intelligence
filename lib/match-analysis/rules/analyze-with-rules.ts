@@ -498,7 +498,10 @@ export function analyzeMatchWithRules(input: MatchAnalysisInput): MatchAnalysis 
       summary: formSummary(homeForm, awayForm),
     },
     keyPlayers: deriveKeyPlayers(input),
-    injuries: deriveInjuries(input),
+    injuries:
+      input.injuries && input.injuries.length > 0
+        ? input.injuries
+        : deriveInjuries(input),
     expectedGoals,
     riskLevel,
     recommendation,

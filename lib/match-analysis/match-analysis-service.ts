@@ -79,6 +79,7 @@ export class MatchAnalysisService {
       timeline: bundle.events,
       players: bundle.players,
       marketOdds: options.marketOdds ?? oddsFromBundle,
+      injuries: options.injuries,
     };
 
     return this.analyze(input);
@@ -91,17 +92,38 @@ export function createMatchAnalysisService(
   return new MatchAnalysisService(options);
 }
 
+function decimalFor(
+  quote: ApexMatchBundle["odds"][number] | undefined,
+  keys: string[],
+): number | null {
+  if (!quote) return null;
+  const byKey = Object.fromEntries(
+    quote.selections.map((s) => [s.key.toLowerCase(), s.decimalOdds]),
+  );
+  for (const key of keys) {
+    const value = byKey[key];
+    if (value != null && Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
 function extractOdds(
   bundle: ApexMatchBundle,
 ): MatchAnalysisInput["marketOdds"] | undefined {
   const oneXTwo = bundle.odds.find((o) => o.market === "1x2");
-  if (!oneXTwo) return undefined;
-  const byKey = Object.fromEntries(
-    oneXTwo.selections.map((s) => [s.key.toLowerCase(), s.decimalOdds]),
+  const overUnder = bundle.odds.find(
+    (o) => o.market === "over_under" && (o.line == null || o.line === 2.5),
   );
+  const btts = bundle.odds.find((o) => o.market === "btts");
+  if (!oneXTwo && !overUnder && !btts) return undefined;
+
   return {
-    home: byKey.home ?? byKey["1"] ?? null,
-    draw: byKey.draw ?? byKey.x ?? null,
-    away: byKey.away ?? byKey["2"] ?? null,
+    home: decimalFor(oneXTwo, ["home", "1"]),
+    draw: decimalFor(oneXTwo, ["draw", "x"]),
+    away: decimalFor(oneXTwo, ["away", "2"]),
+    over25: decimalFor(overUnder, ["over"]),
+    under25: decimalFor(overUnder, ["under"]),
+    bttsYes: decimalFor(btts, ["yes", "si", "sí"]),
+    bttsNo: decimalFor(btts, ["no"]),
   };
 }

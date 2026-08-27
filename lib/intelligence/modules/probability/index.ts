@@ -17,7 +17,11 @@ export {
   DEFAULT_HYBRID_CONFIG,
   mergeHybridConfig,
 } from "@/lib/intelligence/modules/probability/hybrid/config";
-export { marginalizePoissonScoreGrid } from "@/lib/intelligence/modules/probability/hybrid/score-matrix";
+export {
+  bothTeamsToScoreFromLambdas,
+  marginalizePoissonScoreGrid,
+} from "@/lib/intelligence/modules/probability/hybrid/score-matrix";
+export type { BothTeamsToScoreProbability } from "@/lib/intelligence/modules/probability/hybrid/score-matrix";
 export type {
   EloRatingProvider,
   HybridProbabilityConfig,

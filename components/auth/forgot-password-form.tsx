@@ -1,34 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { AuthCard } from "@/components/ui/auth-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getPasswordResetEmailRedirectTo } from "@/lib/auth/password-recovery";
 import { getAuthErrorMessage } from "@/lib/supabase/auth-errors";
 import { createClient } from "@/lib/supabase/client";
-import { isValidEmail, validatePassword } from "@/lib/validation";
+import { isValidEmail } from "@/lib/validation";
 
-type LoginErrors = {
+type ForgotPasswordErrors = {
   email?: string;
-  password?: string;
   form?: string;
 };
 
-export function LoginForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") ?? "/dashboard";
-  const passwordUpdated = searchParams.get("password_updated") === "1";
-
+export function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState<LoginErrors>({});
+  const [errors, setErrors] = useState<ForgotPasswordErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
-  function validate(): LoginErrors {
-    const nextErrors: LoginErrors = {};
+  function validate(): ForgotPasswordErrors {
+    const nextErrors: ForgotPasswordErrors = {};
 
     if (!email.trim()) {
       nextErrors.email = "El email es obligatorio.";
@@ -36,14 +30,12 @@ export function LoginForm() {
       nextErrors.email = "Introduce un email válido.";
     }
 
-    const passwordError = validatePassword(password);
-    if (passwordError) nextErrors.password = passwordError;
-
     return nextErrors;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setEmailSent(false);
 
     const validationErrors = validate();
     setErrors(validationErrors);
@@ -53,9 +45,8 @@ export function LoginForm() {
     setIsSubmitting(true);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: getPasswordResetEmailRedirectTo(window.location.origin),
     });
 
     setIsSubmitting(false);
@@ -65,22 +56,22 @@ export function LoginForm() {
       return;
     }
 
-    router.push(redirectTo);
-    router.refresh();
+    setErrors({});
+    setEmailSent(true);
   }
 
   return (
     <AuthCard
-      title="Iniciar sesión"
-      subtitle="Accede a tu panel de análisis deportivo"
+      title="Recuperar contraseña"
+      subtitle="Te enviaremos un enlace para crear una nueva contraseña"
       footer={
         <>
-          ¿No tienes cuenta?{" "}
+          ¿La recuerdas?{" "}
           <Link
-            href="/register"
+            href="/login"
             className="font-medium text-[#00D4AA] transition-colors hover:text-[#00eabb]"
           >
-            Crear cuenta
+            Iniciar sesión
           </Link>
         </>
       }
@@ -97,43 +88,26 @@ export function LoginForm() {
           error={errors.email}
         />
 
-        <Input
-          label="Contraseña"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          placeholder="••••••••"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          error={errors.password}
-        />
-
-        <div className="flex justify-end">
-          <Link
-            href="/forgot-password"
-            className="text-sm font-medium text-[#00D4AA] transition-colors hover:text-[#00eabb]"
-          >
-            ¿Olvidaste tu contraseña?
-          </Link>
-        </div>
-
-        {passwordUpdated && (
-          <p
-            className="rounded-lg border border-[#00D4AA]/30 bg-[#00D4AA]/10 px-4 py-3 text-sm text-[#00D4AA]"
-            role="status"
-          >
-            Contraseña actualizada. Inicia sesión con tu nueva contraseña.
-          </p>
-        )}
-
         {errors.form && (
-          <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400" role="alert">
+          <p
+            className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+            role="alert"
+          >
             {errors.form}
           </p>
         )}
 
+        {emailSent && (
+          <p
+            className="rounded-lg border border-[#00D4AA]/30 bg-[#00D4AA]/10 px-4 py-3 text-sm text-[#00D4AA]"
+            role="status"
+          >
+            Revisa tu email para restablecer la contraseña.
+          </p>
+        )}
+
         <Button type="submit" fullWidth disabled={isSubmitting}>
-          {isSubmitting ? "Iniciando sesión..." : "Iniciar sesión"}
+          {isSubmitting ? "Enviando enlace..." : "Enviar enlace"}
         </Button>
       </form>
     </AuthCard>

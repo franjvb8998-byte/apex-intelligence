@@ -5,3 +5,8 @@ export { PhaseTabs } from "@/components/match-center/phase-tabs";
 export { PreviewPhase } from "@/components/match-center/preview-phase";
 export { LivePhase } from "@/components/match-center/live-phase";
 export { PostPhase } from "@/components/match-center/post-phase";
+export { RecommendationCard } from "@/components/match-center/recommendation-card";
+export { OddsEvCard } from "@/components/match-center/odds-ev-card";
+export { TeamFormCard } from "@/components/match-center/team-form-card";
+export { HeadToHeadCard } from "@/components/match-center/head-to-head-card";
+export { InjuriesCard } from "@/components/match-center/injuries-card";

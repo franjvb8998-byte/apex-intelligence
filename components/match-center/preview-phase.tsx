@@ -8,6 +8,11 @@ import {
   ScoreGauge,
 } from "@/components/design-system";
 import { ExplanationPanel as DsExplanationPanel } from "@/components/design-system";
+import { HeadToHeadCard } from "@/components/match-center/head-to-head-card";
+import { InjuriesCard } from "@/components/match-center/injuries-card";
+import { OddsEvCard } from "@/components/match-center/odds-ev-card";
+import { RecommendationCard } from "@/components/match-center/recommendation-card";
+import { TeamFormCard } from "@/components/match-center/team-form-card";
 import { KeyFactors } from "@/components/match-analysis/key-factors";
 import { RisksPanel } from "@/components/match-analysis/risks-panel";
 import type { MatchCenterPreviewData } from "@/lib/match-center/types";
@@ -18,17 +23,22 @@ const outcomeLabel = {
   away: "Victoria visitante",
 } as const;
 
+const confidenceLabel = {
+  high: "Alta",
+  medium: "Media",
+  low: "Baja",
+} as const;
+
 type PreviewPhaseProps = {
   data: MatchCenterPreviewData;
 };
 
 /**
- * Preview cards — consume MatchCenterPreviewData.
- * Probabilities originate from ProbabilityEngine via the adapter;
- * swap `source` when Core is wired.
+ * Match Center Preview — dashboard profesional pre-partido.
+ * Probabilities from Probability Engine; odds/form/H2H/injuries from Data Platform.
  */
 export function PreviewPhase({ data }: PreviewPhaseProps) {
-  const { analysis, hybrid } = data;
+  const { analysis, hybrid, dashboard } = data;
   const lead =
     analysis.predictedOutcome === "home"
       ? analysis.homeTeam.shortName
@@ -41,14 +51,14 @@ export function PreviewPhase({ data }: PreviewPhaseProps) {
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="info">Preview</Badge>
         <Badge>PE · {hybrid.modelVersion}</Badge>
-        {data.source === "mock" && <Badge tone="warning">Elo simulado</Badge>}
+        {data.source === "mock" && <Badge tone="warning">Elo estimado</Badge>}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-6 lg:col-span-3">
           <Card>
             <CardHeader
-              title="Probabilidad 1X2"
+              title="Probabilidad de victoria / empate / derrota"
               description={`Lectura principal: ${outcomeLabel[analysis.predictedOutcome]}`}
               action={<Badge tone="accent">{lead}</Badge>}
             />
@@ -70,11 +80,56 @@ export function PreviewPhase({ data }: PreviewPhaseProps) {
             />
           </Card>
 
+          <div className="grid gap-6 sm:grid-cols-2">
+            <Card>
+              <CardHeader
+                title="Predicción de goles"
+                description={`Total ${hybrid.expectedGoals.total.toFixed(2)} xG`}
+              />
+              <dl className="grid grid-cols-2 gap-3 text-center">
+                <div>
+                  <dt className="text-[11px] uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
+                    {analysis.homeTeam.shortName}
+                  </dt>
+                  <dd className="mt-1 text-2xl font-semibold tabular-nums text-[var(--apex-fg)]">
+                    {hybrid.expectedGoals.home.toFixed(2)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
+                    {analysis.awayTeam.shortName}
+                  </dt>
+                  <dd className="mt-1 text-2xl font-semibold tabular-nums text-[var(--apex-fg)]">
+                    {hybrid.expectedGoals.away.toFixed(2)}
+                  </dd>
+                </div>
+              </dl>
+            </Card>
+
+            <Card>
+              <CardHeader
+                title="BTTS"
+                description="Ambos marcan (malla Poisson del PE)"
+              />
+              <div className="grid gap-2">
+                <MarketChip
+                  interactive={false}
+                  selected={hybrid.btts.yes >= hybrid.btts.no}
+                  label="Sí"
+                  value={`${Math.round(hybrid.btts.yes * 100)}%`}
+                />
+                <MarketChip
+                  interactive={false}
+                  selected={hybrid.btts.no > hybrid.btts.yes}
+                  label="No"
+                  value={`${Math.round(hybrid.btts.no * 100)}%`}
+                />
+              </div>
+            </Card>
+          </div>
+
           <Card>
-            <CardHeader
-              title="Mercados"
-              description={`xG esperado ${hybrid.expectedGoals.home.toFixed(2)} – ${hybrid.expectedGoals.away.toFixed(2)}`}
-            />
+            <CardHeader title="Over / Under 2.5" />
             <div className="grid gap-2 sm:grid-cols-2">
               <MarketChip
                 interactive={false}
@@ -91,8 +146,10 @@ export function PreviewPhase({ data }: PreviewPhaseProps) {
             </div>
           </Card>
 
+          <OddsEvCard rows={dashboard.odds} />
+
           <DsExplanationPanel
-            title="Explicación APEX"
+            title="Explicación generada por IA"
             summary={analysis.explanation.summary}
             footnotes={analysis.explanation.caveats}
             defaultOpen
@@ -104,11 +161,13 @@ export function PreviewPhase({ data }: PreviewPhaseProps) {
         </div>
 
         <div className="space-y-6 lg:col-span-2">
+          <RecommendationCard dashboard={dashboard} />
+
           <Card className="flex flex-col items-center gap-4">
             <CardHeader
               className="mb-0 w-full"
-              title="APEX Score"
-              description={analysis.apexScore.label}
+              title="Confianza"
+              description={`Banda ${confidenceLabel[analysis.confidence.band]} · ${analysis.apexScore.label}`}
             />
             <ScoreGauge
               value={analysis.apexScore.value}
@@ -126,6 +185,13 @@ export function PreviewPhase({ data }: PreviewPhaseProps) {
           <RisksPanel risks={analysis.risks} />
         </div>
       </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <TeamFormCard home={dashboard.form.home} away={dashboard.form.away} />
+        <HeadToHeadCard meetings={dashboard.h2h} />
+      </div>
+
+      <InjuriesCard injuries={dashboard.injuries} />
     </div>
   );
 }

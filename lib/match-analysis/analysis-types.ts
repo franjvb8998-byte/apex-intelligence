@@ -36,6 +36,21 @@ export type MatchAnalysisTeamStats = {
   away?: MatchAnalysisTeamStatSnapshot | null;
 };
 
+export type MatchAnalysisKeyPlayer = {
+  id: string;
+  name: string;
+  teamId: string | null;
+  position: string;
+  shirtNumber: number | null;
+};
+
+export type MatchAnalysisInjury = {
+  id: string;
+  playerName: string;
+  teamId: string | null;
+  detail: string;
+};
+
 /**
  * Service input — all signals already normalized (no vendor JSON).
  */
@@ -55,8 +70,12 @@ export type MatchAnalysisInput = {
     away?: number | null;
     over25?: number | null;
     under25?: number | null;
+    bttsYes?: number | null;
+    bttsNo?: number | null;
   };
   players?: ApexPlayer[];
+  /** Injury feed from the data layer when available. */
+  injuries?: MatchAnalysisInjury[];
 };
 
 export type MatchAnalysisPrediction = {
@@ -71,21 +90,6 @@ export type MatchAnalysisFactor = {
   label: string;
   detail: string;
   side?: "home" | "away" | "match";
-};
-
-export type MatchAnalysisKeyPlayer = {
-  id: string;
-  name: string;
-  teamId: string | null;
-  position: string;
-  shirtNumber: number | null;
-};
-
-export type MatchAnalysisInjury = {
-  id: string;
-  playerName: string;
-  teamId: string | null;
-  detail: string;
 };
 
 export type MatchAnalysisExpectedGoals = {
@@ -130,6 +134,7 @@ export type MatchAnalysis = {
 export type MatchAnalysisFromBundleOptions = {
   teamStats?: MatchAnalysisTeamStats;
   marketOdds?: MatchAnalysisInput["marketOdds"];
+  injuries?: MatchAnalysisInjury[];
   homeElo?: number;
   awayElo?: number;
 };

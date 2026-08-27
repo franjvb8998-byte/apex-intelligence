@@ -17,18 +17,18 @@ export type BreadcrumbItem = {
 
 export const PRIMARY_NAV: NavItem[] = [
   {
+    id: "match-center",
+    label: "Match Center",
+    href: "/match-center",
+    description: "Dashboard del partido",
+    keywords: ["partido", "analisis", "preview", "ev"],
+  },
+  {
     id: "dashboard",
     label: "Dashboard",
     href: "/dashboard",
     description: "Partidos, ligas y estado del sistema",
     keywords: ["home", "inicio", "overview"],
-  },
-  {
-    id: "match-center",
-    label: "Match Center",
-    href: "/match-center",
-    description: "Preview · Live · Post",
-    keywords: ["partido", "analisis", "preview"],
   },
   {
     id: "copilot",

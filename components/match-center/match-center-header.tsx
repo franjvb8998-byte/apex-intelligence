@@ -66,7 +66,9 @@ export function MatchCenterHeader({
             <Badge tone="warning">{sourceLabel ?? "Datos simulados"}</Badge>
           )}
           {match.source === "data-platform" && (
-            <Badge tone="info">Data Platform · API-Football</Badge>
+            <Badge tone="info">
+              Data Platform · {match.providerLabel ?? "catálogo"}
+            </Badge>
           )}
         </div>
 
@@ -82,8 +84,8 @@ export function MatchCenterHeader({
             {match.awayTeam.name}
           </h1>
           <p className="mt-2 text-sm text-[var(--apex-fg-muted)]">
-            {phaseEyebrow[phase]} — Preview, Live y Post Match en una sola
-            experiencia.
+            {phaseEyebrow[phase]} — dashboard de decisión con probabilidad,
+            EV, mercados y contexto del catálogo.
           </p>
         </div>
       </div>

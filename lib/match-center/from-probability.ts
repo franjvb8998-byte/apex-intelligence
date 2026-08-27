@@ -7,6 +7,7 @@ import {
   createEloPoissonHybridEngine,
   mostLikelyOutcome,
   normalizedEntropy,
+  bothTeamsToScoreFromLambdas,
   type HybridProbabilityResult,
   type ProbabilityEngine,
   type TeamEloInput,
@@ -14,6 +15,7 @@ import {
 import type { ConfidenceScore, MatchOutcome } from "@/lib/intelligence/types";
 import { explainPrediction } from "@/lib/explainable-ai/engine";
 import type { MatchAnalysisData } from "@/lib/match-analysis/types";
+import { placeholderPreviewDashboard } from "@/lib/match-center/dashboard";
 import type {
   MatchCenterPreviewData,
   MatchCenterTeam,
@@ -112,6 +114,11 @@ export function mapHybridToMatchAnalysis(
 ): MatchAnalysisData {
   const predictedOutcome = mostLikelyOutcome(result.oneXTwo);
   const confidence = confidenceFromHybrid(result);
+  const btts = bothTeamsToScoreFromLambdas({
+    lambdaHome: result.poisson.lambdaHome,
+    lambdaAway: result.poisson.lambdaAway,
+    maxGoals: result.meta.config.maxGoals,
+  });
 
   return {
     matchId: context.matchId,
@@ -170,6 +177,24 @@ export function mapHybridToMatchAnalysis(
           },
         ],
       },
+      {
+        id: "m-btts",
+        label: "Both Teams To Score",
+        type: "btts",
+        line: null,
+        selections: [
+          {
+            key: "yes",
+            label: "BTTS Sí",
+            probability: btts.yes,
+          },
+          {
+            key: "no",
+            label: "BTTS No",
+            probability: btts.no,
+          },
+        ],
+      },
     ],
     keyFactors: context.narrative.keyFactors,
     risks: context.narrative.risks,
@@ -192,6 +217,11 @@ export function buildPreviewFromHybrid(
   context: PreviewBuildContext,
 ): MatchCenterPreviewData {
   const analysis = mapHybridToMatchAnalysis(result, context);
+  const btts = bothTeamsToScoreFromLambdas({
+    lambdaHome: result.poisson.lambdaHome,
+    lambdaAway: result.poisson.lambdaAway,
+    maxGoals: result.meta.config.maxGoals,
+  });
   return {
     analysis,
     eloInput: context.eloInput,
@@ -199,7 +229,9 @@ export function buildPreviewFromHybrid(
       modelVersion: result.meta.modelVersion,
       expectedGoals: result.expectedGoals,
       overUnder25: result.overUnder25,
+      btts,
     },
+    dashboard: placeholderPreviewDashboard(btts),
     source: context.source ?? "mock",
   };
 }

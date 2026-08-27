@@ -30,7 +30,10 @@ import {
   RECORDED_API_FOOTBALL_FIXTURE_ID,
 } from "@/lib/data-platform/providers/api-football/fixtures";
 import { mapApiFootballEnvelopeToApexBundle } from "@/lib/data-platform/providers/api-football/mapper";
-import type { ApiFootballFixturesResponse } from "@/lib/data-platform/providers/api-football/types";
+import type {
+  ApiFootballFixturesResponse,
+  ApiFootballOddsItem,
+} from "@/lib/data-platform/providers/api-football/types";
 
 export type ApiFootballDataProviderOptions = {
   apiKey?: string | null;
@@ -215,7 +218,23 @@ export class ApiFootballDataProvider implements IDataProvider {
       }
     }
 
-    return this.bundleFromPayload(payload, String(item.fixture.id));
+    let oddsItems: ApiFootballOddsItem[] | undefined;
+    if (this.enrichMatch) {
+      try {
+        const oddsPayload = await this.client.getFixtureOdds(
+          String(item.fixture.id),
+        );
+        oddsItems = oddsPayload.response ?? [];
+      } catch {
+        // optional enrichment
+      }
+    }
+
+    return this.bundleFromPayload(
+      payload,
+      String(item.fixture.id),
+      oddsItems,
+    );
   }
 
   async listFixtures(
@@ -253,9 +272,11 @@ export class ApiFootballDataProvider implements IDataProvider {
   private bundleFromPayload(
     payload: ApiFootballFixturesResponse,
     externalMatchId: string,
+    odds?: ApiFootballOddsItem[] | null,
   ): ApexMatchBundle {
     const bundle = mapApiFootballEnvelopeToApexBundle(
       toEnvelope(payload, externalMatchId, this.mode),
+      { odds },
     );
     bundle.trustScore = this.quality.score(bundle);
     return bundle;

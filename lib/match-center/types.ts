@@ -13,8 +13,17 @@ import type {
   UUID,
 } from "@/lib/intelligence/types";
 import type { TeamEloInput } from "@/lib/intelligence/modules/probability";
-import type { MatchAnalysis } from "@/lib/match-analysis/analysis-types";
+import type { BothTeamsToScoreProbability } from "@/lib/intelligence/modules/probability";
+import type {
+  MatchAnalysis,
+  MatchAnalysisInjury,
+} from "@/lib/match-analysis/analysis-types";
 import type { MatchAnalysisData } from "@/lib/match-analysis/types";
+import type {
+  Recommendation,
+  ValueOpportunity,
+} from "@/lib/intelligence/reasoning/contracts/types";
+import type { ApexMarketType } from "@/lib/data-platform/types/odds";
 
 export type MatchCenterPhase = "preview" | "live" | "post";
 
@@ -34,12 +43,61 @@ export type MatchCenterMeta = {
   awayTeam: MatchCenterTeam;
   /** Provenance until Data Platform / Core wiring exists. */
   source: "mock" | "data-platform" | "intelligence-core";
+  /** Human label of the IDataProvider (mock, API-Football, …). */
+  providerLabel?: string;
 };
 
 /**
  * Pre-match (Preview) payload.
  * `analysis` reuses Match Analysis DTO; `eloInput` + hybrid meta keep the PE seam explicit.
  */
+export type MatchCenterOddsRow = {
+  id: string;
+  market: ApexMarketType;
+  marketLabel: string;
+  selection: string;
+  label: string;
+  decimalOdds: number | null;
+  impliedProbability: number | null;
+  modelProbability: number | null;
+  expectedValue: number | null;
+  bookmaker: string | null;
+};
+
+export type MatchCenterFormSide = {
+  teamId: string;
+  teamName: string;
+  form: string | null;
+  played: number | null;
+  wins: number | null;
+  draws: number | null;
+  losses: number | null;
+  goalsFor: number | null;
+  goalsAgainst: number | null;
+};
+
+export type MatchCenterH2HMeeting = {
+  id: string;
+  kickoffAt: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeGoals: number | null;
+  awayGoals: number | null;
+};
+
+export type MatchCenterPreviewDashboard = {
+  btts: BothTeamsToScoreProbability;
+  odds: MatchCenterOddsRow[];
+  form: {
+    home: MatchCenterFormSide | null;
+    away: MatchCenterFormSide | null;
+  };
+  h2h: MatchCenterH2HMeeting[];
+  injuries: MatchAnalysisInjury[];
+  recommendation: Recommendation;
+  valueBet: ValueOpportunity | null;
+};
+
 export type MatchCenterPreviewData = {
   analysis: MatchAnalysisData;
   /** Inputs used (or to be used) by ProbabilityEngine.predict. */
@@ -48,7 +106,9 @@ export type MatchCenterPreviewData = {
     modelVersion: string;
     expectedGoals: { home: number; away: number; total: number };
     overUnder25: { line: 2.5; over: number; under: number };
+    btts: BothTeamsToScoreProbability;
   };
+  dashboard: MatchCenterPreviewDashboard;
   source: "mock" | "intelligence-core";
 };
 

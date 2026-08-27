@@ -109,6 +109,68 @@ describe("API-Football mapper", () => {
     expect(bundle.players.length).toBeGreaterThan(0);
     expect(bundle.match.id).toContain("api-football");
   });
+
+  it("maps 1X2, O/U 2.5 and BTTS odds from the first bookmaker", () => {
+    const payload = createRecordedApiFootballFixturesResponse();
+    const bundle = mapApiFootballEnvelopeToApexBundle(
+      {
+        provider: "api-football",
+        externalMatchId: RECORDED_API_FOOTBALL_FIXTURE_ID,
+        fetchedAt: "2026-08-12T12:00:00.000Z",
+        payload,
+      },
+      {
+        odds: [
+          {
+            fixture: { id: Number(RECORDED_API_FOOTBALL_FIXTURE_ID) },
+            bookmakers: [
+              {
+                id: 8,
+                name: "Bet365",
+                bets: [
+                  {
+                    id: 1,
+                    name: "Match Winner",
+                    values: [
+                      { value: "Home", odd: "1.80" },
+                      { value: "Draw", odd: "3.60" },
+                      { value: "Away", odd: "4.20" },
+                    ],
+                  },
+                  {
+                    id: 5,
+                    name: "Goals Over/Under",
+                    values: [
+                      { value: "Over 2.5", odd: "1.95" },
+                      { value: "Under 2.5", odd: "1.90" },
+                    ],
+                  },
+                  {
+                    id: 8,
+                    name: "Both Teams Score",
+                    values: [
+                      { value: "Yes", odd: "1.70" },
+                      { value: "No", odd: "2.10" },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    );
+
+    expect(bundle.odds.map((q) => q.market)).toEqual([
+      "1x2",
+      "over_under",
+      "btts",
+    ]);
+    expect(bundle.odds.find((q) => q.market === "over_under")?.line).toBe(2.5);
+    expect(
+      bundle.odds.find((q) => q.market === "btts")?.selections[0]?.key,
+    ).toBe("yes");
+  });
 });
 
 describe("ApiFootballProvider", () => {

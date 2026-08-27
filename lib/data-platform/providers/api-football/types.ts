@@ -146,6 +146,37 @@ export type ApiFootballEventsResponse =
 export type ApiFootballOddsResponse =
   ApiFootballListResponse<ApiFootballOddsItem>;
 
+/** GET /fixtures/headtohead — same item shape as fixtures. */
+export type ApiFootballHeadToHeadResponse = ApiFootballFixturesResponse;
+
+/** GET /injuries */
+export type ApiFootballInjuryItem = {
+  player: {
+    id: number | null;
+    name: string;
+    photo?: string | null;
+    type?: string | null;
+    reason?: string | null;
+  };
+  team: {
+    id: number;
+    name: string;
+    logo?: string | null;
+  };
+  fixture?: {
+    id?: number;
+    date?: string;
+  };
+  league?: {
+    id?: number;
+    name?: string | null;
+    season?: number;
+  };
+};
+
+export type ApiFootballInjuriesResponse =
+  ApiFootballListResponse<ApiFootballInjuryItem>;
+
 export type ApiFootballTeamDetails = {
   team: {
     id: number;

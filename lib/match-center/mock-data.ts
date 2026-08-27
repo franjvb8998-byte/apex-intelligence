@@ -21,6 +21,7 @@ import {
   analyzeMatchWithRules,
   confidenceFromProbability,
 } from "@/lib/match-analysis/rules/analyze-with-rules";
+import { buildPreviewDashboard } from "@/lib/match-center/dashboard";
 import type {
   MatchCenterData,
   MatchCenterLiveData,
@@ -332,6 +333,20 @@ export function getMockMatchCenter(
       home: { form: "WWDLW", wins: 12, goalsAgainst: 18 },
       away: { form: "LDLWW", wins: 9, goalsAgainst: 24 },
     },
+  });
+
+  preview.dashboard = buildPreviewDashboard({
+    btts: preview.hybrid.btts,
+    oneXTwo: preview.analysis.oneXTwo,
+    overUnder25: preview.hybrid.overUnder25,
+    odds: [],
+    analysis: aiAnalysis,
+    teamStats: {
+      home: { form: "WWDLW", wins: 12, goalsAgainst: 18, teamName: HOME.name },
+      away: { form: "LDLWW", wins: 9, goalsAgainst: 24, teamName: AWAY.name },
+    },
+    homeTeam: { ...HOME },
+    awayTeam: { ...AWAY },
   });
 
   return {

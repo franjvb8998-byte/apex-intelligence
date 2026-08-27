@@ -31,6 +31,8 @@ import type {
   ApiFootballStandingsResponse,
   ApiFootballTeamStatisticsResponse,
   ApiFootballTeamsResponse,
+  ApiFootballHeadToHeadResponse,
+  ApiFootballInjuriesResponse,
 } from "@/lib/data-platform/providers/api-football/types";
 
 export type ApiFootballClientOptions = {
@@ -74,6 +76,16 @@ export type ApiFootballClient = {
   getFixtureEvents(fixtureId: string): Promise<ApiFootballEventsResponse>;
   /** Legacy odds helper kept for recorded/ingest adapter compatibility. */
   getFixtureOdds(fixtureId: string): Promise<ApiFootballOddsResponse>;
+  getHeadToHead(
+    homeTeamId: string | number,
+    awayTeamId: string | number,
+    last?: number,
+  ): Promise<ApiFootballHeadToHeadResponse>;
+  getInjuries(query: {
+    fixture?: string | number;
+    team?: string | number;
+    season?: string | number;
+  }): Promise<ApiFootballInjuriesResponse>;
 };
 
 function assertApiKey(apiKey: string): void {
@@ -187,6 +199,19 @@ export function createApiFootballClient(
     getFixtureOdds(fixtureId) {
       return get<ApiFootballOddsResponse>("/odds", { fixture: fixtureId });
     },
+    getHeadToHead(homeTeamId, awayTeamId, last = 5) {
+      return get<ApiFootballHeadToHeadResponse>("/fixtures/headtohead", {
+        h2h: `${homeTeamId}-${awayTeamId}`,
+        last,
+      });
+    },
+    getInjuries(query) {
+      return get<ApiFootballInjuriesResponse>("/injuries", {
+        fixture: query.fixture,
+        team: query.team,
+        season: query.season,
+      });
+    },
   };
 
   return client;
@@ -240,6 +265,15 @@ export function withApiFootballClientCache(
       cached(`af:events:${fixtureId}`, () => client.getFixtureEvents(fixtureId)),
     getFixtureOdds: (fixtureId) =>
       cached(`af:odds:${fixtureId}`, () => client.getFixtureOdds(fixtureId)),
+    getHeadToHead: (homeTeamId, awayTeamId, last) =>
+      cached(`af:h2h:${homeTeamId}:${awayTeamId}:${last ?? 5}`, () =>
+        client.getHeadToHead(homeTeamId, awayTeamId, last),
+      ),
+    getInjuries: (query) =>
+      cached(
+        `af:injuries:${query.fixture ?? ""}:${query.team ?? ""}:${query.season ?? ""}`,
+        () => client.getInjuries(query),
+      ),
   };
 }
 

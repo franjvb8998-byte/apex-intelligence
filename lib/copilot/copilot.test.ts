@@ -9,7 +9,7 @@ import {
 describe("APEX Copilot mock layer", () => {
   it("exposes welcome + suggested prompts", () => {
     expect(COPILOT_WELCOME).toContain("APEX Copilot");
-    expect(COPILOT_SUGGESTED_PROMPTS).toHaveLength(4);
+    expect(COPILOT_SUGGESTED_PROMPTS).toHaveLength(5);
     expect(MOCK_RECENT_CHATS.length).toBeGreaterThan(0);
   });
 

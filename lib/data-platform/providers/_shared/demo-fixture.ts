@@ -36,7 +36,7 @@ export type MockFixturePayload = {
   }>;
   odds: Array<{
     id: string;
-    market: "1x2" | "over_under";
+    market: "1x2" | "over_under" | "btts";
     line: number | null;
     bookmaker: string;
     selections: Array<{
@@ -121,6 +121,17 @@ export function createDemoFixturePayload(
         selections: [
           { key: "over", label: "Over 2.5", decimalOdds: 1.9 },
           { key: "under", label: "Under 2.5", decimalOdds: 1.95 },
+        ],
+        capturedAt: "2026-08-11T12:00:00.000Z",
+      },
+      {
+        id: `${provider}-odds-btts`,
+        market: "btts",
+        line: null,
+        bookmaker: "MockBook",
+        selections: [
+          { key: "yes", label: "Yes", decimalOdds: 1.8 },
+          { key: "no", label: "No", decimalOdds: 2.05 },
         ],
         capturedAt: "2026-08-11T12:00:00.000Z",
       },

@@ -45,7 +45,7 @@ export default async function DashboardPage() {
               ? " (API-Football)."
               : " (mock automático sin API key)."}{" "}
             <Link
-              href="/match-center"
+              href={`/match-center?matchId=${encodeURIComponent(dashboard.featuredMatchId)}`}
               className="text-[var(--apex-accent)] hover:text-[var(--apex-accent-hover)]"
             >
               Abrir Match Center

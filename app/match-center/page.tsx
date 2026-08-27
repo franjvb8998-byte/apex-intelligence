@@ -7,19 +7,32 @@ import { getMatchCenterData } from "@/lib/match-center";
 export const metadata: Metadata = {
   title: "APEX Match Center™ — APEX Intelligence",
   description:
-    "Preview, Live y Post Match en una sola experiencia de decisión.",
+    "Dashboard de partido: probabilidad, EV, xG, BTTS, forma, H2H y recomendación.",
 };
 
-export default async function MatchCenterPage() {
+type MatchCenterPageProps = {
+  searchParams: Promise<{ matchId?: string | string[] }>;
+};
+
+export default async function MatchCenterPage({
+  searchParams,
+}: MatchCenterPageProps) {
+  const params = await searchParams;
+  const raw = params.matchId;
+  const matchId = Array.isArray(raw) ? raw[0] : raw;
+
   const [data, user] = await Promise.all([
-    getMatchCenterData({ requireProvider: true }),
+    getMatchCenterData({
+      externalMatchId: matchId || undefined,
+      requireProvider: true,
+    }),
     getShellUser(),
   ]);
 
   return (
     <ProductShell user={user}>
       <div className="w-full">
-        <MatchCenterView data={data} />
+        <MatchCenterView data={data} initialPhase="preview" />
       </div>
     </ProductShell>
   );
