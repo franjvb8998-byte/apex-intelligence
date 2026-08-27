@@ -17,12 +17,15 @@ import {
 import {
   resolveDashboardProvider,
   type DashboardProviderResolveOptions,
+  type ResolvedDashboardProvider,
 } from "@/lib/dashboard/resolve-provider";
 import type {
   DashboardData,
   DashboardMatchSummary,
   DashboardProviderKind,
 } from "@/lib/dashboard/types";
+import { getMatchCenterData } from "@/lib/match-center/load";
+import type { MatchCenterData } from "@/lib/match-center/types";
 
 export type LoadDashboardOptions = DashboardProviderResolveOptions & {
   /** Override "today" (ISO date YYYY-MM-DD) — tests. */
@@ -181,7 +184,7 @@ function pickFeaturedExternalId(
   if (firstToday?.externalId) return firstToday.externalId;
   const firstUpcoming = upcoming[0];
   if (firstUpcoming?.externalId) return firstUpcoming.externalId;
-  return seed?.match.externalRefs[0]?.externalId ?? null;
+  return seed?.match?.externalRefs?.[0]?.externalId ?? null;
 }
 
 function buildStatusMessage(input: {
@@ -198,4 +201,66 @@ function buildStatusMessage(input: {
     return `API-Football live · ${input.todayCount} hoy · ${input.upcomingCount} próximos.`;
   }
   return "API-Football conectado (modo recorded / fallback).";
+}
+
+export function emptyDashboardData(
+  resolved: Pick<
+    ResolvedDashboardProvider,
+    "kind" | "dataMode" | "hasApiKey" | "displayName"
+  >,
+): DashboardData {
+  return {
+    system: {
+      provider: resolved.kind,
+      dataMode: resolved.dataMode,
+      hasApiKey: resolved.hasApiKey,
+      displayName: resolved.displayName,
+      todayCount: 0,
+      upcomingCount: 0,
+      leagueCount: 0,
+      teamCount: 0,
+      message: "No se pudieron cargar los partidos. La sesión sigue activa.",
+      checkedAt: new Date().toISOString(),
+    },
+    todayMatches: [],
+    upcomingMatches: [],
+    leagues: [],
+    featuredTeams: [],
+    featuredMatchId: "",
+  };
+}
+
+/**
+ * Dashboard workspace: football widgets must not crash an authenticated session.
+ */
+export async function loadDashboardWorkspace(
+  options: LoadDashboardOptions = {},
+): Promise<{ dashboard: DashboardData; matchCenter: MatchCenterData | null }> {
+  const resolved = resolveDashboardProvider(options);
+  let dashboard: DashboardData;
+  try {
+    dashboard = await getDashboardData({
+      ...options,
+      provider: resolved.provider,
+    });
+  } catch {
+    dashboard = emptyDashboardData(resolved);
+  }
+
+  const featuredId = dashboard.featuredMatchId?.trim();
+  let matchCenter: MatchCenterData | null = null;
+  try {
+    matchCenter = await getMatchCenterData({
+      externalMatchId:
+        dashboard.system.provider === "api-football" && featuredId
+          ? featuredId
+          : undefined,
+      includeFixtureList: false,
+      env: options.env,
+    });
+  } catch {
+    matchCenter = null;
+  }
+
+  return { dashboard, matchCenter };
 }

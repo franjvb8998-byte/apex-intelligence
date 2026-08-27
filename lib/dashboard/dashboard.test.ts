@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MockDataProvider } from "@/lib/data-platform/mock-provider";
 import { ApiFootballDataProvider } from "@/lib/data-platform/providers/api-football/api-football-provider";
-import { getDashboardData } from "@/lib/dashboard/load";
+import { getDashboardData, loadDashboardWorkspace } from "@/lib/dashboard/load";
 import {
   hasFootballApiKey,
   resolveDashboardProvider,
@@ -122,5 +122,30 @@ describe("Dashboard map helpers", () => {
         new Date("2026-08-12T12:00:00.000Z"),
       ),
     ).toBe(false);
+  });
+});
+
+describe("Dashboard workspace", () => {
+  it("does not throw when the football provider crashes on id access", async () => {
+    const provider = {
+      id: "mock" as const,
+      displayName: "Broken",
+      async getMatch() {
+        throw new Error("Cannot read properties of undefined (reading 'id')");
+      },
+      async listFixtures() {
+        throw new Error("Cannot read properties of undefined (reading 'id')");
+      },
+    };
+
+    const { dashboard } = await loadDashboardWorkspace({
+      provider,
+      env: {},
+      today: "2026-08-15",
+      now: new Date("2026-08-12T12:00:00.000Z"),
+    });
+
+    expect(dashboard.todayMatches).toEqual([]);
+    expect(dashboard.system.displayName).toBe("Broken");
   });
 });

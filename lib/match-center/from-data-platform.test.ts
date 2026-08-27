@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createApiFootballProvider,
   createDataPlatform,
+  createMockDataProvider,
   RECORDED_API_FOOTBALL_FIXTURE_ID,
 } from "@/lib/data-platform";
 import { DEMO_MATCH_EXTERNAL_ID } from "@/lib/data-platform/providers/_shared/demo-fixture";
@@ -12,25 +13,22 @@ import {
 } from "@/lib/match-center";
 
 describe("Match Center ← Data Platform", () => {
-  it("loads default Match Center via MockDataProvider (v2)", async () => {
+  it("loads Match Center from API-Football recorded fixtures (no mock)", async () => {
     const data = await getMatchCenterData({
-      externalMatchId: DEMO_MATCH_EXTERNAL_ID,
+      env: {},
       requireProvider: true,
     });
 
     expect(data.source).toBe("platform");
     expect(data.match.source).toBe("data-platform");
-    expect(data.match.homeTeam.name).toBe("Northbridge FC");
-    expect(data.match.awayTeam.name).toBe("Southport United");
+    expect(data.match.homeTeam.name).toBe("Arsenal");
+    expect(data.match.awayTeam.name).toBe("Chelsea");
+    expect(data.fixtures.length).toBeGreaterThan(0);
     expect(data.preview.hybrid.btts.yes + data.preview.hybrid.btts.no).toBeCloseTo(
       1,
     );
-    expect(data.preview.dashboard.odds.length).toBeGreaterThan(0);
-    expect(
-      data.preview.dashboard.odds.some((row) => row.market === "1x2"),
-    ).toBe(true);
     expect(data.preview.dashboard.recommendation.title).toBeTruthy();
-    expect(data.match.providerLabel).toBe("Mock");
+    expect(data.match.providerLabel).toBe("API-Football");
   });
 
   it("builds MatchCenterData from API-Football recorded match (legacy path)", async () => {
@@ -65,8 +63,9 @@ describe("Match Center ← Data Platform", () => {
     expect(center.live.vision.homeTeam.name).toBe("Arsenal");
   });
 
-  it("joins mock catalogue odds into EV rows", async () => {
+  it("joins mock catalogue odds into EV rows when a mock provider is injected", async () => {
     const data = await getMatchCenterData({
+      provider: createMockDataProvider(),
       externalMatchId: DEMO_MATCH_EXTERNAL_ID,
       requireProvider: true,
     });

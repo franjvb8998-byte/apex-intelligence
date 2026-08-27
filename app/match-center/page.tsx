@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ProductShell } from "@/components/app-shell/product-shell";
+import { DashboardMatchList } from "@/components/dashboard";
 import { MatchCenterView } from "@/components/match-center";
 import { getShellUser } from "@/lib/auth/get-shell-user";
 import { getMatchCenterData } from "@/lib/match-center";
@@ -31,7 +32,13 @@ export default async function MatchCenterPage({
 
   return (
     <ProductShell user={user}>
-      <div className="w-full">
+      <div className="w-full space-y-8">
+        <DashboardMatchList
+          title="Partidos"
+          description="Fixtures de hoy (UTC). Si no hay partidos, Premier League 2025."
+          matches={data.fixtures}
+          emptyLabel="API-Football no devolvió fixtures para hoy ni Premier League 2025."
+        />
         <MatchCenterView data={data} initialPhase="preview" />
       </div>
     </ProductShell>

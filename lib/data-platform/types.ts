@@ -16,6 +16,7 @@ export type DataProviderMatchQuery = {
 export type DataProviderFixturesQuery = {
   date?: string;
   leagueId?: string;
+  season?: string;
   limit?: number;
 };
 

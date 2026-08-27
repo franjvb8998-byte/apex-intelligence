@@ -128,8 +128,15 @@ export type ApexTeamStatistics = {
 };
 
 export function adaptApiFootballTeamStatistics(
-  stats: ApiFootballTeamStatistics,
-): ApexTeamStatistics {
+  stats: ApiFootballTeamStatistics | null | undefined,
+): ApexTeamStatistics | null {
+  if (
+    stats?.team?.id == null ||
+    stats.league?.id == null ||
+    stats.fixtures?.played == null
+  ) {
+    return null;
+  }
   return {
     teamId: apexId("team", stats.team.id),
     teamName: stats.team.name,

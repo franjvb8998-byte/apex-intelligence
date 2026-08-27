@@ -52,6 +52,10 @@ export type ApiFootballClient = {
   getFixture(id: string): Promise<ApiFootballFixturesResponse>;
   /** Today's (or any date) matches */
   getFixturesByDate(date: string): Promise<ApiFootballFixturesResponse>;
+  getFixturesByLeague(
+    league: string | number,
+    season: string | number,
+  ): Promise<ApiFootballFixturesResponse>;
   getTeam(id: string): Promise<ApiFootballTeamsResponse>;
   getTeamStatistics(
     team: string | number,
@@ -159,6 +163,12 @@ export function createApiFootballClient(
     getFixturesByDate(date) {
       return get<ApiFootballFixturesResponse>("/fixtures", { date });
     },
+    getFixturesByLeague(league, season) {
+      return get<ApiFootballFixturesResponse>("/fixtures", {
+        league,
+        season,
+      });
+    },
     getTeam(id) {
       return get<ApiFootballTeamsResponse>("/teams", { id });
     },
@@ -241,6 +251,10 @@ export function withApiFootballClientCache(
       cached(`af:fixture:${id}`, () => client.getFixture(id)),
     getFixturesByDate: (date) =>
       cached(`af:fixtures:date:${date}`, () => client.getFixturesByDate(date)),
+    getFixturesByLeague: (league, season) =>
+      cached(`af:fixtures:league:${league}:${season}`, () =>
+        client.getFixturesByLeague(league, season),
+      ),
     getTeam: (id) => cached(`af:team:${id}`, () => client.getTeam(id)),
     getTeamStatistics: (team, league, season) =>
       cached(`af:team-stats:${team}:${league}:${season}`, () =>

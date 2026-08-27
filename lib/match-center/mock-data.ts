@@ -356,6 +356,7 @@ export function getMockMatchCenter(
     live,
     post,
     aiAnalysis,
+    fixtures: [],
     source: "mock",
   };
 }

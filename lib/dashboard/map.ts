@@ -31,25 +31,28 @@ function mapStatus(status: ApexMatchStatus): DashboardMatchStatus {
 export function matchSummaryFromBundle(
   bundle: ApexMatchBundle,
 ): DashboardMatchSummary {
+  const match = bundle.match;
+  const home = bundle.homeTeam;
+  const away = bundle.awayTeam;
   return {
-    id: bundle.match.id,
-    externalId: bundle.match.externalRefs[0]?.externalId ?? null,
-    kickoffAt: bundle.match.kickoffAt,
-    status: mapStatus(bundle.match.status),
+    id: match?.id ?? "unknown",
+    externalId: match?.externalRefs?.[0]?.externalId ?? null,
+    kickoffAt: match?.kickoffAt ?? "",
+    status: mapStatus(match?.status ?? "unknown"),
     leagueName: bundle.league?.name ?? null,
     homeTeam: {
-      id: bundle.homeTeam.id,
-      name: bundle.homeTeam.name,
-      shortName: bundle.homeTeam.shortName,
+      id: home?.id ?? "unknown-home",
+      name: home?.name ?? "Local",
+      shortName: home?.shortName ?? null,
     },
     awayTeam: {
-      id: bundle.awayTeam.id,
-      name: bundle.awayTeam.name,
-      shortName: bundle.awayTeam.shortName,
+      id: away?.id ?? "unknown-away",
+      name: away?.name ?? "Visitante",
+      shortName: away?.shortName ?? null,
     },
     score: {
-      home: bundle.match.score.home,
-      away: bundle.match.score.away,
+      home: match?.score?.home ?? null,
+      away: match?.score?.away ?? null,
     },
   };
 }
@@ -69,31 +72,35 @@ export function leagueSummaryFromBundle(
 
 export function teamsFromBundle(bundle: ApexMatchBundle): DashboardTeamSummary[] {
   const leagueName = bundle.league?.name ?? null;
-  return [
-    {
+  const teams: DashboardTeamSummary[] = [];
+  if (bundle.homeTeam?.id) {
+    teams.push({
       id: bundle.homeTeam.id,
-      externalId: bundle.homeTeam.externalRefs[0]?.externalId ?? null,
+      externalId: bundle.homeTeam.externalRefs?.[0]?.externalId ?? null,
       name: bundle.homeTeam.name,
       shortName: bundle.homeTeam.shortName,
       crestUrl: bundle.homeTeam.crestUrl,
       leagueName,
-    },
-    {
+    });
+  }
+  if (bundle.awayTeam?.id) {
+    teams.push({
       id: bundle.awayTeam.id,
-      externalId: bundle.awayTeam.externalRefs[0]?.externalId ?? null,
+      externalId: bundle.awayTeam.externalRefs?.[0]?.externalId ?? null,
       name: bundle.awayTeam.name,
       shortName: bundle.awayTeam.shortName,
       crestUrl: bundle.awayTeam.crestUrl,
       leagueName,
-    },
-  ];
+    });
+  }
+  return teams;
 }
 
 export function uniqueById<T extends { id: string }>(items: T[]): T[] {
   const seen = new Set<string>();
   const out: T[] = [];
   for (const item of items) {
-    if (seen.has(item.id)) continue;
+    if (!item?.id || seen.has(item.id)) continue;
     seen.add(item.id);
     out.push(item);
   }

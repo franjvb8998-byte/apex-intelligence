@@ -29,8 +29,12 @@ import { createFixtureApiFootballClient } from "@/lib/data-platform/providers/ap
 import {
   RECORDED_API_FOOTBALL_FIXTURE_ID,
 } from "@/lib/data-platform/providers/api-football/fixtures";
-import { mapApiFootballEnvelopeToApexBundle } from "@/lib/data-platform/providers/api-football/mapper";
+import {
+  mapApiFootballEnvelopeToApexBundle,
+  mapApiFootballStatus,
+} from "@/lib/data-platform/providers/api-football/mapper";
 import type {
+  ApiFootballFixtureItem,
   ApiFootballFixturesResponse,
   ApiFootballOddsItem,
 } from "@/lib/data-platform/providers/api-football/types";
@@ -53,6 +57,9 @@ export type ApiFootballDataProviderOptions = {
   /** Disable response cache (tests). Default true. */
   useCache?: boolean;
 };
+
+/** Process-wide HTTP cache so Dashboard and Match Center share fixture responses. */
+const sharedApiFootballCache = createTtlCache({ defaultTtlMs: 60_000 });
 
 function vendorErrorMessage(payload: { errors?: unknown }): string | null {
   const errors = payload.errors;
@@ -106,8 +113,7 @@ export class ApiFootballDataProvider implements IDataProvider {
     const config = readApiFootballConfig(env);
     const fallback = options.fallback ?? "recorded";
     const cacheTtlMs = options.cacheTtlMs ?? 60_000;
-    const cache =
-      options.cache ?? createTtlCache({ defaultTtlMs: cacheTtlMs });
+    const cache = options.cache ?? sharedApiFootballCache;
     const useCache = options.useCache !== false;
 
     const wrap = (client: ApiFootballClient) =>
@@ -240,8 +246,12 @@ export class ApiFootballDataProvider implements IDataProvider {
   async listFixtures(
     query: DataProviderFixturesQuery = {},
   ): Promise<ApexMatchBundle[]> {
-    const date = query.date ?? new Date().toISOString().slice(0, 10);
-    const payload = await this.client.getFixturesByDate(date);
+    const payload =
+      query.leagueId && query.season
+        ? await this.client.getFixturesByLeague(query.leagueId, query.season)
+        : await this.client.getFixturesByDate(
+            query.date ?? new Date().toISOString().slice(0, 10),
+          );
     const vendorError = vendorErrorMessage(payload);
     if (vendorError) {
       throw new ApiFootballError({
@@ -252,9 +262,10 @@ export class ApiFootballDataProvider implements IDataProvider {
     }
 
     let items = payload.response ?? [];
-    if (query.leagueId) {
+    if (query.leagueId && !query.season) {
       items = items.filter((item) => String(item.league.id) === query.leagueId);
     }
+    items = rankFixtureItems(items);
     if (query.limit != null && query.limit > 0) {
       items = items.slice(0, query.limit);
     }
@@ -281,6 +292,23 @@ export class ApiFootballDataProvider implements IDataProvider {
     bundle.trustScore = this.quality.score(bundle);
     return bundle;
   }
+}
+
+function rankFixtureItems(
+  items: ApiFootballFixtureItem[],
+): ApiFootballFixtureItem[] {
+  const rank = (item: ApiFootballFixtureItem) => {
+    const status = mapApiFootballStatus(item.fixture.status.short);
+    if (status === "live") return 0;
+    if (status === "scheduled") return 1;
+    if (status === "finished") return 2;
+    return 3;
+  };
+  return [...items].sort(
+    (a, b) =>
+      rank(a) - rank(b) ||
+      (a.fixture.date ?? "").localeCompare(b.fixture.date ?? ""),
+  );
 }
 
 export function createApiFootballDataProvider(

@@ -1,6 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 
 export const AUTH_GET_USER_TIMEOUT_MS = 700;
+export const AUTHENTICATED_GET_USER_TIMEOUT_MS = 4_000;
 
 type AuthGetUserResult = {
   data: { user: User | null };

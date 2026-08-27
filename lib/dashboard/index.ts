@@ -11,6 +11,8 @@ export type {
 
 export {
   getDashboardData,
+  loadDashboardWorkspace,
+  emptyDashboardData,
   type LoadDashboardOptions,
 } from "@/lib/dashboard/load";
 

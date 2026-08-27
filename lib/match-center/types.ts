@@ -6,6 +6,7 @@
  */
 
 import type { VisionLiveState } from "@/lib/apex-vision/types";
+import type { DashboardMatchSummary } from "@/lib/dashboard/types";
 import type {
   ConfidenceScore,
   MatchOutcome,
@@ -181,5 +182,7 @@ export type MatchCenterData = {
   post: MatchCenterPostData;
   /** Sprint 8 — AI Match Analysis (rules + PE + Data Platform). */
   aiAnalysis: MatchAnalysis;
+  /** Today's (or fallback) fixtures for the selector. */
+  fixtures: DashboardMatchSummary[];
   source: "mock" | "platform";
 };

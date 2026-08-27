@@ -319,8 +319,14 @@ export async function getTeamStatistics(
         `Team statistics not found for team=${input.team} league=${input.league} season=${input.season}`,
       );
     }
+    const statistics = teamStatisticsFromApiFootball(payload.response);
+    if (!statistics) {
+      throw notFound(
+        `Team statistics not found for team=${input.team} league=${input.league} season=${input.season}`,
+      );
+    }
     return {
-      statistics: teamStatisticsFromApiFootball(payload.response),
+      statistics,
       provider: provider.id,
     };
   }

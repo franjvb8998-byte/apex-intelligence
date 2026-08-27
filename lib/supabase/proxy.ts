@@ -78,7 +78,16 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await getUserFast(supabase);
 
-  if (!user && pathname.startsWith("/dashboard")) {
+  if (user?.id) {
+    return supabaseResponse;
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const hasSession = Boolean(session?.user?.id);
+
+  if (!hasSession && pathname.startsWith("/dashboard")) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirect", pathname);

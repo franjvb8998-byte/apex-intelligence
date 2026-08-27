@@ -232,8 +232,9 @@ export function leagueFromApiFootball(item: ApiFootballLeagueItem): BffLeague {
 
 export function teamStatisticsFromApiFootball(
   stats: ApiFootballTeamStatistics,
-): BffTeamStatistics {
+): BffTeamStatistics | null {
   const adapted = adaptApiFootballTeamStatistics(stats);
+  if (!adapted) return null;
   return {
     teamId: adapted.teamId,
     teamName: adapted.teamName,

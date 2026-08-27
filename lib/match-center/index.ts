@@ -33,6 +33,7 @@ export {
 export {
   getMatchCenterData,
   loadMatchCenterFromApiFootball,
+  resolveMatchCenterProvider,
   type LoadMatchCenterOptions,
 } from "@/lib/match-center/load";
 

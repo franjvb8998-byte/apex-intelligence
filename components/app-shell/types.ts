@@ -3,6 +3,8 @@
  */
 
 export type ShellUser = {
+  /** Supabase auth user id. Present only after a verified session/user. */
+  id?: string;
   displayName: string;
   email?: string | null;
 };

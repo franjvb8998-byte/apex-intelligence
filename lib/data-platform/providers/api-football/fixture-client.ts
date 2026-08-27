@@ -20,6 +20,7 @@ import type {
   ApiFootballOddsResponse,
   ApiFootballHeadToHeadResponse,
   ApiFootballInjuriesResponse,
+  ApiFootballFixturesResponse,
 } from "@/lib/data-platform/providers/api-football/types";
 
 export function createFixtureApiFootballClient(): ApiFootballClient {
@@ -33,6 +34,12 @@ export function createFixtureApiFootballClient(): ApiFootballClient {
     },
     async getFixturesByDate(date) {
       return createRecordedApiFootballTodaysMatchesResponse(date);
+    },
+    async getFixturesByLeague(league, _season) {
+      if (String(league) !== "39") {
+        return emptyList<ApiFootballFixturesResponse>("fixtures");
+      }
+      return createRecordedApiFootballFixturesResponse();
     },
     async getTeam(id) {
       return createRecordedApiFootballTeamsResponse(id);

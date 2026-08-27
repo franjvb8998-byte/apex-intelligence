@@ -351,6 +351,7 @@ export function createMatchCenterFromApexBundle(
     live,
     post,
     aiAnalysis,
+    fixtures: [],
     source: "platform",
   };
 }

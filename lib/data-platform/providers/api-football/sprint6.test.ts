@@ -63,6 +63,21 @@ describe("API-Football Sprint 6 — fixtures fallback", () => {
     expect(list.length).toBeGreaterThan(0);
   });
 
+  it("lists fixtures by league and season", async () => {
+    const provider = new ApiFootballDataProvider({
+      apiKey: null,
+      env: {},
+      useCache: false,
+    });
+    const list = await provider.listFixtures({
+      leagueId: "39",
+      season: "2025",
+      limit: 20,
+    });
+    expect(list.length).toBeGreaterThan(0);
+    expect(list[0]?.homeTeam.name).toBe("Arsenal");
+  });
+
   it("ProviderFactory api-football without key does not throw", () => {
     const provider = ProviderFactory.create({
       provider: "api-football",
@@ -154,7 +169,12 @@ describe("API-Football Sprint 6 — adapters", () => {
     expect(team.id).toContain("apex:api-football:team:");
     expect(player.name).toBe("B. Saka");
     expect(league.name).toBe("Premier League");
-    expect(stats.wins).toBe(28);
+    expect(stats?.wins).toBe(28);
+  });
+
+  it("does not crash when team statistics payload is empty", () => {
+    expect(adaptApiFootballTeamStatistics(undefined)).toBeNull();
+    expect(adaptApiFootballTeamStatistics({} as never)).toBeNull();
   });
 });
 

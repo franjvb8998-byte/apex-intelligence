@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ProductShell } from "@/components/app-shell/product-shell";
+import { EmptyState } from "@/components/app-shell/states";
 import { DashboardOverview } from "@/components/dashboard";
 import { MatchCenterView } from "@/components/match-center";
 import { getShellUser } from "@/lib/auth/get-shell-user";
-import { getDashboardData, resolveDashboardProvider } from "@/lib/dashboard";
-import { getMatchCenterData } from "@/lib/match-center";
+import { loadDashboardWorkspace } from "@/lib/dashboard";
 
 export const metadata: Metadata = {
   title: "Dashboard — APEX Intelligence",
@@ -16,20 +16,18 @@ export const metadata: Metadata = {
 
 /**
  * Authenticated home — Dashboard wired to Data Platform + Match Center.
+ * Auth is resolved before any football widget; widget failures stay empty.
  */
 export default async function DashboardPage() {
   const shellUser = await getShellUser();
-  if (!shellUser) {
+  if (!shellUser?.id) {
     redirect("/login");
   }
 
-  const resolved = resolveDashboardProvider();
-  const dashboard = await getDashboardData({ provider: resolved.provider });
-  const matchCenter = await getMatchCenterData({
-    externalMatchId: dashboard.featuredMatchId,
-    provider: resolved.provider,
-    requireProvider: false,
-  });
+  const { dashboard, matchCenter } = await loadDashboardWorkspace();
+  const featuredHref = dashboard.featuredMatchId
+    ? `/match-center?matchId=${encodeURIComponent(dashboard.featuredMatchId)}`
+    : "/match-center";
 
   return (
     <ProductShell user={shellUser}>
@@ -45,7 +43,7 @@ export default async function DashboardPage() {
               ? " (API-Football)."
               : " (mock automático sin API key)."}{" "}
             <Link
-              href={`/match-center?matchId=${encodeURIComponent(dashboard.featuredMatchId)}`}
+              href={featuredHref}
               className="text-[var(--apex-accent)] hover:text-[var(--apex-accent-hover)]"
             >
               Abrir Match Center
@@ -71,7 +69,22 @@ export default async function DashboardPage() {
               Match Center™ — misma experiencia Preview / Live / Post.
             </p>
           </div>
-          <MatchCenterView data={matchCenter} />
+          {matchCenter ? (
+            <MatchCenterView data={matchCenter} />
+          ) : (
+            <EmptyState
+              title="Partido destacado no disponible"
+              description="La sesión está activa. No se pudo cargar el partido destacado; inténtalo de nuevo en unos segundos."
+              action={
+                <Link
+                  href="/match-center"
+                  className="text-sm text-[var(--apex-accent)] hover:text-[var(--apex-accent-hover)]"
+                >
+                  Abrir Match Center
+                </Link>
+              }
+            />
+          )}
         </section>
       </div>
     </ProductShell>
