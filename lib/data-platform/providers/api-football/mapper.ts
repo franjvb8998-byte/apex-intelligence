@@ -496,6 +496,7 @@ export function mapApiFootballFixtureItemToApexBundle(
       sport: "football",
       season:
         item.league.season != null ? String(item.league.season) : null,
+      logoUrl: item.league.logo ?? null,
       externalRefs: [
         { provider: PROVIDER, externalId: String(item.league.id) },
       ],

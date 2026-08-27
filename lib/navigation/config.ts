@@ -31,6 +31,13 @@ export const PRIMARY_NAV: NavItem[] = [
     keywords: ["home", "inicio", "overview"],
   },
   {
+    id: "bankroll",
+    label: "My Bankroll",
+    href: "/bankroll",
+    description: "Saldo, apuestas y rendimiento",
+    keywords: ["bankroll", "stakes", "apuestas", "roi", "yield"],
+  },
+  {
     id: "copilot",
     label: "Copilot",
     href: "/copilot",
@@ -81,6 +88,10 @@ const BREADCRUMB_MAP: Record<string, BreadcrumbItem[]> = {
   "/copilot": [
     { label: "Dashboard", href: "/dashboard" },
     { label: "Copilot" },
+  ],
+  "/bankroll": [
+    { label: "Dashboard", href: "/dashboard" },
+    { label: "My Bankroll" },
   ],
   "/match-analysis": [
     { label: "Match Center™", href: "/match-center" },

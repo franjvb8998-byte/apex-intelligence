@@ -102,6 +102,7 @@ export function adaptApiFootballLeague(
     country: item.country?.name ?? null,
     sport: "football",
     season: current != null ? String(current) : null,
+    logoUrl: item.league.logo ?? null,
     externalRefs: [
       {
         provider: "api-football",

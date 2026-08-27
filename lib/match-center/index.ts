@@ -39,6 +39,7 @@ export {
 export {
   getMatchCenterData,
   listMatchCenterFixtures,
+  listMatchCenterFixtureBundles,
   loadMatchCenterFromApiFootball,
   resolveMatchCenterProvider,
   type LoadMatchCenterOptions,

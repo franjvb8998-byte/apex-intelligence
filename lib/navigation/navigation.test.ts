@@ -27,12 +27,18 @@ describe("Release 0.1 navigation", () => {
       { label: "Partido" },
     ]);
     expect(titleForPath("/match-center/1635059")).toBe("Match Center");
-    expect(titleForPath("/copilot")).toBe("Copilot");
+    expect(PRIMARY_NAV.some((n) => n.href === "/bankroll")).toBe(true);
+    expect(titleForPath("/bankroll")).toBe("My Bankroll");
+    expect(breadcrumbsForPath("/bankroll")).toEqual([
+      { label: "Dashboard", href: "/dashboard" },
+      { label: "My Bankroll" },
+    ]);
   });
 
   it("builds command palette items", () => {
     const items = buildCommandItems();
     expect(items.some((i) => i.href === "/dashboard")).toBe(true);
+    expect(items.some((i) => i.href === "/bankroll")).toBe(true);
     expect(items.some((i) => i.group === "Acciones")).toBe(true);
   });
 

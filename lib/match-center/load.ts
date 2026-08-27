@@ -79,10 +79,20 @@ export async function getMatchCenterData(
 export async function listMatchCenterFixtures(
   options: LoadMatchCenterOptions = {},
 ): Promise<DashboardMatchSummary[]> {
+  const fixtures = await listMatchCenterFixtureBundles(options);
+  return fixtures.map(matchSummaryFromBundle);
+}
+
+/**
+ * Same catalogue as {@link listMatchCenterFixtures}, as Apex bundles
+ * (odds + league logo available for Bankroll).
+ */
+export async function listMatchCenterFixtureBundles(
+  options: LoadMatchCenterOptions = {},
+): Promise<ApexMatchBundle[]> {
   const env = options.env ?? process.env;
   const provider = options.provider ?? resolveMatchCenterProvider(env);
-  const fixtures = await loadFixtureCatalogue(provider);
-  return fixtures.map(matchSummaryFromBundle);
+  return loadFixtureCatalogue(provider);
 }
 
 async function loadFixtureCatalogue(

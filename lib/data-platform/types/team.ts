@@ -6,6 +6,8 @@ export type ApexLeague = {
   country: string | null;
   sport: string;
   season: string | null;
+  /** Competition crest when the vendor publishes one. */
+  logoUrl?: string | null;
   externalRefs: ExternalRef[];
 };
 
