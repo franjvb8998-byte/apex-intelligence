@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { DashboardMatchList } from "@/components/dashboard";
 import { MatchCenterView } from "@/components/match-center/match-center-view";
 import type { DashboardMatchSummary } from "@/lib/dashboard/types";
@@ -11,13 +12,14 @@ type MatchCenterListProps = {
 /**
  * `/match-center` — fixture catalogue only (no Preview / Live / Post).
  */
-export function MatchCenterList({ matches }: MatchCenterListProps) {
+export async function MatchCenterList({ matches }: MatchCenterListProps) {
+  const t = await getTranslations("matchCenter");
   return (
     <DashboardMatchList
-      title="Partidos"
-      description="Fixtures de hoy (UTC). Si no hay partidos, Premier League 2025."
+      title={t("listTitle")}
+      description={t("listDescription")}
       matches={matches}
-      emptyLabel="API-Football no devolvió fixtures para hoy ni Premier League 2025."
+      emptyLabel={t("emptyFixtures")}
     />
   );
 }
@@ -29,14 +31,15 @@ type MatchCenterDetailProps = {
 /**
  * `/match-center/[fixtureId]` — selected match only (no fixture list).
  */
-export function MatchCenterDetail({ data }: MatchCenterDetailProps) {
+export async function MatchCenterDetail({ data }: MatchCenterDetailProps) {
+  const t = await getTranslations("common");
   return (
     <div className="w-full space-y-6">
       <Link
         href="/match-center"
         className="apex-focusable inline-flex items-center text-sm text-[var(--apex-accent)] hover:text-[var(--apex-accent-hover)]"
       >
-        Volver a partidos
+        {t("backToMatches")}
       </Link>
       <MatchCenterView key={data.match.matchId} data={data} />
     </div>

@@ -1,17 +1,8 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { MatchCenterPhase } from "@/lib/match-center/types";
 import { cx } from "@/components/design-system";
-
-const PHASES: Array<{
-  id: MatchCenterPhase;
-  label: string;
-  hint: string;
-}> = [
-  { id: "preview", label: "Preview", hint: "Pre-partido" },
-  { id: "live", label: "Live", hint: "En juego" },
-  { id: "post", label: "Post Match", hint: "Cierre" },
-];
 
 type PhaseTabsProps = {
   active: MatchCenterPhase;
@@ -22,13 +13,19 @@ type PhaseTabsProps = {
  * Phase switcher for Match Center™ — presentational; parent owns state.
  */
 export function PhaseTabs({ active, onChange }: PhaseTabsProps) {
+  const t = useTranslations("matchCenter");
+  const phases: Array<{ id: MatchCenterPhase; label: string; hint: string }> = [
+    { id: "preview", label: t("preview"), hint: t("previewHint") },
+    { id: "live", label: t("live"), hint: t("liveHint") },
+    { id: "post", label: t("post"), hint: t("postHint") },
+  ];
   return (
     <div
       role="tablist"
-      aria-label="Fases del partido"
+      aria-label={t("phasesAria")}
       className="grid grid-cols-3 gap-2 rounded-[var(--apex-radius-2xl)] border border-[var(--apex-border)] bg-[var(--apex-surface)] p-1.5"
     >
-      {PHASES.map((phase) => {
+      {phases.map((phase) => {
         const selected = active === phase.id;
         return (
           <button

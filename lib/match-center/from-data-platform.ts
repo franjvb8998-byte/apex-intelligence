@@ -22,6 +22,7 @@ import type { ApexMatchEvent } from "@/lib/data-platform/types/event";
 import type { ApexMatchStatus } from "@/lib/data-platform/types/match";
 import type { ApexPlayer } from "@/lib/data-platform/types/team";
 import type { MatchOutcome } from "@/lib/intelligence/types";
+import { estimateEloFromTeamId } from "@/lib/intelligence/modules/probability";
 import type { MatchAnalysisTeamStatSnapshot } from "@/lib/match-analysis/analysis-types";
 import { createMatchAnalysisService } from "@/lib/match-analysis/match-analysis-service";
 import { buildPreviewDashboard } from "@/lib/match-center/dashboard";
@@ -29,7 +30,11 @@ import {
   absencesToAnalysisInjuries,
   type MatchCenterEnrichment,
 } from "@/lib/match-center/enrich";
+import { buildIntelligenceReport } from "@/lib/intelligence-report";
 import { buildPreviewFromEngine } from "@/lib/match-center/from-probability";
+import { scoreMatchSelection, apexScoreFromScoring } from "@/lib/scoring-engine/from-match";
+import { selectionTwinFromPreview } from "@/lib/team-intelligence/builders";
+import { ratePreview } from "@/lib/match-rating";
 import type {
   MatchCenterData,
   MatchCenterLiveData,
@@ -71,15 +76,9 @@ function outcomeFromScore(
 
 /**
  * Stable pseudo-Elo from team id so PE gets deterministic inputs without DB ratings.
- * TODO(elo-provider): replace with EloRatingProvider / catalogue ratings.
+ * Re-exported from the Probability Engine helper.
  */
-export function estimateEloFromTeamId(teamId: string, base = 1500): number {
-  let hash = 0;
-  for (let i = 0; i < teamId.length; i++) {
-    hash = (hash * 31 + teamId.charCodeAt(i)) >>> 0;
-  }
-  return base + (hash % 251) - 125;
-}
+export { estimateEloFromTeamId };
 
 function hasPlayed(snapshot?: MatchAnalysisTeamStatSnapshot | null): boolean {
   return snapshot != null && snapshot.played != null && snapshot.played > 0;
@@ -472,7 +471,7 @@ export function createMatchCenterFromApexBundle(
       bundle.provenance.primaryProvider === "api-football"
         ? "API-Football"
         : bundle.provenance.primaryProvider === "mock"
-          ? "Mock"
+          ? "Catálogo"
           : bundle.provenance.primaryProvider,
   };
 
@@ -560,6 +559,7 @@ export function createMatchCenterFromApexBundle(
       },
     },
     source: "intelligence-core",
+    skipPlatformScore: true,
   });
 
   preview.analysis.modelVersion = `${preview.hybrid.modelVersion}+data-platform`;
@@ -579,6 +579,38 @@ export function createMatchCenterFromApexBundle(
     trends: options.enrichment?.trends,
     homeTeam,
     awayTeam,
+  });
+
+  const rating = ratePreview(
+    preview,
+    aiAnalysis,
+    `APEX Rating · ${bundle.provenance.primaryProvider}`,
+  );
+  preview.analysis.rating = rating;
+  const extras = {
+    injuries: preview.dashboard.injuries,
+    homeForm: preview.dashboard.form.home,
+    awayForm: preview.dashboard.form.away,
+    weather: match.weather,
+    odds: preview.dashboard.odds,
+  };
+  const team = selectionTwinFromPreview(
+    match,
+    preview.dashboard,
+    preview.analysis.predictedOutcome,
+  );
+  const { decision, scoring } = scoreMatchSelection({
+    analysis: preview.analysis,
+    extras,
+    team,
+    season: bundle.league?.season ?? null,
+  });
+  preview.analysis.decision = decision;
+  preview.analysis.scoring = scoring;
+  preview.analysis.apexScore = apexScoreFromScoring(scoring);
+  preview.analysis.report = buildIntelligenceReport({
+    data: preview.analysis,
+    ...extras,
   });
 
   const live = buildLiveFromBundle(bundle, preview);

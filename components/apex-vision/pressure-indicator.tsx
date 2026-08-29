@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { Badge, Card, CardHeader } from "@/components/design-system";
 import type { VisionSide } from "@/lib/apex-vision/types";
 
@@ -17,12 +18,13 @@ export function PressureIndicator({
   homeLabel,
   awayLabel,
 }: PressureIndicatorProps) {
+  const t = useTranslations("vision");
   const team = side === "home" ? homeLabel : awayLabel;
 
   return (
     <Card padding="sm">
       <CardHeader
-        title="Presión"
+        title={t("pressure")}
         action={
           <Badge tone={side === "home" ? "accent" : "info"}>
             {team}
@@ -36,7 +38,7 @@ export function PressureIndicator({
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(value)}
-        aria-label={`Presión de ${team}`}
+        aria-label={t("pressureOf", { team })}
       >
         <motion.div
           className={

@@ -1,58 +1,62 @@
+import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/ui/button";
 import { PageShell } from "@/components/layout/page-shell";
+import { getShellUser } from "@/lib/auth/get-shell-user";
 
-const features = [
-  {
-    icon: "📊",
-    title: "Dashboard Inteligente",
-    description:
-      "Visualiza tu rendimiento en tiempo real con métricas claras y accionables.",
-  },
-  {
-    icon: "🤖",
-    title: "APEX Copilot",
-    description:
-      "Asistente visual para valor, análisis y el porqué de cada probabilidad.",
-  },
-  {
-    icon: "📈",
-    title: "Match Center™",
-    description:
-      "Preview, Live y Post Match en una sola experiencia de decisión.",
-  },
-  {
-    icon: "🛡",
-    title: "Auditoría de Apuestas",
-    description:
-      "Revisa y valida cada decisión con trazabilidad completa de tu historial.",
-  },
-];
+export default async function Home() {
+  const user = await getShellUser();
+  if (user?.id) {
+    redirect("/scanner");
+  }
 
-export default function Home() {
+  const t = await getTranslations("home");
+  const features = [
+    {
+      icon: "◎",
+      title: t("features.scannerTitle"),
+      description: t("features.scannerDescription"),
+    },
+    {
+      icon: "🤖",
+      title: t("features.copilotTitle"),
+      description: t("features.copilotDescription"),
+    },
+    {
+      icon: "📈",
+      title: t("features.matchCenterTitle"),
+      description: t("features.matchCenterDescription"),
+    },
+    {
+      icon: "🛡",
+      title: t("features.portfolioTitle"),
+      description: t("features.portfolioDescription"),
+    },
+  ];
+
   return (
     <PageShell>
-        <div className="w-full">
+      <div className="w-full">
         <section className="mx-auto max-w-3xl text-center">
           <div className="mb-6 inline-flex items-center rounded-full border border-[#00D4AA]/20 bg-[#00D4AA]/10 px-4 py-1.5 text-sm text-[#00D4AA]">
-            Plataforma de análisis deportivo · Release 0.1
+            {t("badge")}
           </div>
 
           <h1 className="text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">
-            La inteligencia que{" "}
+            {t("headlineBefore")}{" "}
             <span className="bg-gradient-to-r from-[#00D4AA] to-[#00a888] bg-clip-text text-transparent">
-              transforma
+              {t("headlineHighlight")}
             </span>{" "}
-            tus apuestas.
+            {t("headlineAfter")}
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-400 sm:text-xl">
-            Analiza tu historial, mide tu rendimiento y toma decisiones basadas
-            en datos.
+            {t("subheadline")}
           </p>
 
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <ButtonLink href="/register" fullWidth className="sm:w-auto">
-              Comenzar
+              {t("ctaStart")}
             </ButtonLink>
             <ButtonLink
               href="/login"
@@ -60,15 +64,15 @@ export default function Home() {
               fullWidth
               className="sm:w-auto"
             >
-              Iniciar sesión
+              {t("ctaSignIn")}
             </ButtonLink>
             <ButtonLink
-              href="/dashboard"
+              href="/scanner"
               variant="secondary"
               fullWidth
               className="sm:w-auto"
             >
-              Abrir producto
+              {t("ctaOpenProduct")}
             </ButtonLink>
           </div>
         </section>

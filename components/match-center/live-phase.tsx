@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { AiSidePanel } from "@/components/apex-vision/ai-side-panel";
 import { MomentumBar } from "@/components/apex-vision/momentum-bar";
 import { PitchField } from "@/components/apex-vision/pitch-field";
@@ -9,9 +10,8 @@ import { VisionTimeline } from "@/components/apex-vision/vision-timeline";
 import {
   Badge,
   Card,
-  CardHeader,
-  HeatmapPlaceholder,
 } from "@/components/design-system";
+import { UnavailableDataCard } from "@/components/app-shell/states";
 import { LineupsCard, hasPublishedLineup } from "@/components/match-center/lineups-card";
 import { simulateVisionTick } from "@/lib/apex-vision";
 import type { MatchCenterLiveData } from "@/lib/match-center/types";
@@ -28,6 +28,8 @@ type LivePhaseProps = {
  * Tick simulation is mock; replace with realtime feed later (`source`).
  */
 export function LivePhase({ data }: LivePhaseProps) {
+  const t = useTranslations("matchCenter");
+  const vision = useTranslations("vision");
   const [state, setState] = useState<VisionLiveState>(data.vision);
   const [visionBaseline, setVisionBaseline] = useState(data.vision);
 
@@ -52,7 +54,9 @@ export function LivePhase({ data }: LivePhaseProps) {
     <div className="space-y-6" role="tabpanel" aria-labelledby="match-center-tab-live">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="danger">Live</Badge>
+          <Badge tone={data.source === "mock" ? "info" : "danger"}>
+            {data.source === "mock" ? t("livePreview") : "Live"}
+          </Badge>
           <Badge tone="accent">APEX Vision</Badge>
         {data.source === "data-platform" && (
           <Badge>API-Football</Badge>
@@ -63,7 +67,7 @@ export function LivePhase({ data }: LivePhaseProps) {
             {state.score.home} – {state.score.away}
           </p>
           <p className="mt-1 text-xs uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-            Minuto {state.minute}&apos;
+            {vision("minute", { minute: state.minute })}
           </p>
         </Card>
       </div>
@@ -91,13 +95,10 @@ export function LivePhase({ data }: LivePhaseProps) {
             />
           </div>
 
-          <Card>
-            <CardHeader title="Heatmap" description="Placeholder listo para feed real" />
-            <HeatmapPlaceholder
-              title="Actividad en campo"
-              description="Sustituir por agregación de zonas cuando el feed live esté conectado."
-            />
-          </Card>
+          <UnavailableDataCard
+            title={t("heatmapUnavailable")}
+            description={t("heatmapUnavailableDescription")}
+          />
 
           {showLineups && (
             <LineupsCard home={lineups.home} away={lineups.away} />

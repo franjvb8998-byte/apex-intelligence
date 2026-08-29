@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getLocale, getTranslations } from "next-intl/server";
 import { EmptyState } from "@/components/app-shell/states";
 import { Badge } from "@/components/design-system/badge";
 import { Card, CardHeader } from "@/components/design-system/card";
@@ -28,37 +29,21 @@ function statusTone(
   }
 }
 
-function statusLabel(status: DashboardMatchStatus): string {
-  switch (status) {
-    case "live":
-      return "En vivo";
-    case "scheduled":
-      return "Programado";
-    case "finished":
-      return "Finalizado";
-    case "postponed":
-      return "Aplazado";
-    case "cancelled":
-      return "Cancelado";
-    default:
-      return "—";
-  }
-}
-
-function formatKickoff(iso: string): string {
+function formatKickoff(iso: string, locale: string): string {
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return iso;
-  return new Date(ms).toLocaleString("es-ES", {
+  return new Date(ms).toLocaleString(locale, {
     weekday: "short",
     day: "numeric",
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "UTC",
   });
 }
 
-function scoreLine(match: DashboardMatchSummary): string {
-  if (match.score.home == null && match.score.away == null) return "vs";
+function scoreLine(match: DashboardMatchSummary, vs: string): string {
+  if (match.score.home == null && match.score.away == null) return vs;
   return `${match.score.home ?? "—"} – ${match.score.away ?? "—"}`;
 }
 
@@ -71,7 +56,7 @@ type MatchListSectionProps = {
   hrefForFixture?: (fixtureId: string) => string;
 };
 
-export function DashboardMatchList({
+export async function DashboardMatchList({
   title,
   description,
   matches,
@@ -79,11 +64,32 @@ export function DashboardMatchList({
   selectedFixtureId,
   hrefForFixture = matchCenterHref,
 }: MatchListSectionProps) {
+  const t = await getTranslations("dashboard");
+  const common = await getTranslations("common");
+  const locale = await getLocale();
+
+  function statusLabel(status: DashboardMatchStatus): string {
+    switch (status) {
+      case "live":
+        return t("live");
+      case "scheduled":
+        return t("scheduled");
+      case "finished":
+        return t("finished");
+      case "postponed":
+        return t("postponed");
+      case "cancelled":
+        return t("cancelled");
+      default:
+        return "—";
+    }
+  }
+
   return (
     <Card padding="md">
       <CardHeader title={title} description={description} />
       {matches.length === 0 ? (
-        <EmptyState title="Sin partidos" description={emptyLabel} />
+        <EmptyState title={t("noMatches")} description={emptyLabel} />
       ) : (
         <ul className="divide-y divide-[var(--apex-border)]">
           {matches.map((match) => {
@@ -110,7 +116,7 @@ export function DashboardMatchList({
                       />
                       <span className="min-w-0 truncate">{match.homeTeam.name}</span>
                       <span className="shrink-0 text-[var(--apex-fg-subtle)]">
-                        {scoreLine(match)}
+                        {scoreLine(match, common("vs"))}
                       </span>
                       <TeamLogo
                         src={match.awayTeam.logoUrl}
@@ -121,7 +127,8 @@ export function DashboardMatchList({
                       <span className="min-w-0 truncate">{match.awayTeam.name}</span>
                     </p>
                     <p className="mt-1 text-xs text-[var(--apex-fg-muted)]">
-                      {match.leagueName ?? "Liga"} · {formatKickoff(match.kickoffAt)}
+                      {match.leagueName ?? common("league")} ·{" "}
+                      {formatKickoff(match.kickoffAt, locale)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -134,7 +141,7 @@ export function DashboardMatchList({
                         prefetch={false}
                         className="apex-focusable relative z-10 rounded-[var(--apex-radius-md)] px-2 py-1 text-xs text-[var(--apex-accent)] hover:text-[var(--apex-accent-hover)]"
                       >
-                        Ver
+                        {t("view")}
                       </Link>
                     )}
                   </div>

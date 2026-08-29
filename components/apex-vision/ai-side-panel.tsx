@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslations } from "next-intl";
 import {
   Badge,
   Card,
@@ -21,38 +22,39 @@ const riskTone: Record<VisionRiskLevel, "success" | "warning" | "danger"> = {
   high: "danger",
 };
 
-const riskLabel: Record<VisionRiskLevel, string> = {
-  low: "Bajo",
-  medium: "Medio",
-  high: "Alto",
-};
-
 export function AiSidePanel({ state }: AiSidePanelProps) {
+  const t = useTranslations("vision");
+  const common = useTranslations("common");
   const { markets, confidence, risk, riskLabel: riskDetail, aiInsight } = state;
+  const riskLabel = {
+    low: t("riskLow"),
+    medium: t("riskMedium"),
+    high: t("riskHigh"),
+  } as const;
 
   return (
     <aside className="space-y-4 lg:sticky lg:top-6">
       <Card>
         <CardHeader
-          title="Panel de IA"
-          description="Lectura en vivo (mock)"
+          title={t("aiPanel")}
+          description={t("aiPanelDescription")}
           action={<Badge tone="accent">Vision</Badge>}
         />
 
         <div className="space-y-5">
           <div>
             <p className="mb-3 text-xs uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-              Victoria (1X2)
+              {t("win1x2")}
             </p>
             <ProbabilityBars
-              aria-label="Probabilidad de victoria"
+              aria-label={t("winProbability")}
               items={[
                 {
                   id: "home",
                   label: state.homeTeam.shortName,
                   value: markets.homeWin,
                 },
-                { id: "draw", label: "Empate", value: markets.draw },
+                { id: "draw", label: common("draw"), value: markets.draw },
                 {
                   id: "away",
                   label: state.awayTeam.shortName,
@@ -66,7 +68,7 @@ export function AiSidePanel({ state }: AiSidePanelProps) {
             <MarketChip
               interactive={false}
               selected={markets.over25 >= 0.5}
-              label="Over 2.5"
+              label={common("over25")}
               value={`${Math.round(markets.over25 * 100)}%`}
             />
             <MarketChip
@@ -78,7 +80,7 @@ export function AiSidePanel({ state }: AiSidePanelProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 rounded-[var(--apex-radius-xl)] border border-[var(--apex-border)] bg-slate-950/40 px-4 py-3">
-            <span className="text-sm text-[var(--apex-fg-muted)]">Riesgo</span>
+            <span className="text-sm text-[var(--apex-fg-muted)]">{t("risk")}</span>
             <Badge tone={riskTone[risk]}>{riskLabel[risk]}</Badge>
             <p className="w-full text-xs text-[var(--apex-fg-subtle)]">
               {riskDetail}
@@ -90,7 +92,7 @@ export function AiSidePanel({ state }: AiSidePanelProps) {
       </Card>
 
       <Card>
-        <CardHeader title="Lo que está viendo la IA" />
+        <CardHeader title={t("aiSeeing")} />
         <AnimatePresence mode="wait">
           <motion.p
             key={aiInsight}

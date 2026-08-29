@@ -1,27 +1,29 @@
-import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { GuestShell } from "@/components/app-shell/guest-shell";
 import { ApexShowcaseView } from "@/components/apex-showcase";
 import { Badge } from "@/components/design-system";
+import { localeMetadata } from "@/lib/i18n/page-meta";
 
-export const metadata: Metadata = {
-  title: "APEX Showcase — Internal",
-  description:
-    "Internal development showcase for the APEX Intelligence platform.",
-  robots: {
-    index: false,
-    follow: false,
-  },
-};
+export async function generateMetadata() {
+  return {
+    ...(await localeMetadata("showcase")),
+    robots: {
+      index: false,
+      follow: false,
+    },
+  };
+}
 
 /**
  * Internal platform showcase — UI only.
  * No Supabase server / next/headers imports.
  */
-export default function ApexShowcasePage() {
+export default async function ApexShowcasePage() {
+  const t = await getTranslations("showcase");
   return (
     <GuestShell>
       <div className="w-full space-y-6">
-        <Badge tone="accent">Internal only</Badge>
+        <Badge tone="accent">{t("internalOnly")}</Badge>
         <ApexShowcaseView />
       </div>
     </GuestShell>

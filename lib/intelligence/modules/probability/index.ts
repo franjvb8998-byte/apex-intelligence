@@ -48,6 +48,8 @@ export {
   normalizedEntropy,
   softmaxFromScores,
 } from "@/lib/intelligence/modules/probability/math/normalize";
+export { confidenceFromHybrid } from "@/lib/intelligence/modules/probability/confidence-from-hybrid";
+export { estimateEloFromTeamId } from "@/lib/intelligence/modules/probability/elo-estimate";
 
 /**
  * General probability utilities (normalize / softmax / entropy).

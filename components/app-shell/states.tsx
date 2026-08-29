@@ -1,4 +1,7 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { Badge } from "@/components/design-system";
 import { cx } from "@/components/design-system/utils";
 
@@ -9,10 +12,12 @@ type LoadingStateProps = {
 };
 
 export function LoadingState({
-  label = "Cargando…",
+  label,
   className,
   rows = 3,
 }: LoadingStateProps) {
+  const t = useTranslations("common");
+  const text = label ?? t("loading");
   return (
     <div
       className={cx("w-full space-y-4", className)}
@@ -22,7 +27,7 @@ export function LoadingState({
     >
       <div className="flex items-center gap-2">
         <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--apex-accent)]" />
-        <p className="text-sm text-[var(--apex-fg-muted)]">{label}</p>
+        <p className="text-sm text-[var(--apex-fg-muted)]">{text}</p>
       </div>
       {Array.from({ length: rows }).map((_, index) => (
         <div
@@ -31,7 +36,7 @@ export function LoadingState({
           style={{ animationDelay: `${index * 80}ms` }}
         />
       ))}
-      <span className="sr-only">{label}</span>
+      <span className="sr-only">{text}</span>
     </div>
   );
 }
@@ -56,14 +61,37 @@ export function EmptyState({
         className,
       )}
     >
-      <Badge tone="neutral">Vacío</Badge>
-      <h2 className="mt-4 text-lg font-semibold text-[var(--apex-fg)]">{title}</h2>
+      <h2 className="text-lg font-semibold text-[var(--apex-fg)]">{title}</h2>
       {description && (
         <p className="mt-2 max-w-md text-sm text-[var(--apex-fg-muted)]">
           {description}
         </p>
       )}
       {action && <div className="mt-6">{action}</div>}
+    </div>
+  );
+}
+
+type UnavailableDataProps = {
+  title: string;
+  description: string;
+  className?: string;
+};
+
+export function UnavailableDataCard({
+  title,
+  description,
+  className,
+}: UnavailableDataProps) {
+  return (
+    <div
+      className={cx(
+        "rounded-[var(--apex-radius-xl)] border border-dashed border-[var(--apex-border-strong)] bg-slate-950/40 px-4 py-8 text-center",
+        className,
+      )}
+    >
+      <p className="text-sm font-medium text-[var(--apex-fg)]">{title}</p>
+      <p className="mt-2 text-sm text-[var(--apex-fg-muted)]">{description}</p>
     </div>
   );
 }
@@ -76,11 +104,13 @@ type ErrorStateProps = {
 };
 
 export function ErrorState({
-  title = "Algo salió mal",
-  description = "No pudimos cargar esta vista. Inténtalo de nuevo.",
+  title,
+  description,
   action,
   className,
 }: ErrorStateProps) {
+  const t = useTranslations("errors");
+  const common = useTranslations("common");
   return (
     <div
       className={cx(
@@ -89,10 +119,12 @@ export function ErrorState({
       )}
       role="alert"
     >
-      <Badge tone="danger">Error</Badge>
-      <h2 className="mt-4 text-lg font-semibold text-[var(--apex-fg)]">{title}</h2>
+      <Badge tone="danger">{common("error")}</Badge>
+      <h2 className="mt-4 text-lg font-semibold text-[var(--apex-fg)]">
+        {title ?? t("genericTitle")}
+      </h2>
       <p className="mt-2 max-w-md text-sm text-[var(--apex-fg-muted)]">
-        {description}
+        {description ?? t("genericDescription")}
       </p>
       {action && <div className="mt-6">{action}</div>}
     </div>

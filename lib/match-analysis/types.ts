@@ -12,6 +12,11 @@ import type {
 } from "@/lib/intelligence/types";
 import type { ExplanationFactor } from "@/lib/intelligence/types/engine";
 import type { ExplainablePrediction } from "@/lib/explainable-ai/types";
+import type { ApexMatchRating } from "@/lib/match-rating/types";
+import type { ApexIntelligenceReport } from "@/lib/intelligence-report/types";
+import type { ApexDecision } from "@/lib/decision-engine/types";
+import type { ApexScoring } from "@/lib/scoring-engine/types";
+import type { TeamIntelligence } from "@/lib/team-intelligence/models";
 import type {
   MatchAnalysisVenueSplit,
 } from "@/lib/match-analysis/analysis-types";
@@ -43,7 +48,7 @@ export type MatchAnalysisMarket = {
 };
 
 export type ApexScoreBreakdown = {
-  /** Composite 0–100 score for decision quality / model conviction. */
+  /** Composite 0–100 APEX Match Rating. */
   value: number;
   label: string;
   components: Array<{
@@ -97,6 +102,14 @@ export type MatchAnalysisData = {
   predictedOutcome: MatchOutcome;
   confidence: ConfidenceScore;
   apexScore: ApexScoreBreakdown;
+  /** Full Match Rating (legacy 10-metric board). */
+  rating: ApexMatchRating;
+  /** Scoring Engine v2 — platform score and recommendation. */
+  scoring?: ApexScoring;
+  /** APEX Decision Engine v1 — stake / Kelly. Recommendation comes from `scoring`. */
+  decision: ApexDecision;
+  /** APEX Intelligence Report v2 — deterministic analyst briefing. */
+  report: ApexIntelligenceReport;
   markets: MatchAnalysisMarket[];
   keyFactors: ExplanationFactor[];
   risks: MatchRisk[];
@@ -132,5 +145,15 @@ export type MatchAnalysisData = {
     home: number;
     away: number;
     total: number;
+  };
+  /** Fixture context published by the catalogue. Never inferred. */
+  context?: {
+    weather: string | null;
+    referee: string | null;
+  };
+  /** Club twins from Team Intelligence — presentation only. */
+  twins?: {
+    home: TeamIntelligence;
+    away: TeamIntelligence;
   };
 };

@@ -1,4 +1,7 @@
+"use client";
+
 import { Badge, Card, CardHeader } from "@/components/design-system";
+import { useTranslations } from "next-intl";
 import type { CopilotAnalysisCardData } from "@/lib/copilot";
 
 const riskTone = {
@@ -12,13 +15,14 @@ type AnalysisCardProps = {
 };
 
 export function AnalysisCard({ data }: AnalysisCardProps) {
+  const t = useTranslations("copilot");
   return (
     <Card padding="sm" className="mt-3 border-[var(--apex-accent-border)] bg-[var(--apex-surface-muted)]/50">
       <CardHeader
         className="mb-3"
-        title="Análisis"
+        title={t("analysis")}
         description={data.league}
-        action={<Badge tone={riskTone[data.risk]}>Risk {data.risk}</Badge>}
+        action={<Badge tone={riskTone[data.risk]}>{t("risk", { band: data.risk })}</Badge>}
       />
       <p className="text-sm font-medium text-[var(--apex-fg)]">{data.matchLabel}</p>
       <p className="mt-2 text-sm text-[var(--apex-fg-muted)]">{data.summary}</p>

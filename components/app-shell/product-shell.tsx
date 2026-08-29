@@ -6,6 +6,8 @@ export type ProductShellProps = {
   children: ReactNode;
   /** Resolved by the Server Component / layout that owns auth — never fetched here. */
   user?: ShellUser | null;
+  /** Full-bleed content (wide data tables). */
+  flush?: boolean;
 };
 
 /**
@@ -15,6 +17,11 @@ export type ProductShellProps = {
 export function ProductShell({
   children,
   user = null,
+  flush = false,
 }: ProductShellProps) {
-  return <AppShell user={user}>{children}</AppShell>;
+  return (
+    <AppShell user={user} flush={flush}>
+      {children}
+    </AppShell>
+  );
 }

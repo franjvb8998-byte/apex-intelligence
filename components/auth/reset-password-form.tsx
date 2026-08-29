@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { FormEvent, useEffect, useState } from "react";
 import { AuthCard } from "@/components/ui/auth-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RESET_PASSWORD_PATH } from "@/lib/auth/password-recovery";
-import { getAuthErrorMessage } from "@/lib/supabase/auth-errors";
+import { getAuthErrorKey } from "@/lib/supabase/auth-errors";
 import { createClient } from "@/lib/supabase/client";
 import { validatePassword } from "@/lib/validation";
 
@@ -20,6 +21,7 @@ type ResetPasswordErrors = {
 type SessionStatus = "loading" | "ready" | "invalid";
 
 export function ResetPasswordForm() {
+  const t = useTranslations("auth");
   const router = useRouter();
 
   const [password, setPassword] = useState("");
@@ -87,12 +89,12 @@ export function ResetPasswordForm() {
     const nextErrors: ResetPasswordErrors = {};
 
     const passwordError = validatePassword(password);
-    if (passwordError) nextErrors.password = passwordError;
+    if (passwordError) nextErrors.password = t(`validation.${passwordError}`);
 
     if (!confirmPassword) {
-      nextErrors.confirmPassword = "Confirma tu contraseña.";
+      nextErrors.confirmPassword = t("validation.confirmPasswordRequired");
     } else if (password !== confirmPassword) {
-      nextErrors.confirmPassword = "Las contraseñas no coinciden.";
+      nextErrors.confirmPassword = t("validation.passwordMismatch");
     }
 
     return nextErrors;
@@ -113,7 +115,7 @@ export function ResetPasswordForm() {
 
     if (error) {
       setIsSubmitting(false);
-      setErrors({ form: getAuthErrorMessage(error.message) });
+      setErrors({ form: t(`errors.${getAuthErrorKey(error.message)}`) });
       return;
     }
 
@@ -130,10 +132,10 @@ export function ResetPasswordForm() {
   if (sessionStatus === "loading") {
     return (
       <AuthCard
-        title="Restablecer contraseña"
-        subtitle="Validando el enlace de recuperación..."
+        title={t("reset.loadingTitle")}
+        subtitle={t("reset.loadingSubtitle")}
       >
-        <p className="text-center text-sm text-slate-400">Un momento...</p>
+        <p className="text-center text-sm text-slate-400">{t("reset.wait")}</p>
       </AuthCard>
     );
   }
@@ -141,28 +143,28 @@ export function ResetPasswordForm() {
   if (sessionStatus === "invalid") {
     return (
       <AuthCard
-        title="Enlace no válido"
-        subtitle="El enlace de recuperación ha expirado o ya se ha usado"
+        title={t("reset.invalidTitle")}
+        subtitle={t("reset.invalidSubtitle")}
         footer={
           <>
             <Link
               href="/forgot-password"
               className="font-medium text-[#00D4AA] transition-colors hover:text-[#00eabb]"
             >
-              Solicitar un nuevo enlace
+              {t("reset.requestNew")}
             </Link>
             {" · "}
             <Link
               href="/login"
               className="font-medium text-[#00D4AA] transition-colors hover:text-[#00eabb]"
             >
-              Iniciar sesión
+              {t("login.submit")}
             </Link>
           </>
         }
       >
         <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-          Vuelve a solicitar la recuperación de contraseña para continuar.
+          {t("reset.invalidBody")}
         </p>
       </AuthCard>
     );
@@ -170,23 +172,23 @@ export function ResetPasswordForm() {
 
   return (
     <AuthCard
-      title="Nueva contraseña"
-      subtitle="Elige una contraseña para tu cuenta"
+      title={t("reset.newTitle")}
+      subtitle={t("reset.newSubtitle")}
       footer={
         <>
-          ¿Ya puedes entrar?{" "}
+          {t("reset.footerPrompt")}{" "}
           <Link
             href="/login"
             className="font-medium text-[#00D4AA] transition-colors hover:text-[#00eabb]"
           >
-            Iniciar sesión
+            {t("login.submit")}
           </Link>
         </>
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
         <Input
-          label="Nueva contraseña"
+          label={t("reset.passwordLabel")}
           name="password"
           type="password"
           autoComplete="new-password"
@@ -197,7 +199,7 @@ export function ResetPasswordForm() {
         />
 
         <Input
-          label="Confirmar contraseña"
+          label={t("register.confirmPassword")}
           name="confirmPassword"
           type="password"
           autoComplete="new-password"
@@ -221,12 +223,12 @@ export function ResetPasswordForm() {
             className="rounded-lg border border-[#00D4AA]/30 bg-[#00D4AA]/10 px-4 py-3 text-sm text-[#00D4AA]"
             role="status"
           >
-            Contraseña actualizada. Redirigiendo al inicio de sesión...
+            {t("reset.success")}
           </p>
         )}
 
         <Button type="submit" fullWidth disabled={isSubmitting || success}>
-          {isSubmitting ? "Guardando..." : "Guardar contraseña"}
+          {isSubmitting ? t("reset.submitting") : t("reset.submit")}
         </Button>
       </form>
     </AuthCard>

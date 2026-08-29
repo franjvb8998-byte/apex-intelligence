@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Card, CardHeader } from "@/components/design-system";
 import type {
   MatchCenterLineup,
@@ -31,6 +34,7 @@ function LineupSide({
   lineup: MatchCenterLineup | null;
   emptyLabel: string;
 }) {
+  const t = useTranslations("matchCenter");
   if (!lineup || (lineup.startXI.length === 0 && lineup.substitutes.length === 0)) {
     return <p className="text-sm text-[var(--apex-fg-muted)]">{emptyLabel}</p>;
   }
@@ -40,7 +44,7 @@ function LineupSide({
       <div>
         <p className="text-sm font-medium text-[var(--apex-fg)]">{lineup.teamName}</p>
         <p className="text-xs text-[var(--apex-fg-subtle)]">
-          {lineup.formation ?? "Formación no publicada"}
+          {lineup.formation ?? t("formationUnpublished")}
         </p>
       </div>
       {lineup.startXI.length > 0 ? (
@@ -51,13 +55,13 @@ function LineupSide({
         </ul>
       ) : (
         <p className="text-xs text-[var(--apex-fg-subtle)]">
-          Once inicial no publicado.
+          {t("startingXiUnpublished")}
         </p>
       )}
       {lineup.substitutes.length > 0 ? (
         <div>
           <p className="mb-1 text-[10px] uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-            Suplentes
+            {t("substitutes")}
           </p>
           <ul>
             {lineup.substitutes.map((player) => (
@@ -76,20 +80,21 @@ type LineupsCardProps = {
 };
 
 export function LineupsCard({ home, away }: LineupsCardProps) {
+  const t = useTranslations("matchCenter");
   return (
     <Card>
       <CardHeader
-        title="Alineaciones"
-        description="Once inicial del proveedor cuando está publicado"
+        title={t("lineups")}
+        description={t("lineupsDescription")}
       />
       <div className="grid gap-6 sm:grid-cols-2">
         <LineupSide
           lineup={home}
-          emptyLabel="Sin alineación local publicada para este partido."
+          emptyLabel={t("lineupHomeEmpty")}
         />
         <LineupSide
           lineup={away}
-          emptyLabel="Sin alineación visitante publicada para este partido."
+          emptyLabel={t("lineupAwayEmpty")}
         />
       </div>
     </Card>

@@ -3,6 +3,7 @@
 import { BallMarker } from "@/components/apex-vision/ball-marker";
 import { PlayerMarkers } from "@/components/apex-vision/player-markers";
 import { Card } from "@/components/design-system";
+import { useTranslations } from "next-intl";
 import type { PitchPoint, VisionPlayer } from "@/lib/apex-vision/types";
 
 type PitchFieldProps = {
@@ -21,11 +22,12 @@ export function PitchField({
   homeShort,
   awayShort,
 }: PitchFieldProps) {
+  const t = useTranslations("vision");
   return (
-    <Card padding="sm" className="overflow-hidden" aria-label="Campo de fútbol">
+    <Card padding="sm" className="overflow-hidden" aria-label={t("pitchAria")}>
       <div className="mb-3 flex items-center justify-between px-1 text-xs text-[var(--apex-fg-subtle)]">
         <span className="font-semibold text-[var(--apex-accent)]">{homeShort}</span>
-        <span>Campo 2D · APEX Vision</span>
+        <span>{t("pitch2d")}</span>
         <span className="font-semibold text-sky-400">{awayShort}</span>
       </div>
 

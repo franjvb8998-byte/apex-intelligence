@@ -3,7 +3,6 @@
  */
 
 import { getDefaultMatchId, DEMO_MATCH_EXTERNAL_ID } from "@/lib/data-platform";
-import { RECORDED_API_FOOTBALL_FIXTURE_ID } from "@/lib/data-platform/providers/api-football/fixtures";
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
 import {
   addUtcDays,
@@ -26,8 +25,10 @@ import type {
 } from "@/lib/dashboard/types";
 import {
   ignoreNonQuotaErrors,
-  isApiFootballQuotaError,
-} from "@/lib/data-platform/providers/api-football/quota";
+  isQuotaError,
+  RECORDED_API_FOOTBALL_FIXTURE_ID,
+  createRepositories,
+} from "@/lib/repositories";
 import { getMatchCenterData } from "@/lib/match-center/load";
 import type { MatchCenterData } from "@/lib/match-center/types";
 
@@ -40,41 +41,37 @@ export type LoadDashboardOptions = DashboardProviderResolveOptions & {
 };
 
 async function listForDate(
-  listFixtures: NonNullable<
-    ReturnType<typeof resolveDashboardProvider>["provider"]["listFixtures"]
-  >,
+  fixtures: ReturnType<typeof createRepositories>["fixtures"],
   date: string,
 ): Promise<ApexMatchBundle[]> {
-  return ignoreNonQuotaErrors(() => listFixtures({ date }), []);
+  return ignoreNonQuotaErrors(() => fixtures.list({ date }), []);
 }
 
 /**
- * Load Dashboard overview from the resolved Data Platform provider.
+ * Load Dashboard overview from the DAL.
  */
 export async function getDashboardData(
   options: LoadDashboardOptions = {},
 ): Promise<DashboardData> {
   const resolved = resolveDashboardProvider(options);
-  const { provider, kind, dataMode, hasApiKey, displayName } = resolved;
+  const { kind, dataMode, hasApiKey, displayName } = resolved;
+  const repos = createRepositories({
+    provider: resolved.provider,
+    env: options.env,
+  });
   const today = options.today ?? startOfUtcDay(options.now ?? new Date());
   const upcomingDays = options.upcomingDays ?? 3;
   const now = options.now ?? new Date();
 
-  const listFixtures =
-    provider.listFixtures?.bind(provider) ??
-    (async () => {
-      const matchId = defaultMatchIdFor(kind, options.env);
-      return [await provider.getMatch({ matchId })];
-    });
-
-  const todayBundles = await listForDate(listFixtures, today);
+  const todayBundles = await listForDate(repos.fixtures, today);
 
   const upcomingBundles: ApexMatchBundle[] = [];
   const seenIds = new Set(todayBundles.map((b) => b.match.id));
 
   for (let offset = 0; offset <= upcomingDays; offset += 1) {
     const date = addUtcDays(today, offset);
-    const bundles = offset === 0 ? todayBundles : await listForDate(listFixtures, date);
+    const bundles =
+      offset === 0 ? todayBundles : await listForDate(repos.fixtures, date);
     for (const bundle of bundles) {
       if (seenIds.has(bundle.match.id) && offset > 0) continue;
       if (offset > 0) seenIds.add(bundle.match.id);
@@ -86,11 +83,9 @@ export async function getDashboardData(
   let seed: ApexMatchBundle | null = null;
   if (todayBundles.length === 0 && upcomingBundles.length === 0) {
     try {
-      seed = await provider.getMatch({
-        matchId: defaultMatchIdFor(kind, options.env),
-      });
+      seed = await repos.fixtures.getById(defaultMatchIdFor(kind, options.env));
     } catch (error) {
-      if (isApiFootballQuotaError(error)) throw error;
+      if (isQuotaError(error)) throw error;
       seed = null;
     }
   }
@@ -196,7 +191,7 @@ function buildStatusMessage(input: {
   upcomingCount: number;
 }): string {
   if (input.kind === "mock" || !input.hasApiKey) {
-    return "Sin API key — Dashboard en modo mock (Data Platform).";
+    return "Sin API key — Dashboard usa el catálogo de Data Platform.";
   }
   if (input.dataMode === "live") {
     return `API-Football live · ${input.todayCount} hoy · ${input.upcomingCount} próximos.`;
@@ -249,7 +244,7 @@ export async function loadDashboardWorkspace(
       provider: resolved.provider,
     });
   } catch (error) {
-    if (isApiFootballQuotaError(error)) {
+    if (isQuotaError(error)) {
       return {
         dashboard: emptyDashboardData(resolved),
         matchCenter: null,
@@ -272,7 +267,7 @@ export async function loadDashboardWorkspace(
     });
   } catch (error) {
     if (
-      isApiFootballQuotaError(error) &&
+      isQuotaError(error) &&
       dashboard.todayMatches.length === 0 &&
       dashboard.upcomingMatches.length === 0
     ) {

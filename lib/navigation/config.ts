@@ -1,61 +1,111 @@
 /**
- * Product navigation — UX only (Release 0.1).
+ * Product navigation — ids and hrefs only. Visible labels live in locale files.
  */
 
+export const NAV_IDS = [
+  "scanner",
+  "feed",
+  "smart-combos",
+  "match-center",
+  "dashboard",
+  "bankroll",
+  "portfolio",
+  "lab",
+  "copilot",
+  "match-analysis",
+  "match-live",
+  "showcase",
+  "design-system",
+] as const;
+
+export type NavId = (typeof NAV_IDS)[number];
+
+export const PLAIN_NAV_KEYS = ["apex", "match", "matchCenterTm"] as const;
+
+export type PlainNavKey = (typeof PLAIN_NAV_KEYS)[number];
+
+export type NavLabelKey = NavId | PlainNavKey;
+
+export type CommandActionKey =
+  | "openScanner"
+  | "openFeed"
+  | "openLab"
+  | "openCombos"
+  | "newCopilot";
+
 export type NavItem = {
-  id: string;
-  label: string;
+  id: NavId;
   href: string;
-  description: string;
   keywords?: string[];
 };
 
 export type BreadcrumbItem = {
-  label: string;
+  key: string;
   href?: string;
 };
 
+export function isNavId(value: string): value is NavId {
+  return (NAV_IDS as readonly string[]).includes(value);
+}
+
+export function isPlainNavKey(value: string): value is PlainNavKey {
+  return (PLAIN_NAV_KEYS as readonly string[]).includes(value);
+}
+
 export const PRIMARY_NAV: NavItem[] = [
   {
+    id: "scanner",
+    href: "/scanner",
+    keywords: ["scanner", "home", "opportunities", "value", "ev", "apex", "picks", "desk"],
+  },
+  {
+    id: "feed",
+    href: "/feed",
+    keywords: ["feed", "terminal", "bloomberg"],
+  },
+  {
+    id: "smart-combos",
+    href: "/smart-combos",
+    keywords: ["combo", "accumulator", "acca", "builder", "kelly", "monte carlo"],
+  },
+  {
     id: "match-center",
-    label: "Match Center",
     href: "/match-center",
-    description: "Dashboard del partido",
-    keywords: ["partido", "analisis", "preview", "ev"],
+    keywords: ["match", "analysis", "preview", "ev"],
   },
   {
     id: "dashboard",
-    label: "Dashboard",
     href: "/dashboard",
-    description: "Partidos, ligas y estado del sistema",
-    keywords: ["home", "inicio", "overview"],
+    keywords: ["home", "overview"],
   },
   {
     id: "bankroll",
-    label: "My Bankroll",
     href: "/bankroll",
-    description: "Saldo, apuestas y rendimiento",
-    keywords: ["bankroll", "stakes", "apuestas", "roi", "yield"],
+    keywords: ["bankroll", "stakes", "roi", "yield"],
+  },
+  {
+    id: "portfolio",
+    href: "/portfolio",
+    keywords: ["portfolio", "exposure", "risk", "kelly", "diversification"],
+  },
+  {
+    id: "lab",
+    href: "/lab",
+    keywords: ["lab", "research", "backtest", "models", "quant", "explainability"],
   },
   {
     id: "copilot",
-    label: "Copilot",
     href: "/copilot",
-    description: "Asistente APEX (demo UI)",
-    keywords: ["chat", "ia", "assistant"],
+    keywords: ["chat", "assistant"],
   },
   {
     id: "match-analysis",
-    label: "Match Analysis",
     href: "/match-analysis",
-    description: "Probabilidades y explicación",
     keywords: ["1x2", "markets", "score"],
   },
   {
     id: "match-live",
-    label: "APEX Vision",
     href: "/match-live",
-    description: "Campo en vivo y momentum",
     keywords: ["vision", "live", "pitch"],
   },
 ];
@@ -63,16 +113,12 @@ export const PRIMARY_NAV: NavItem[] = [
 export const SECONDARY_NAV: NavItem[] = [
   {
     id: "showcase",
-    label: "Showcase",
     href: "/apex-showcase",
-    description: "Vista interna del sistema",
     keywords: ["demo", "roadmap"],
   },
   {
     id: "design-system",
-    label: "Design System",
     href: "/design-system",
-    description: "Tokens y componentes",
     keywords: ["ds", "ui", "tokens"],
   },
 ];
@@ -80,50 +126,66 @@ export const SECONDARY_NAV: NavItem[] = [
 export const ALL_NAV = [...PRIMARY_NAV, ...SECONDARY_NAV];
 
 const BREADCRUMB_MAP: Record<string, BreadcrumbItem[]> = {
-  "/dashboard": [{ label: "Dashboard" }],
+  "/scanner": [{ key: "scanner" }],
+  "/feed": [{ key: "feed" }],
+  "/dashboard": [{ key: "dashboard" }],
+  "/opportunities": [{ key: "scanner" }],
+  "/smart-combos": [
+    { key: "dashboard", href: "/dashboard" },
+    { key: "smart-combos" },
+  ],
+  "/apex-opportunities": [{ key: "scanner" }],
   "/match-center": [
-    { label: "Dashboard", href: "/dashboard" },
-    { label: "Match Center™" },
+    { key: "dashboard", href: "/dashboard" },
+    { key: "matchCenterTm" },
   ],
   "/copilot": [
-    { label: "Dashboard", href: "/dashboard" },
-    { label: "Copilot" },
+    { key: "dashboard", href: "/dashboard" },
+    { key: "copilot" },
   ],
   "/bankroll": [
-    { label: "Dashboard", href: "/dashboard" },
-    { label: "My Bankroll" },
+    { key: "dashboard", href: "/dashboard" },
+    { key: "bankroll" },
+  ],
+  "/portfolio": [
+    { key: "dashboard", href: "/dashboard" },
+    { key: "portfolio" },
+  ],
+  "/lab": [
+    { key: "dashboard", href: "/dashboard" },
+    { key: "lab" },
   ],
   "/match-analysis": [
-    { label: "Match Center™", href: "/match-center" },
-    { label: "Match Analysis" },
+    { key: "matchCenterTm", href: "/match-center" },
+    { key: "match-analysis" },
   ],
   "/match-live": [
-    { label: "Match Center™", href: "/match-center" },
-    { label: "APEX Vision" },
+    { key: "matchCenterTm", href: "/match-center" },
+    { key: "match-live" },
   ],
   "/apex-showcase": [
-    { label: "Dashboard", href: "/dashboard" },
-    { label: "Showcase" },
+    { key: "dashboard", href: "/dashboard" },
+    { key: "showcase" },
   ],
   "/design-system": [
-    { label: "Dashboard", href: "/dashboard" },
-    { label: "Design System" },
+    { key: "dashboard", href: "/dashboard" },
+    { key: "design-system" },
   ],
 };
 
 export function breadcrumbsForPath(pathname: string): BreadcrumbItem[] {
   if (pathname.startsWith("/match-analysis/")) {
     return [
-      { label: "Dashboard", href: "/dashboard" },
-      { label: "Match Analysis", href: "/match-analysis" },
-      { label: "Partido" },
+      { key: "dashboard", href: "/dashboard" },
+      { key: "match-analysis", href: "/match-analysis" },
+      { key: "match" },
     ];
   }
   if (pathname.startsWith("/match-center/")) {
     return [
-      { label: "Dashboard", href: "/dashboard" },
-      { label: "Match Center™", href: "/match-center" },
-      { label: "Partido" },
+      { key: "dashboard", href: "/dashboard" },
+      { key: "matchCenterTm", href: "/match-center" },
+      { key: "match" },
     ];
   }
   if (pathname === "/match-center") {
@@ -132,43 +194,74 @@ export function breadcrumbsForPath(pathname: string): BreadcrumbItem[] {
   const exact = BREADCRUMB_MAP[pathname];
   if (exact) return exact;
   const base = pathname.split("/").filter(Boolean)[0];
-  if (!base) return [{ label: "APEX" }];
-  return [
-    { label: "Dashboard", href: "/dashboard" },
-    { label: base },
-  ];
+  if (!base) return [{ key: "apex" }];
+  return [{ key: "dashboard", href: "/dashboard" }, { key: base }];
 }
 
-export function titleForPath(pathname: string): string {
-  if (pathname.startsWith("/match-center")) return "Match Center";
-  if (pathname.startsWith("/match-analysis")) return "Match Analysis";
+export function titleKeyForPath(pathname: string): NavId | "apex" {
+  if (pathname.startsWith("/scanner")) return "scanner";
+  if (pathname.startsWith("/feed")) return "feed";
+  if (pathname.startsWith("/opportunities")) return "scanner";
+  if (pathname.startsWith("/smart-combos")) return "smart-combos";
+  if (pathname.startsWith("/apex-opportunities")) return "scanner";
+  if (pathname.startsWith("/match-center")) return "match-center";
+  if (pathname.startsWith("/match-analysis")) return "match-analysis";
+  if (pathname.startsWith("/portfolio")) return "portfolio";
+  if (pathname.startsWith("/lab")) return "lab";
   const item = ALL_NAV.find((n) => n.href === pathname);
-  return item?.label ?? "APEX";
+  return item?.id ?? "apex";
+}
+
+/** @deprecated Use titleKeyForPath — kept for call sites that still expect a key. */
+export function titleForPath(pathname: string): string {
+  return titleKeyForPath(pathname);
 }
 
 export type CommandItem = {
   id: string;
-  label: string;
   href?: string;
-  hint?: string;
-  group: "Navegación" | "Acciones" | "Búsqueda";
+  group: "navigation" | "actions" | "search";
+  navId?: NavId;
+  actionKey?: CommandActionKey;
 };
 
 export function buildCommandItems(): CommandItem[] {
   return [
     ...ALL_NAV.map((item) => ({
       id: `nav-${item.id}`,
-      label: item.label,
       href: item.href,
-      hint: item.description,
-      group: "Navegación" as const,
+      group: "navigation" as const,
+      navId: item.id,
     })),
     {
+      id: "action-open-scanner",
+      href: "/scanner",
+      group: "actions",
+      actionKey: "openScanner",
+    },
+    {
+      id: "action-open-feed",
+      href: "/feed",
+      group: "actions",
+      actionKey: "openFeed",
+    },
+    {
+      id: "action-open-lab",
+      href: "/lab",
+      group: "actions",
+      actionKey: "openLab",
+    },
+    {
+      id: "action-open-combos",
+      href: "/smart-combos",
+      group: "actions",
+      actionKey: "openCombos",
+    },
+    {
       id: "action-new-analysis",
-      label: "Nuevo análisis en Copilot",
       href: "/copilot",
-      hint: "Abrir asistente",
-      group: "Acciones",
+      group: "actions",
+      actionKey: "newCopilot",
     },
   ];
 }

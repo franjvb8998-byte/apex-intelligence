@@ -1,14 +1,18 @@
+"use client";
+
+import { useLocale, useTranslations } from "next-intl";
 import { Badge } from "@/components/design-system";
 import { TeamLogo } from "@/components/design-system/team-logo";
 
-function formatKickoff(iso: string): string {
+function formatKickoff(iso: string, locale: string): string {
   try {
-    return new Intl.DateTimeFormat("es-ES", {
+    return new Intl.DateTimeFormat(locale, {
       weekday: "short",
       day: "numeric",
       month: "short",
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "UTC",
       timeZoneName: "short",
     }).format(new Date(iso));
   } catch {
@@ -29,12 +33,6 @@ type MatchHeaderProps = {
   source: "mock" | "intelligence-core" | "data-platform";
 };
 
-const statusLabel = {
-  scheduled: "Programado",
-  live: "En vivo",
-  finished: "Finalizado",
-} as const;
-
 const statusTone = {
   scheduled: "info",
   live: "danger",
@@ -53,12 +51,20 @@ export function MatchHeader({
   awayLogoUrl,
   source,
 }: MatchHeaderProps) {
+  const t = useTranslations("matchAnalysis");
+  const locale = useLocale();
+  const statusLabel = {
+    scheduled: t("statusScheduled"),
+    live: t("statusLive"),
+    finished: t("statusFinished"),
+  } as const;
+
   return (
     <header className="space-y-6">
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <span className="text-[var(--apex-accent)]">{leagueName}</span>
         <span className="text-[var(--apex-fg-subtle)]">·</span>
-        <span className="text-[var(--apex-fg-muted)]">{formatKickoff(kickoffAt)}</span>
+        <span className="text-[var(--apex-fg-muted)]">{formatKickoff(kickoffAt, locale)}</span>
         <Badge tone={statusTone[status]}>{statusLabel[status]}</Badge>
         {source === "data-platform" && <Badge>API-Football</Badge>}
         {source === "intelligence-core" && <Badge>Probability Engine</Badge>}
@@ -76,7 +82,7 @@ export function MatchHeader({
             VS
           </span>
           <span className="text-xs uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-            Análisis APEX
+            {t("apexAnalysis")}
           </span>
         </div>
         <TeamBlock

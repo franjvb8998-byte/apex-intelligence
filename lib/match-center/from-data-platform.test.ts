@@ -77,6 +77,10 @@ describe("Match Center ← Data Platform", () => {
     expect(data.defaultPhase).toBe("post");
     expect(data.post.finalScore).toEqual({ home: 2, away: 1 });
     expect(data.preview.analysis.oneXTwo.home).toBeGreaterThan(0);
+    expect(data.preview.analysis.scoring?.engineId).toBe("scoring-v2");
+    expect(data.preview.analysis.scoring?.overall).toBe(
+      data.preview.analysis.apexScore.value,
+    );
     expect(data.preview.hybrid.btts.yes).toBeGreaterThan(0);
     expect(data.preview.dashboard.form.home?.form).toBeTruthy();
     expect(data.preview.dashboard.form.away?.teamName).toBe("Chelsea");

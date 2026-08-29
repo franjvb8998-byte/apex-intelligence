@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { FormEvent, useState } from "react";
 import { AuthCard } from "@/components/ui/auth-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getPasswordResetEmailRedirectTo } from "@/lib/auth/password-recovery";
-import { getAuthErrorMessage } from "@/lib/supabase/auth-errors";
+import { getAuthErrorKey } from "@/lib/supabase/auth-errors";
 import { createClient } from "@/lib/supabase/client";
 import { isValidEmail } from "@/lib/validation";
 
@@ -16,6 +17,7 @@ type ForgotPasswordErrors = {
 };
 
 export function ForgotPasswordForm() {
+  const t = useTranslations("auth");
   const [email, setEmail] = useState("");
   const [errors, setErrors] = useState<ForgotPasswordErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,9 +27,9 @@ export function ForgotPasswordForm() {
     const nextErrors: ForgotPasswordErrors = {};
 
     if (!email.trim()) {
-      nextErrors.email = "El email es obligatorio.";
+      nextErrors.email = t("validation.emailRequired");
     } else if (!isValidEmail(email)) {
-      nextErrors.email = "Introduce un email válido.";
+      nextErrors.email = t("validation.emailInvalid");
     }
 
     return nextErrors;
@@ -52,7 +54,7 @@ export function ForgotPasswordForm() {
     setIsSubmitting(false);
 
     if (error) {
-      setErrors({ form: getAuthErrorMessage(error.message) });
+      setErrors({ form: t(`errors.${getAuthErrorKey(error.message)}`) });
       return;
     }
 
@@ -62,27 +64,27 @@ export function ForgotPasswordForm() {
 
   return (
     <AuthCard
-      title="Recuperar contraseña"
-      subtitle="Te enviaremos un enlace para crear una nueva contraseña"
+      title={t("forgot.title")}
+      subtitle={t("forgot.subtitle")}
       footer={
         <>
-          ¿La recuerdas?{" "}
+          {t("forgot.footerPrompt")}{" "}
           <Link
             href="/login"
             className="font-medium text-[#00D4AA] transition-colors hover:text-[#00eabb]"
           >
-            Iniciar sesión
+            {t("login.submit")}
           </Link>
         </>
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
         <Input
-          label="Email"
+          label={t("login.email")}
           name="email"
           type="email"
           autoComplete="email"
-          placeholder="tu@email.com"
+          placeholder={t("login.emailPlaceholder")}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           error={errors.email}
@@ -102,12 +104,12 @@ export function ForgotPasswordForm() {
             className="rounded-lg border border-[#00D4AA]/30 bg-[#00D4AA]/10 px-4 py-3 text-sm text-[#00D4AA]"
             role="status"
           >
-            Revisa tu email para restablecer la contraseña.
+            {t("forgot.emailSent")}
           </p>
         )}
 
         <Button type="submit" fullWidth disabled={isSubmitting}>
-          {isSubmitting ? "Enviando enlace..." : "Enviar enlace"}
+          {isSubmitting ? t("forgot.submitting") : t("forgot.submit")}
         </Button>
       </form>
     </AuthCard>

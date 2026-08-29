@@ -4,14 +4,17 @@
 
 1. [Overview](#overview)
 2. [Intelligence Core](#intelligence-core)
-3. [Probability Engine](#probability-engine)
-4. [Reasoning Layer](#reasoning-layer)
-5. [Explainability](#explainability)
-6. [Learning Engine](#learning-engine)
-7. [APEX Vision](#apex-vision)
-8. [Inputs and outputs](#inputs-and-outputs)
-9. [Boundaries](#boundaries)
-10. [Open questions](#open-questions)
+3. [Team Intelligence](#team-intelligence)
+4. [Scoring Engine v2](#scoring-engine-v2)
+5. [Probability Engine](#probability-engine)
+6. [Reasoning Layer](#reasoning-layer)
+7. [Explainability](#explainability)
+8. [Learning Engine](#learning-engine)
+9. [Intelligence Learning System](#intelligence-learning-system)
+10. [APEX Vision](#apex-vision)
+11. [Inputs and outputs](#inputs-and-outputs)
+12. [Boundaries](#boundaries)
+13. [Open questions](#open-questions)
 
 ---
 
@@ -22,6 +25,14 @@ APEX Intelligence separates **probability** (numeric engine), **reasoning** (exp
 ## Intelligence Core
 
 Shared types, ports, and composition root under `lib/intelligence/`. See [`docs/AI_ENGINE.md`](./AI_ENGINE.md).
+
+## Team Intelligence
+
+Club digital twin under `lib/team-intelligence/`. Coverage-weighted 0–100 from published team facts. **Does not** modify Probability, Decision Engine weights, or vendor HTTP. See [`docs/TEAM_INTELLIGENCE.md`](./TEAM_INTELLIGENCE.md).
+
+## Scoring Engine v2
+
+Official platform score under `lib/scoring-engine/`. Nine independently testable pillars, recalibrate `weights.ts`. Consumes Probability, Decision Engine value/risk/confidence, and Team Intelligence — it does not replace those engines' internals. See [`docs/SCORING_ENGINE.md`](./SCORING_ENGINE.md).
 
 ## Probability Engine
 
@@ -41,7 +52,11 @@ Core module stubs (`modules/explainability`) vs Reasoning Layer `ExplainabilityS
 
 ## Learning Engine
 
-Separate package (`lib/learning-engine/`). Not modified by the Reasoning Layer sprint.
+Separate package (`lib/learning-engine/`). Post-match PE evaluation (accuracy, Brier, ECE). Not modified by the recommendation learning sprint.
+
+## Intelligence Learning System
+
+Recommendation registry + settlement + ROI / calibration / market metrics under `lib/intelligence-learning/`. Persists Scoring Engine v2 recommendations from Scanner, Match Analysis and Smart Combo. Does not train models. See [`docs/INTELLIGENCE_LEARNING.md`](./INTELLIGENCE_LEARNING.md).
 
 ## APEX Vision
 

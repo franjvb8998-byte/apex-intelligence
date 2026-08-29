@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Card, CardHeader } from "@/components/design-system";
 import { formatMoney, formatSignedMoney } from "@/lib/bankroll/currency";
 import type { BankrollCurrency } from "@/lib/bankroll/currency";
@@ -64,15 +67,16 @@ function BankrollEvolutionChart({
       ? `${line} L ${coords[coords.length - 1]!.x} ${height} L ${coords[0]!.x} ${height} Z`
       : "";
 
+  const t = useTranslations("bankroll");
   return (
     <Card>
       <CardHeader
-        title="Evolución del bankroll"
-        description="Saldo tras cada apuesta liquidada"
+        title={t("evolutionTitle")}
+        description={t("evolutionDescription")}
       />
       {points.length < 2 ? (
         <p className="text-sm text-[var(--apex-fg-muted)]">
-          Aún no hay historial suficiente para la curva.
+          {t("evolutionEmpty")}
         </p>
       ) : (
         <div>
@@ -80,7 +84,7 @@ function BankrollEvolutionChart({
             viewBox={`0 0 ${width} ${height}`}
             className="h-36 w-full"
             role="img"
-            aria-label="Evolución del bankroll"
+            aria-label={t("evolutionAria")}
           >
             <path
               d={area}
@@ -113,6 +117,7 @@ function MonthlyProfitChart({
   months: MonthlyProfit[];
   currency: BankrollCurrency;
 }) {
+  const t = useTranslations("bankroll");
   const peak = Math.max(
     ...months.map((month) => Math.abs(month.profit)),
     1,
@@ -120,15 +125,15 @@ function MonthlyProfitChart({
   return (
     <Card>
       <CardHeader
-        title="Beneficio mensual"
-        description="P/L agregado por mes UTC"
+        title={t("monthlyTitle")}
+        description={t("monthlyDescription")}
       />
       {months.length === 0 ? (
         <p className="text-sm text-[var(--apex-fg-muted)]">
-          Sin resultados mensuales todavía.
+          {t("monthlyEmpty")}
         </p>
       ) : (
-        <ul className="space-y-3" aria-label="Beneficio mensual">
+        <ul className="space-y-3" aria-label={t("monthlyTitle")}>
           {months.map((month) => {
             const width = Math.max(6, (Math.abs(month.profit) / peak) * 100);
             const positive = month.profit >= 0;
@@ -174,6 +179,7 @@ function WinLossHistoryChart({
   bets: BankrollBet[];
   currency: BankrollCurrency;
 }) {
+  const t = useTranslations("bankroll");
   const settled = [...bets]
     .filter((bet) => bet.result === "won" || bet.result === "lost")
     .sort((a, b) => a.placedAt.localeCompare(b.placedAt));
@@ -187,22 +193,22 @@ function WinLossHistoryChart({
   return (
     <Card>
       <CardHeader
-        title="Historial win / loss"
+        title={t("winLossTitle")}
         description={
           settled.length > 0
-            ? `${wins} aciertos · ${losses} fallos`
-            : "Apuestas liquidadas en orden cronológico"
+            ? t("winLossSettled", { wins, losses })
+            : t("winLossDescription")
         }
       />
       {settled.length === 0 ? (
         <p className="text-sm text-[var(--apex-fg-muted)]">
-          Todavía no hay apuestas liquidadas.
+          {t("winLossEmpty")}
         </p>
       ) : (
         <div
           className="flex h-36 items-end gap-1"
           role="img"
-          aria-label="Historial de aciertos y fallos"
+          aria-label={t("winLossAria")}
         >
           {settled.map((bet) => {
             const magnitude = Math.abs(bet.profit ?? 0);

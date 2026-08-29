@@ -1,13 +1,11 @@
 /**
- * Match Center data loader — API-Football (live when API_FOOTBALL_KEY is set).
+ * Match Center data loader — fixtures and match payloads via the DAL.
  * Free-plan flow: today's fixtures, then Premier League 2025 fallback.
  */
 
-import { createApiFootballDataProvider, type IDataProvider } from "@/lib/data-platform";
+import type { IDataProvider } from "@/lib/data-platform";
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
-import { ignoreNonQuotaErrors } from "@/lib/data-platform/providers/api-football/quota";
 import { matchSummaryFromBundle } from "@/lib/dashboard/map";
-import { hasFootballApiKey } from "@/lib/dashboard/resolve-provider";
 import type { DashboardMatchSummary } from "@/lib/dashboard/types";
 import {
   EMPTY_MATCH_CENTER_ENRICHMENT,
@@ -16,10 +14,10 @@ import {
 import { vendorFixtureId } from "@/lib/match-center/fixture-id";
 import { createMatchCenterFromApexBundle } from "@/lib/match-center/from-data-platform";
 import type { MatchCenterData } from "@/lib/match-center/types";
-
-const PREMIER_LEAGUE_ID = "39";
-const PREMIER_LEAGUE_SEASON = "2025";
-const FIXTURE_LIMIT = 20;
+import {
+  createProductDataProvider,
+  createRepositories,
+} from "@/lib/repositories";
 
 export type LoadMatchCenterOptions = {
   /** External fixture id (API-Football fixture id or Apex id). */
@@ -39,31 +37,34 @@ export type LoadMatchCenterOptions = {
 export function resolveMatchCenterProvider(
   env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
 ): IDataProvider {
-  const hasKey = hasFootballApiKey(env);
-  return createApiFootballDataProvider({
+  return createProductDataProvider(env);
+}
+
+function repositoriesFor(options: LoadMatchCenterOptions) {
+  const env = options.env ?? process.env;
+  return createRepositories({
+    provider: options.provider,
     env,
     enrichMatch: true,
-    fallback: hasKey ? "error" : "recorded",
   });
 }
 
 /**
- * Load Match Center from API-Football. Does not use the mock catalogue.
+ * Load Match Center from the DAL. Does not use the mock catalogue.
  */
 export async function getMatchCenterData(
   options: LoadMatchCenterOptions = {},
 ): Promise<MatchCenterData> {
-  const env = options.env ?? process.env;
-  const provider = options.provider ?? resolveMatchCenterProvider(env);
+  const repos = repositoriesFor(options);
   const requested = vendorFixtureId(options.externalMatchId);
   const skipCatalogue = options.includeFixtureList === false && Boolean(requested);
-  const fixtures = skipCatalogue ? [] : await loadFixtureCatalogue(provider);
+  const fixtures = skipCatalogue ? [] : await repos.fixtures.listCatalogue();
   const matchId = resolveSelectedFixtureId(fixtures, requested ?? undefined);
 
-  const bundle = await provider.getMatch({ matchId });
+  const bundle = await repos.fixtures.getById(matchId);
   let enrichment;
   try {
-    enrichment = await enrichMatchCenterContext(provider, bundle);
+    enrichment = await enrichMatchCenterContext(repos, bundle);
   } catch {
     enrichment = { ...EMPTY_MATCH_CENTER_ENRICHMENT };
   }
@@ -90,47 +91,7 @@ export async function listMatchCenterFixtures(
 export async function listMatchCenterFixtureBundles(
   options: LoadMatchCenterOptions = {},
 ): Promise<ApexMatchBundle[]> {
-  const env = options.env ?? process.env;
-  const provider = options.provider ?? resolveMatchCenterProvider(env);
-  return loadFixtureCatalogue(provider);
-}
-
-async function loadFixtureCatalogue(
-  provider: IDataProvider,
-): Promise<ApexMatchBundle[]> {
-  const today = new Date().toISOString().slice(0, 10);
-  let list = await ignoreNonQuotaErrors(
-    async () => (await provider.listFixtures?.({ date: today })) ?? [],
-    [],
-  );
-
-  if (list.length === 0) {
-    list = await ignoreNonQuotaErrors(
-      async () =>
-        (await provider.listFixtures?.({
-          leagueId: PREMIER_LEAGUE_ID,
-          season: PREMIER_LEAGUE_SEASON,
-          limit: FIXTURE_LIMIT,
-        })) ?? [],
-      [],
-    );
-  }
-
-  return rankFixtures(list).slice(0, FIXTURE_LIMIT);
-}
-
-function rankFixtures(items: ApexMatchBundle[]): ApexMatchBundle[] {
-  const rank = (status: ApexMatchBundle["match"]["status"]) => {
-    if (status === "live") return 0;
-    if (status === "scheduled") return 1;
-    if (status === "finished") return 2;
-    return 3;
-  };
-  return [...items].sort(
-    (a, b) =>
-      rank(a.match.status) - rank(b.match.status) ||
-      a.match.kickoffAt.localeCompare(b.match.kickoffAt),
-  );
+  return repositoriesFor(options).fixtures.listCatalogue();
 }
 
 function externalId(bundle: ApexMatchBundle): string | null {

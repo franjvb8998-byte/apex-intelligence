@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Card, CardHeader } from "@/components/design-system";
 import type { MatchCenterTeamTrends } from "@/lib/match-center/types";
 
@@ -18,10 +21,12 @@ function TrendSide({
   name: string;
   trends: MatchCenterTeamTrends;
 }) {
+  const t = useTranslations("matchCenter");
+  const common = useTranslations("common");
   const recentLabel =
     trends.recentSample > 0
-      ? `Últimos ${trends.recentSample}`
-      : "Temporada";
+      ? t("lastN", { count: trends.recentSample })
+      : t("season");
   return (
     <div className="space-y-3">
       <div>
@@ -32,38 +37,42 @@ function TrendSide({
       </div>
       <dl className="grid grid-cols-2 gap-2">
         <Stat
-          label="GF / partido"
+          label={t("gfPerMatch")}
           value={avg(trends.goalsScoredAvg)}
           hint={
             trends.seasonGoalsScoredAvg != null
-              ? `Temp. ${avg(trends.seasonGoalsScoredAvg)}`
+              ? t("seasonHint", { value: avg(trends.seasonGoalsScoredAvg) })
               : null
           }
         />
         <Stat
-          label="GC / partido"
+          label={t("gaPerMatch")}
           value={avg(trends.goalsConcededAvg)}
           hint={
             trends.seasonGoalsConcededAvg != null
-              ? `Temp. ${avg(trends.seasonGoalsConcededAvg)}`
+              ? t("seasonHint", { value: avg(trends.seasonGoalsConcededAvg) })
               : null
           }
         />
         <Stat
-          label="Porterías a cero"
+          label={t("cleanSheets")}
           value={
             trends.cleanSheets != null ? String(trends.cleanSheets) : "—"
           }
           hint={
             trends.seasonCleanSheets != null
-              ? `Temp. ${trends.seasonCleanSheets}`
+              ? t("seasonHint", { value: trends.seasonCleanSheets })
               : trends.cleanSheetPct != null
                 ? pct(trends.cleanSheetPct)
                 : null
           }
         />
         <Stat label="BTTS" value={pct(trends.bttsPct)} />
-        <Stat label="Over 2.5" value={pct(trends.over25Pct)} className="col-span-2" />
+        <Stat
+          label={common("over25")}
+          value={pct(trends.over25Pct)}
+          className="col-span-2"
+        />
       </dl>
     </div>
   );
@@ -110,16 +119,17 @@ export function TeamTrendsCard({
   home,
   away,
 }: TeamTrendsCardProps) {
+  const t = useTranslations("matchCenter");
   const empty = !home && !away;
   return (
     <Card>
       <CardHeader
-        title="Promedios y mercados"
-        description="Goles, porterías a cero, BTTS y Over 2.5 a partir de los últimos 5 y la temporada, si el catálogo los publica"
+        title={t("trendsTitle")}
+        description={t("trendsDescription")}
       />
       {empty ? (
         <p className="text-sm text-[var(--apex-fg-muted)]">
-          Sin promedios de goles ni porcentajes de mercado para estos equipos.
+          {t("noTrends")}
         </p>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2">

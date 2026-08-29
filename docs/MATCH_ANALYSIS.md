@@ -68,6 +68,10 @@ Panel **AI Match Analysis** debajo de Preview / Live / Post:
 - Tactical Summary, Expected Goals, Key Factors
 - Recommendation, Value Bet, Explainability
 
+**Match Rating (0–100)** — `lib/match-rating/`.  
+**APEX Decision Engine v1** — `lib/decision-engine/`. Carta de recomendación en `/match-analysis/[id]`. Ver `docs/DECISION_ENGINE.md`.  
+**APEX Intelligence Report v2** — `lib/intelligence-report/`. Informe de 9 secciones en `/match-analysis/[id]`. Ver `docs/INTELLIGENCE_REPORT.md`.
+
 ---
 
 ## 5. Tests

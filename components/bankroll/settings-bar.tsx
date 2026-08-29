@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   BANKROLL_CURRENCIES,
   currencyFractionDigits,
@@ -25,6 +26,7 @@ export function BankrollSettingsBar({
   onCurrencyChange,
   onUnitValueChange,
 }: BankrollSettingsBarProps) {
+  const t = useTranslations("bankroll");
   const { money } = useMoneyFormatter(settings.currency);
   const digits = currencyFractionDigits(settings.currency);
   const [unitDraft, setUnitDraft] = useState(() =>
@@ -50,7 +52,7 @@ export function BankrollSettingsBar({
     <div className="flex flex-wrap items-end gap-3">
       <label className="space-y-1">
         <span className="block text-[11px] uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-          Moneda
+          {t("currency")}
         </span>
         <select
           value={settings.currency}
@@ -80,7 +82,7 @@ export function BankrollSettingsBar({
           }
           onBlur={(event) => commitUnit(event.target.value)}
           className={`${fieldClass} w-28 font-mono tabular-nums`}
-          aria-label="Valor de 1 unidad"
+          aria-label={t("unitValueAria")}
         />
       </label>
       <p className="pb-2 text-xs text-[var(--apex-fg-muted)]">

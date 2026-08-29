@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import {
   Badge,
   Card,
@@ -11,12 +14,6 @@ import {
 import { ExplanationPanel } from "@/components/design-system";
 import type { MatchCenterPostData } from "@/lib/match-center/types";
 
-const outcomeLabel = {
-  home: "Victoria local",
-  draw: "Empate",
-  away: "Victoria visitante",
-} as const;
-
 type PostPhaseProps = {
   data: MatchCenterPostData;
   homeShort: string;
@@ -27,19 +24,31 @@ type PostPhaseProps = {
  * Post Match cards — typed for Learning Engine swap (`source`).
  */
 export function PostPhase({ data, homeShort, awayShort }: PostPhaseProps) {
+  const t = useTranslations("matchCenter");
+  const common = useTranslations("common");
+  const outcomeLabel = {
+    home: t("outcomeHome"),
+    draw: t("outcomeDraw"),
+    away: t("outcomeAway"),
+  } as const;
   const timelineItems: TimelineItem[] = [
     {
       id: "pre",
       timeLabel: "Pre",
-      title: `Predicción: ${outcomeLabel[data.preMatch.predictedOutcome]}`,
-      description: `Modelo ${data.preMatch.modelVersion}`,
+      title: t("predictionLine", {
+        outcome: outcomeLabel[data.preMatch.predictedOutcome],
+      }),
+      description: t("modelLine", { version: data.preMatch.modelVersion }),
       tone: "info",
     },
     {
       id: "ft",
       timeLabel: "FT",
-      title: `Resultado: ${data.finalScore.home}–${data.finalScore.away} (${outcomeLabel[data.actualOutcome]})`,
-      description: data.outcomeHit ? "Outcome acertado" : "Outcome fallido",
+      title: t("resultLine", {
+        score: `${data.finalScore.home}–${data.finalScore.away}`,
+        outcome: outcomeLabel[data.actualOutcome],
+      }),
+      description: data.outcomeHit ? t("outcomeHit") : t("outcomeMiss"),
       tone: data.outcomeHit ? "success" : "danger",
     },
     ...data.notes.map((note) => ({
@@ -60,7 +69,7 @@ export function PostPhase({ data, homeShort, awayShort }: PostPhaseProps) {
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="success">Post Match</Badge>
         {data.source === "mock" && (
-          <Badge tone="warning">Learning simulado</Badge>
+          <Badge tone="warning">{t("simulatedLearning")}</Badge>
         )}
         {data.source === "data-platform" && (
           <Badge>API-Football</Badge>
@@ -74,8 +83,8 @@ export function PostPhase({ data, homeShort, awayShort }: PostPhaseProps) {
         <div className="space-y-6 lg:col-span-3">
           <Card>
             <CardHeader
-              title="Resultado vs predicción"
-              description="Cierre del ciclo de decisión"
+              title={t("resultVsPrediction")}
+              description={t("decisionClose")}
               action={
                 <span className="font-mono text-2xl font-bold tabular-nums text-white">
                   {data.finalScore.home} – {data.finalScore.away}
@@ -85,7 +94,7 @@ export function PostPhase({ data, homeShort, awayShort }: PostPhaseProps) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-[var(--apex-radius-xl)] border border-[var(--apex-border)] bg-slate-950/40 px-4 py-3">
                 <p className="text-xs uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-                  Predicción
+                  {t("prediction")}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-white">
                   {outcomeLabel[data.preMatch.predictedOutcome]}
@@ -93,7 +102,7 @@ export function PostPhase({ data, homeShort, awayShort }: PostPhaseProps) {
               </div>
               <div className="rounded-[var(--apex-radius-xl)] border border-[var(--apex-border)] bg-slate-950/40 px-4 py-3">
                 <p className="text-xs uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-                  Resultado
+                  {t("result")}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-white">
                   {outcomeLabel[data.actualOutcome]}
@@ -103,7 +112,7 @@ export function PostPhase({ data, homeShort, awayShort }: PostPhaseProps) {
 
             <div className="mt-5">
               <ProbabilityBars
-                aria-label="Probabilidades pre-partido"
+                aria-label={t("preMatchProbs")}
                 items={[
                   {
                     id: "home",
@@ -112,7 +121,7 @@ export function PostPhase({ data, homeShort, awayShort }: PostPhaseProps) {
                   },
                   {
                     id: "draw",
-                    label: "Empate",
+                    label: common("draw"),
                     value: data.preMatch.oneXTwo.draw,
                   },
                   {
@@ -127,8 +136,8 @@ export function PostPhase({ data, homeShort, awayShort }: PostPhaseProps) {
 
           <Card>
             <CardHeader
-              title="Veredicto de mercados"
-              description="Listo para mapear desde Learning Engine"
+              title={t("marketVerdict")}
+              description={t("learningEngineReady")}
             />
             <div className="grid gap-2 sm:grid-cols-3">
               {data.markets.map((market) => (
@@ -145,7 +154,7 @@ export function PostPhase({ data, homeShort, awayShort }: PostPhaseProps) {
           </Card>
 
           <ExplanationPanel
-            title="Aprendizaje"
+            title={t("learning")}
             summary={data.learningSummary}
             defaultOpen
           >
@@ -180,14 +189,14 @@ export function PostPhase({ data, homeShort, awayShort }: PostPhaseProps) {
 
         <div className="space-y-6 lg:col-span-2">
           <Card>
-            <CardHeader title="Métricas de cierre" />
+            <CardHeader title={t("closeMetrics")} />
             <div className="grid grid-cols-2 gap-3">
               <Metric
                 label="Brier"
                 value={data.metrics.brierScore.toFixed(3)}
               />
               <Metric
-                label="Error outcome"
+                label={t("outcomeError")}
                 value={data.metrics.outcomeError.toFixed(3)}
               />
             </div>
@@ -195,13 +204,13 @@ export function PostPhase({ data, homeShort, awayShort }: PostPhaseProps) {
               className="mt-4"
               value={data.preMatch.confidence.value}
               band={data.preMatch.confidence.band}
-              label="Confianza pre-partido"
+              label={t("preMatchConfidence")}
             />
           </Card>
 
           <Card>
-            <CardHeader title="Cronología del ciclo" />
-            <Timeline items={timelineItems} aria-label="Ciclo post-partido" />
+            <CardHeader title={t("cycleTimeline")} />
+            <Timeline items={timelineItems} aria-label={t("cycleAria")} />
           </Card>
         </div>
       </div>

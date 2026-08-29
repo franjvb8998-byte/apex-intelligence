@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { DashboardFeaturedTeams, DashboardLeagues } from "@/components/dashboard/leagues-teams";
 import { DashboardMatchList } from "@/components/dashboard/match-list";
 import { DashboardSystemStatusCard } from "@/components/dashboard/system-status";
@@ -10,23 +11,24 @@ type DashboardOverviewProps = {
 /**
  * Dashboard overview sections — same UI for mock and live providers.
  */
-export function DashboardOverview({ data }: DashboardOverviewProps) {
+export async function DashboardOverview({ data }: DashboardOverviewProps) {
+  const t = await getTranslations("dashboard");
   return (
     <div className="w-full space-y-6">
       <DashboardSystemStatusCard system={data.system} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <DashboardMatchList
-          title="Partidos del día"
-          description="Fixtures del provider para la fecha de hoy (UTC)."
+          title={t("todayMatches")}
+          description={t("todayMatchesDescription")}
           matches={data.todayMatches}
-          emptyLabel="No hay partidos programados para hoy."
+          emptyLabel={t("todayEmpty")}
         />
         <DashboardMatchList
-          title="Próximos partidos"
-          description="Ventana de los próximos días + partidos aún no finalizados."
+          title={t("upcomingMatches")}
+          description={t("upcomingMatchesDescription")}
           matches={data.upcomingMatches}
-          emptyLabel="No hay próximos partidos en la ventana actual."
+          emptyLabel={t("upcomingEmpty")}
         />
       </div>
 

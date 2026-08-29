@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Card, CardHeader } from "@/components/design-system";
 import type { ExplainableFactor } from "@/lib/explainable-ai/types";
 
@@ -6,12 +9,13 @@ type NegativeFactorsProps = {
 };
 
 export function NegativeFactors({ factors }: NegativeFactorsProps) {
+  const t = useTranslations("matchCenter");
   return (
     <Card padding="sm">
       <CardHeader
         className="mb-3"
-        title="Factores negativos"
-        description="Riesgos y contra-señales"
+        title={t("negativeFactors")}
+        description={t("negativeFactorsDescription")}
       />
       <ul className="space-y-3">
         {factors.map((factor) => (

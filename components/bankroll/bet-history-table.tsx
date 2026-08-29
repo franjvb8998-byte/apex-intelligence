@@ -1,17 +1,11 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Badge, Card, CardHeader } from "@/components/design-system";
 import { formatDate, formatOdds } from "@/lib/bankroll/format";
 import { useMoneyFormatter } from "@/lib/bankroll/use-money-formatter";
 import type { BankrollCurrency } from "@/lib/bankroll/currency";
 import type { BankrollBet, BetResult } from "@/lib/bankroll/types";
-
-const resultLabel: Record<BetResult, string> = {
-  won: "Ganada",
-  lost: "Perdida",
-  void: "Nula",
-  pending: "Pendiente",
-};
 
 const resultTone: Record<BetResult, "success" | "danger" | "neutral" | "warning"> = {
   won: "success",
@@ -26,29 +20,36 @@ type BetHistoryTableProps = {
 };
 
 export function BetHistoryTable({ bets, currency }: BetHistoryTableProps) {
+  const t = useTranslations("bankroll");
   const { money, signed } = useMoneyFormatter(currency);
+  const resultLabel: Record<BetResult, string> = {
+    won: t("resultWon"),
+    lost: t("resultLost"),
+    void: t("resultVoid"),
+    pending: t("resultPending"),
+  };
   return (
     <Card>
       <CardHeader
-        title="Historial de apuestas"
-        description="Ledger mock — las apuestas nuevas viven en esta sesión"
+        title={t("historyTitle")}
+        description={t("historyDescription")}
       />
       {bets.length === 0 ? (
         <p className="text-sm text-[var(--apex-fg-muted)]">
-          Aún no hay apuestas. Usa Añadir apuesta para registrar la primera.
+          {t("historyEmpty")}
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[44rem] text-left text-sm">
             <thead>
               <tr className="border-b border-[var(--apex-border)] text-[11px] uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-                <th className="pb-2 pr-3 font-medium">Fecha</th>
-                <th className="pb-2 pr-3 font-medium">Partido</th>
-                <th className="pb-2 pr-3 font-medium">Mercado</th>
-                <th className="pb-2 pr-3 font-medium">Cuota</th>
-                <th className="pb-2 pr-3 font-medium">Stake</th>
-                <th className="pb-2 pr-3 font-medium">Resultado</th>
-                <th className="pb-2 font-medium">Beneficio</th>
+                <th className="pb-2 pr-3 font-medium">{t("colDate")}</th>
+                <th className="pb-2 pr-3 font-medium">{t("colMatch")}</th>
+                <th className="pb-2 pr-3 font-medium">{t("colMarket")}</th>
+                <th className="pb-2 pr-3 font-medium">{t("colOdds")}</th>
+                <th className="pb-2 pr-3 font-medium">{t("colStake")}</th>
+                <th className="pb-2 pr-3 font-medium">{t("colResult")}</th>
+                <th className="pb-2 font-medium">{t("colProfit")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--apex-border)]">

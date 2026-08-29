@@ -15,7 +15,7 @@ export function PageTransition({ children }: PageTransitionProps) {
   return (
     <motion.div
       key={pathname}
-      initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+      initial={reduceMotion === false ? { opacity: 0, y: 8 } : false}
       animate={{ opacity: 1, y: 0 }}
       transition={{
         duration: reduceMotion ? 0 : 0.28,

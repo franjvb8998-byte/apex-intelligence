@@ -7,7 +7,6 @@ import {
 import { createEloPoissonHybridEngine } from "@/lib/intelligence/modules/probability";
 import { createMatchAnalysisService } from "@/lib/match-analysis/match-analysis-service";
 import { createMockDataProvider } from "@/lib/data-platform/mock-provider";
-import { getMockCopilotReply } from "@/lib/copilot";
 
 describe("Explainable AI engine", () => {
   it("builds structured explanation from Probability Engine output", () => {
@@ -78,11 +77,9 @@ describe("Explainable AI · Match Analysis integration", () => {
 });
 
 describe("Explainable AI · Copilot mock", () => {
-  it("returns explainable card for explanation prompts", () => {
-    const reply = getMockCopilotReply("Explícame esta predicción.");
-    expect(reply.card?.kind).toBe("explainable");
-    if (reply.card?.kind === "explainable") {
-      expect(reply.card.explainable.qualityScore.value).toBeGreaterThan(0);
-    }
+  it("still ships a rules explainable payload for UI demos", () => {
+    const report = getMockExplainablePrediction();
+    expect(report.method).toBe("rules");
+    expect(report.qualityScore.value).toBeGreaterThan(0);
   });
 });

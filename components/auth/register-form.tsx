@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { FormEvent, useState } from "react";
 import { AuthCard } from "@/components/ui/auth-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getAuthErrorMessage } from "@/lib/supabase/auth-errors";
+import { getAuthErrorKey } from "@/lib/supabase/auth-errors";
 import { createClient } from "@/lib/supabase/client";
 import { isValidEmail, validatePassword } from "@/lib/validation";
 
@@ -19,6 +20,7 @@ type RegisterErrors = {
 };
 
 export function RegisterForm() {
+  const t = useTranslations("auth");
   const router = useRouter();
 
   const [name, setName] = useState("");
@@ -33,24 +35,24 @@ export function RegisterForm() {
     const nextErrors: RegisterErrors = {};
 
     if (!name.trim()) {
-      nextErrors.name = "El nombre es obligatorio.";
+      nextErrors.name = t("validation.nameRequired");
     } else if (name.trim().length < 2) {
-      nextErrors.name = "El nombre debe tener al menos 2 caracteres.";
+      nextErrors.name = t("validation.nameMinLength");
     }
 
     if (!email.trim()) {
-      nextErrors.email = "El email es obligatorio.";
+      nextErrors.email = t("validation.emailRequired");
     } else if (!isValidEmail(email)) {
-      nextErrors.email = "Introduce un email válido.";
+      nextErrors.email = t("validation.emailInvalid");
     }
 
     const passwordError = validatePassword(password);
-    if (passwordError) nextErrors.password = passwordError;
+    if (passwordError) nextErrors.password = t(`validation.${passwordError}`);
 
     if (!confirmPassword) {
-      nextErrors.confirmPassword = "Confirma tu contraseña.";
+      nextErrors.confirmPassword = t("validation.confirmPasswordRequired");
     } else if (password !== confirmPassword) {
-      nextErrors.confirmPassword = "Las contraseñas no coinciden.";
+      nextErrors.confirmPassword = t("validation.passwordMismatch");
     }
 
     return nextErrors;
@@ -75,19 +77,19 @@ export function RegisterForm() {
         data: {
           full_name: name.trim(),
         },
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/scanner`,
       },
     });
 
     setIsSubmitting(false);
 
     if (error) {
-      setErrors({ form: getAuthErrorMessage(error.message) });
+      setErrors({ form: t(`errors.${getAuthErrorKey(error.message)}`) });
       return;
     }
 
     if (data.session) {
-      router.push("/dashboard");
+      router.push("/scanner");
       router.refresh();
       return;
     }
@@ -97,45 +99,45 @@ export function RegisterForm() {
 
   return (
     <AuthCard
-      title="Crear cuenta"
-      subtitle="Empieza a analizar tus apuestas con inteligencia"
+      title={t("register.title")}
+      subtitle={t("register.subtitle")}
       footer={
         <>
-          ¿Ya tienes cuenta?{" "}
+          {t("register.footerPrompt")}{" "}
           <Link
             href="/login"
             className="font-medium text-[#00D4AA] transition-colors hover:text-[#00eabb]"
           >
-            Iniciar sesión
+            {t("register.footerLink")}
           </Link>
         </>
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
         <Input
-          label="Nombre"
+          label={t("register.name")}
           name="name"
           type="text"
           autoComplete="name"
-          placeholder="Tu nombre"
+          placeholder={t("register.namePlaceholder")}
           value={name}
           onChange={(e) => setName(e.target.value)}
           error={errors.name}
         />
 
         <Input
-          label="Email"
+          label={t("login.email")}
           name="email"
           type="email"
           autoComplete="email"
-          placeholder="tu@email.com"
+          placeholder={t("login.emailPlaceholder")}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           error={errors.email}
         />
 
         <Input
-          label="Contraseña"
+          label={t("login.password")}
           name="password"
           type="password"
           autoComplete="new-password"
@@ -146,7 +148,7 @@ export function RegisterForm() {
         />
 
         <Input
-          label="Confirmar contraseña"
+          label={t("register.confirmPassword")}
           name="confirmPassword"
           type="password"
           autoComplete="new-password"
@@ -164,12 +166,12 @@ export function RegisterForm() {
 
         {confirmationSent && (
           <p className="rounded-lg border border-[#00D4AA]/30 bg-[#00D4AA]/10 px-4 py-3 text-sm text-[#00D4AA]" role="status">
-            Revisa tu email para confirmar la cuenta antes de iniciar sesión.
+            {t("register.confirmationSent")}
           </p>
         )}
 
         <Button type="submit" fullWidth disabled={isSubmitting}>
-          {isSubmitting ? "Creando cuenta..." : "Crear cuenta"}
+          {isSubmitting ? t("register.submitting") : t("register.submit")}
         </Button>
       </form>
     </AuthCard>

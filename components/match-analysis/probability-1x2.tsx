@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import type { OutcomeProbability } from "@/lib/intelligence/types";
 
 type Probability1x2Props = {
@@ -10,14 +11,16 @@ function pct(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
-export function Probability1x2({
+export async function Probability1x2({
   probabilities,
   homeLabel,
   awayLabel,
 }: Probability1x2Props) {
+  const t = await getTranslations("matchCenter");
+  const common = await getTranslations("common");
   const rows = [
     { key: "home", label: homeLabel, value: probabilities.home },
-    { key: "draw", label: "Empate", value: probabilities.draw },
+    { key: "draw", label: common("draw"), value: probabilities.draw },
     { key: "away", label: awayLabel, value: probabilities.away },
   ] as const;
 
@@ -26,7 +29,7 @@ export function Probability1x2({
   return (
     <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6 backdrop-blur-sm">
       <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">
-        Probabilidades 1X2
+        {t("winProbTitle")}
       </h3>
       <ul className="mt-5 space-y-4">
         {rows.map((row) => {

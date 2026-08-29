@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { cx } from "@/components/design-system/utils";
 
 type ThinkingIndicatorProps = {
@@ -7,8 +10,9 @@ type ThinkingIndicatorProps = {
 
 export function ThinkingIndicator({
   className,
-  label = "APEX está pensando",
+  label,
 }: ThinkingIndicatorProps) {
+  const t = useTranslations("copilot");
   return (
     <div
       className={cx(
@@ -23,7 +27,9 @@ export function ThinkingIndicator({
         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--apex-accent)] [animation-delay:150ms]" />
         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--apex-accent)] [animation-delay:300ms]" />
       </span>
-      <span className="text-xs text-[var(--apex-fg-muted)]">{label}</span>
+      <span className="text-xs text-[var(--apex-fg-muted)]">
+        {label ?? t("thinkingDefault")}
+      </span>
     </div>
   );
 }

@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Card, CardHeader } from "@/components/design-system";
 import type { MatchAnalysisVenueSplit } from "@/lib/match-analysis/analysis-types";
 import type {
@@ -31,6 +34,7 @@ export function LeaguePositionChart({
   homeName: string;
   awayName: string;
 }) {
+  const t = useTranslations("matchAnalysis");
   const maxRank = Math.max(home?.rank ?? 1, away?.rank ?? 1, 20);
   const rows = [
     { id: "home", name: homeName, position: home },
@@ -40,13 +44,13 @@ export function LeaguePositionChart({
   return (
     <Card>
       <CardHeader
-        title="Posición en liga"
-        description="Clasificación actual del proveedor"
+        title={t("leaguePosition")}
+        description={t("leaguePositionDescription")}
       />
       {!home && !away ? (
-        <EmptyHint>Sin clasificación para estos equipos en el catálogo.</EmptyHint>
+        <EmptyHint>{t("noLeagueTable")}</EmptyHint>
       ) : (
-        <ul className="space-y-5" aria-label="Posición en liga">
+        <ul className="space-y-5" aria-label={t("leaguePositionAria")}>
           {rows.map((row) => {
             const rank = row.position?.rank ?? null;
             const width =
@@ -82,6 +86,7 @@ function RecentFormSide({
   name: string;
   matches: MatchCenterRecentMatch[];
 }) {
+  const t = useTranslations("matchAnalysis");
   const maxGoals = Math.max(
     1,
     ...matches.flatMap((match) => [match.goalsFor ?? 0, match.goalsAgainst ?? 0]),
@@ -91,7 +96,7 @@ function RecentFormSide({
     return (
       <div>
         <p className="mb-2 text-sm font-medium text-[var(--apex-fg)]">{name}</p>
-        <EmptyHint>Sin últimos 5 partidos en el catálogo.</EmptyHint>
+        <EmptyHint>{t("noLast5")}</EmptyHint>
       </div>
     );
   }
@@ -102,7 +107,7 @@ function RecentFormSide({
       <div
         className="flex h-28 items-end gap-2"
         role="img"
-        aria-label={`Últimos ${matches.length} partidos de ${name}`}
+        aria-label={t("lastNAria", { count: matches.length, name })}
       >
         {matches.map((match) => {
           const gf = match.goalsFor ?? 0;
@@ -115,7 +120,7 @@ function RecentFormSide({
               <div
                 className={`w-full max-w-[2rem] rounded-t-[var(--apex-radius-sm)] ${resultTone(match.result)}`}
                 style={{ height: `${height}%` }}
-                title={`${match.home ? "L" : "V"} vs ${match.opponentName}`}
+                title={`${match.home ? t("homeAbbr") : t("awayAbbr")} vs ${match.opponentName}`}
               />
               <span className="text-[10px] font-semibold text-[var(--apex-fg-muted)]">
                 {match.result ?? "—"}
@@ -139,11 +144,12 @@ export function FormChart({
   home: MatchCenterRecentMatch[];
   away: MatchCenterRecentMatch[];
 }) {
+  const t = useTranslations("matchAnalysis");
   return (
     <Card>
       <CardHeader
-        title="Últimos 5 partidos"
-        description="Barras = goles a favor · color = W / D / L"
+        title={t("last5")}
+        description={t("last5Description")}
       />
       <div className="grid gap-6 sm:grid-cols-2">
         <RecentFormSide name={homeName} matches={home} />
@@ -154,6 +160,7 @@ export function FormChart({
 }
 
 export function HeadToHeadChart({ meetings }: { meetings: MatchCenterH2HMeeting[] }) {
+  const t = useTranslations("matchAnalysis");
   const maxGoals = Math.max(
     1,
     ...meetings.flatMap((meeting) => [
@@ -165,13 +172,13 @@ export function HeadToHeadChart({ meetings }: { meetings: MatchCenterH2HMeeting[
   return (
     <Card>
       <CardHeader
-        title="Head-to-head"
-        description="Goles en los últimos enfrentamientos"
+        title={t("h2hTitle")}
+        description={t("h2hGoals")}
       />
       {meetings.length === 0 ? (
-        <EmptyHint>Sin historial H2H en el catálogo para estos equipos.</EmptyHint>
+        <EmptyHint>{t("noH2h")}</EmptyHint>
       ) : (
-        <ul className="space-y-4" aria-label="Historial head-to-head">
+        <ul className="space-y-4" aria-label={t("h2hAria")}>
           {meetings.map((meeting) => {
             const homeW = ((meeting.homeGoals ?? 0) / maxGoals) * 100;
             const awayW = ((meeting.awayGoals ?? 0) / maxGoals) * 100;
@@ -217,6 +224,7 @@ export function GoalsChart({
   home: MatchCenterRecentMatch[];
   away: MatchCenterRecentMatch[];
 }) {
+  const t = useTranslations("matchAnalysis");
   const sides = [
     { name: homeName, matches: home },
     { name: awayName, matches: away },
@@ -234,8 +242,8 @@ export function GoalsChart({
   return (
     <Card>
       <CardHeader
-        title="Goles recientes"
-        description="A favor vs en contra en los últimos 5"
+        title={t("recentGoals")}
+        description={t("recentGoalsDescription")}
       />
       <div className="grid gap-6 sm:grid-cols-2">
         {sides.map((side) =>
@@ -244,7 +252,7 @@ export function GoalsChart({
               <p className="mb-2 text-sm font-medium text-[var(--apex-fg)]">
                 {side.name}
               </p>
-              <EmptyHint>Sin goles recientes en el catálogo.</EmptyHint>
+              <EmptyHint>{t("noRecentGoals")}</EmptyHint>
             </div>
           ) : (
             <div key={side.name}>
@@ -262,20 +270,20 @@ export function GoalsChart({
                       style={{
                         height: `${Math.max(8, ((match.goalsFor ?? 0) / max) * 100)}%`,
                       }}
-                      title="A favor"
+                      title={t("forGoals")}
                     />
                     <div
                       className="w-1/2 max-w-[0.7rem] rounded-t-[var(--apex-radius-sm)] bg-[var(--apex-danger)]"
                       style={{
                         height: `${Math.max(8, ((match.goalsAgainst ?? 0) / max) * 100)}%`,
                       }}
-                      title="En contra"
+                      title={t("against")}
                     />
                   </div>
                 ))}
               </div>
               <p className="mt-2 text-[11px] text-[var(--apex-fg-subtle)]">
-                Verde: a favor · Rojo: en contra
+                {t("legendForAgainst")}
               </p>
             </div>
           ),
@@ -294,13 +302,14 @@ function SplitBars({
   split: MatchAnalysisVenueSplit | null;
   venue: string;
 }) {
+  const t = useTranslations("matchAnalysis");
   if (!split || split.played === 0) {
     return (
       <div>
         <p className="mb-2 text-sm text-[var(--apex-fg)]">
           {name} · {venue}
         </p>
-        <EmptyHint>Sin desglose local/visitante.</EmptyHint>
+        <EmptyHint>{t("noVenueSplit")}</EmptyHint>
       </div>
     );
   }
@@ -315,7 +324,11 @@ function SplitBars({
       <p className="mb-2 text-sm text-[var(--apex-fg)]">
         {name} · {venue}{" "}
         <span className="text-[var(--apex-fg-subtle)]">
-          ({split.played} PJ · {split.goalsFor ?? "—"} GF · {split.goalsAgainst ?? "—"} GC)
+          ({t("playedLine", {
+            played: split.played,
+            gf: split.goalsFor ?? "—",
+            ga: split.goalsAgainst ?? "—",
+          })})
         </span>
       </p>
       <div className="flex h-3 overflow-hidden rounded-[var(--apex-radius-full)] bg-slate-800">
@@ -352,22 +365,23 @@ export function VenueSplitChart({
     away: MatchAnalysisVenueSplit | null;
   };
 }) {
+  const t = useTranslations("matchAnalysis");
   const empty =
     !home.home && !home.away && !away.home && !away.away;
   return (
     <Card>
       <CardHeader
-        title="Rendimiento local vs visitante"
-        description="Temporada: proporción de victorias, empates y derrotas"
+        title={t("homeVsAway")}
+        description={t("homeVsAwayDescription")}
       />
       {empty ? (
-        <EmptyHint>Sin estadísticas local/visitante en el catálogo.</EmptyHint>
+        <EmptyHint>{t("noVenueStats")}</EmptyHint>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2">
-          <SplitBars name={homeName} split={home.home} venue="en casa" />
-          <SplitBars name={homeName} split={home.away} venue="fuera" />
-          <SplitBars name={awayName} split={away.home} venue="en casa" />
-          <SplitBars name={awayName} split={away.away} venue="fuera" />
+          <SplitBars name={homeName} split={home.home} venue={t("venueHome")} />
+          <SplitBars name={homeName} split={home.away} venue={t("venueAway")} />
+          <SplitBars name={awayName} split={away.home} venue={t("venueHome")} />
+          <SplitBars name={awayName} split={away.away} venue={t("venueAway")} />
         </div>
       )}
     </Card>
@@ -430,48 +444,49 @@ export function MatchMetricsChart({
   away: MatchAnalysisMatchMetrics | null;
   modelXg: { home: number; away: number };
 }) {
+  const t = useTranslations("matchAnalysis");
   const hasVendor =
     home != null ||
     away != null;
   return (
     <Card>
       <CardHeader
-        title="Posesión, tiros y xG"
-        description={`${homeName} (verde) vs ${awayName} (gris). xG de partido solo si el proveedor lo publica.`}
+        title={t("possessionShotsXg")}
+        description={t("vsCaption", { home: homeName, away: awayName })}
       />
       <ul className="space-y-4">
         {hasVendor ? (
           <>
             <DualMetric
-              label="Posesión"
+              label={t("possession")}
               home={home?.possession ?? null}
               away={away?.possession ?? null}
               suffix="%"
               maxHint={100}
             />
             <DualMetric
-              label="Tiros"
+              label={t("shots")}
               home={home?.shots ?? null}
               away={away?.shots ?? null}
             />
             <DualMetric
-              label="Tiros a puerta"
+              label={t("shotsOnTarget")}
               home={home?.shotsOnTarget ?? null}
               away={away?.shotsOnTarget ?? null}
             />
             <DualMetric
-              label="xG del partido"
+              label={t("matchXg")}
               home={home?.expectedGoals ?? null}
               away={away?.expectedGoals ?? null}
             />
           </>
         ) : (
           <EmptyHint>
-            Sin posesión ni tiros publicados para este fixture.
+            {t("noMetrics")}
           </EmptyHint>
         )}
         <DualMetric
-          label="xG del modelo (Probability Engine)"
+          label={t("modelXg")}
           home={modelXg.home}
           away={modelXg.away}
         />

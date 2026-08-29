@@ -1,3 +1,4 @@
+import { getLocale, getTranslations } from "next-intl/server";
 import { Badge } from "@/components/design-system/badge";
 import { Card, CardHeader } from "@/components/design-system/card";
 import type { DashboardSystemStatus } from "@/lib/dashboard/types";
@@ -10,42 +11,50 @@ function providerTone(
   return "info";
 }
 
-function providerLabel(system: DashboardSystemStatus): string {
-  if (system.dataMode === "live") return "Live";
-  if (system.provider === "mock") return "Mock";
-  return "Recorded";
-}
-
 type DashboardSystemStatusProps = {
   system: DashboardSystemStatus;
 };
 
-export function DashboardSystemStatusCard({
+export async function DashboardSystemStatusCard({
   system,
 }: DashboardSystemStatusProps) {
+  const t = await getTranslations("dashboard");
+  const locale = await getLocale();
+  const providerLabel =
+    system.dataMode === "live"
+      ? t("modeLive")
+      : system.provider === "mock"
+        ? t("modeCatalog")
+        : t("modeRecorded");
+  const checkedAt = new Date(system.checkedAt).toLocaleString(locale, {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "UTC",
+  });
+
   return (
     <Card padding="md">
       <CardHeader
-        title="Estado del sistema"
+        title={t("systemTitle")}
         description={system.message}
         action={
-          <Badge tone={providerTone(system)}>{providerLabel(system)}</Badge>
+          <Badge tone={providerTone(system)}>{providerLabel}</Badge>
         }
       />
       <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatusStat label="Provider" value={system.displayName} />
-        <StatusStat label="Hoy" value={String(system.todayCount)} />
-        <StatusStat label="Próximos" value={String(system.upcomingCount)} />
+        <StatusStat label={t("provider")} value={system.displayName} />
+        <StatusStat label={t("today")} value={String(system.todayCount)} />
+        <StatusStat label={t("upcoming")} value={String(system.upcomingCount)} />
         <StatusStat
-          label="API key"
-          value={system.hasApiKey ? "Configurada" : "Ausente"}
+          label={t("apiKey")}
+          value={system.hasApiKey ? t("apiKeyConfigured") : t("apiKeyMissing")}
         />
       </dl>
       <p className="mt-4 text-xs text-[var(--apex-fg-subtle)]">
-        Ligas {system.leagueCount} · Equipos {system.teamCount} · Revisado{" "}
-        {new Date(system.checkedAt).toLocaleString("es-ES", {
-          dateStyle: "short",
-          timeStyle: "short",
+        {t("systemFooter", {
+          leagues: system.leagueCount,
+          teams: system.teamCount,
+          datetime: checkedAt,
         })}
       </p>
     </Card>

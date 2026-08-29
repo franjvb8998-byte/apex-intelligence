@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { Card, CardHeader, cx } from "@/components/design-system";
 
 type MomentumBarProps = {
@@ -11,12 +12,13 @@ type MomentumBarProps = {
 };
 
 export function MomentumBar({ value, homeLabel, awayLabel }: MomentumBarProps) {
+  const t = useTranslations("vision");
   const normalized = (value + 100) / 2; // 0–100
   const homeLead = value >= 0;
 
   return (
     <Card padding="sm">
-      <CardHeader title="Momentum" className="mb-3" />
+      <CardHeader title={t("momentumTitle")} className="mb-3" />
       <div className="mb-2 flex justify-between text-xs">
         <span className={cx(homeLead ? "text-[var(--apex-accent)]" : "text-[var(--apex-fg-muted)]")}>
           {homeLabel}
@@ -31,7 +33,7 @@ export function MomentumBar({ value, homeLabel, awayLabel }: MomentumBarProps) {
         aria-valuemin={-100}
         aria-valuemax={100}
         aria-valuenow={Math.round(value)}
-        aria-label="Momentum del partido"
+        aria-label={t("momentumAria")}
       >
         <motion.div
           className="absolute inset-y-0 left-0 rounded-[var(--apex-radius-full)] bg-gradient-to-r from-[var(--apex-accent)] to-sky-400"

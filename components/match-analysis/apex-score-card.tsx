@@ -1,62 +1,192 @@
-import type { ApexScoreBreakdown } from "@/lib/match-analysis/types";
+import { getTranslations } from "next-intl/server";
+import {
+  Badge,
+  Card,
+  CardHeader,
+  ConfidenceIndicator,
+  ScoreGauge,
+} from "@/components/design-system";
+import { RatingStat } from "@/components/match-analysis/rating-stat";
+import { cx } from "@/components/design-system/utils";
+import type { ApexMatchRating } from "@/lib/match-rating";
 import type { ConfidenceScore } from "@/lib/intelligence/types";
 
 type ApexScoreCardProps = {
-  apexScore: ApexScoreBreakdown;
-  confidence: ConfidenceScore;
-  predictedLabel: string;
+  rating: ApexMatchRating;
 };
 
-const bandCopy = {
-  low: "Baja",
-  medium: "Media",
-  high: "Alta",
-} as const;
+const riskTone = {
+  low: "accent" as const,
+  medium: "warning" as const,
+  high: "danger" as const,
+};
 
-export function ApexScoreCard({
-  apexScore,
-  confidence,
-  predictedLabel,
-}: ApexScoreCardProps) {
+const recTone = {
+  bet: "accent" as const,
+  watch: "warning" as const,
+  skip: "neutral" as const,
+};
+
+function formatOdds(value: number | null, na: string): string {
+  return value == null || !Number.isFinite(value) ? na : value.toFixed(2);
+}
+
+function formatEv(value: number | null, na: string): string {
+  if (value == null || !Number.isFinite(value)) return na;
+  const pct = value * 100;
+  const sign = pct > 0 ? "+" : "";
+  return `${sign}${pct.toFixed(1)}%`;
+}
+
+function evTone(value: number | null) {
+  if (value == null) return "neutral" as const;
+  if (value > 0.02) return "accent" as const;
+  if (value < -0.02) return "danger" as const;
+  return "warning" as const;
+}
+
+export async function ApexScoreCard({ rating }: ApexScoreCardProps) {
+  const t = await getTranslations("matchAnalysis");
+  const missing = rating.metrics.filter((row) => !row.available);
+  const na = t("na");
+
   return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6 backdrop-blur-sm">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">
-            APEX Score
-          </h3>
-          <p className="mt-3 font-mono text-5xl font-bold tabular-nums text-[#00D4AA]">
-            {apexScore.value}
-          </p>
-          <p className="mt-2 max-w-xs text-sm text-slate-400">
-            {apexScore.label}
-          </p>
+    <Card
+      padding="lg"
+      className="border-[var(--apex-accent-border)] bg-[var(--apex-surface)]/90"
+    >
+      <CardHeader
+        className="mb-6"
+        title="APEX Match Rating"
+        description={rating.label}
+        action={
+          <span className="flex flex-wrap gap-1.5">
+            <Badge tone={riskTone[rating.risk]}>Risk {rating.risk}</Badge>
+            <Badge tone={recTone[rating.recommendation]}>
+              {rating.recommendationLabel}
+            </Badge>
+            <Badge>
+              {t("coverage", { pct: Math.round(rating.coverage * 100) })}
+            </Badge>
+          </span>
+        }
+      />
+
+      <div className="grid gap-8 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-center">
+        <ScoreGauge
+          value={rating.overall}
+          label={t("overall")}
+          size="lg"
+          caption={rating.selectionLabel}
+        />
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <RatingStat
+            label="Confidence"
+            value={`${rating.confidencePct}%`}
+            hint={rating.confidence.band}
+            tone={
+              rating.confidence.band === "high"
+                ? "accent"
+                : rating.confidence.band === "medium"
+                  ? "warning"
+                  : "danger"
+            }
+          />
+          <RatingStat
+            label="Risk"
+            value={rating.risk}
+            hint={t("riskHint")}
+            tone={riskTone[rating.risk]}
+          />
+          <RatingStat
+            label={t("valueRating")}
+            value={
+              rating.valueRating == null ? "n/d" : rating.valueRating.toFixed(1)
+            }
+            hint="0–10"
+            tone={
+              (rating.valueRating ?? 0) >= 6
+                ? "accent"
+                : (rating.valueRating ?? 0) >= 4
+                  ? "warning"
+                  : "neutral"
+            }
+          />
+          <RatingStat
+            label={t("stakeKelly")}
+            value={
+              rating.recommendedKelly == null
+                ? "n/d"
+                : `${(rating.recommendedKelly * 100).toFixed(1)}%`
+            }
+            hint={rating.kellyLabel}
+          />
+          <RatingStat
+            label="Fair odds"
+            value={formatOdds(rating.fairOdds, na)}
+            hint={t("fairOddsHint")}
+          />
+          <RatingStat
+            label="Expected value"
+            value={formatEv(rating.expectedValue, na)}
+            hint={t("evHint")}
+            tone={evTone(rating.expectedValue)}
+          />
+          <RatingStat
+            label={t("recommendation")}
+            value={rating.recommendationLabel}
+            hint={rating.selectionLabel}
+            tone={recTone[rating.recommendation]}
+          />
+          <div className="sm:col-span-2 xl:col-span-1">
+            <ConfidenceIndicator
+              value={rating.confidence.value}
+              band={rating.confidence.band}
+              className="h-full"
+            />
+          </div>
         </div>
-        <ConfidenceBadge confidence={confidence} />
       </div>
 
-      <p className="mt-6 text-sm text-slate-300">
-        Lectura principal:{" "}
-        <span className="font-semibold text-white">{predictedLabel}</span>
-      </p>
-
-      <ul className="mt-5 space-y-3 border-t border-slate-800 pt-5">
-        {apexScore.components.map((component) => (
-          <li key={component.key}>
-            <div className="mb-1 flex justify-between text-xs text-slate-400">
-              <span>{component.label}</span>
-              <span className="font-mono tabular-nums">{component.value}</span>
+      <ul className="mt-8 grid gap-3 border-t border-[var(--apex-border)] pt-6 sm:grid-cols-2">
+        {rating.metrics.map((metric) => (
+          <li key={metric.key}>
+            <div className="mb-1 flex items-baseline justify-between gap-3 text-xs">
+              <span className="text-[var(--apex-fg-muted)]">{metric.label}</span>
+              <span className="font-mono tabular-nums text-[var(--apex-fg-subtle)]">
+                {metric.available ? metric.score : "n/d"}
+                <span className="ml-2 text-[10px] uppercase tracking-wider">
+                  w {(metric.weight * 100).toFixed(0)}%
+                </span>
+              </span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
+            <div className="h-1.5 overflow-hidden rounded-[var(--apex-radius-full)] bg-slate-800">
               <div
-                className="h-full rounded-full bg-[#00D4AA]/70 transition-[width] duration-700 ease-out"
-                style={{ width: `${component.value}%` }}
+                className={cx(
+                  "h-full rounded-[var(--apex-radius-full)] transition-[width] duration-[var(--apex-duration-bar)] ease-[var(--apex-ease-out)]",
+                  metric.available
+                    ? "bg-[var(--apex-accent)]"
+                    : "bg-slate-700",
+                )}
+                style={{ width: `${metric.available ? metric.score : 0}%` }}
               />
             </div>
+            <p className="mt-1 text-[11px] leading-snug text-[var(--apex-fg-subtle)]">
+              {metric.note}
+            </p>
           </li>
         ))}
       </ul>
-    </section>
+
+      {missing.length > 0 ? (
+        <p className="mt-4 text-[11px] text-[var(--apex-fg-subtle)]">
+          {t("unpublishedSignals", {
+            list: missing.map((row) => row.label).join(", "),
+          })}
+        </p>
+      ) : null}
+    </Card>
   );
 }
 
@@ -66,16 +196,10 @@ export function ConfidenceBadge({
   confidence: ConfidenceScore;
 }) {
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-950/50 px-4 py-3 text-right">
-      <p className="text-xs uppercase tracking-wider text-slate-500">
-        Confianza
-      </p>
-      <p className="mt-1 text-lg font-semibold text-white">
-        {bandCopy[confidence.band]}
-      </p>
-      <p className="font-mono text-sm tabular-nums text-[#00D4AA]">
-        {Math.round(confidence.value * 100)}%
-      </p>
-    </div>
+    <ConfidenceIndicator
+      value={confidence.value}
+      band={confidence.band}
+      layout="badge"
+    />
   );
 }

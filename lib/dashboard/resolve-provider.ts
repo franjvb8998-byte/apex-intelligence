@@ -7,14 +7,15 @@
 import {
   createApiFootballDataProvider,
   createMockDataProvider,
-  readApiFootballConfig,
   type IDataProvider,
 } from "@/lib/data-platform";
-import { ApiFootballDataProvider } from "@/lib/data-platform/providers/api-football/api-football-provider";
+import { dataModeOf, hasFootballApiKey } from "@/lib/repositories";
 import type {
   DashboardDataMode,
   DashboardProviderKind,
 } from "@/lib/dashboard/types";
+
+export { hasFootballApiKey };
 
 export type DashboardProviderResolveOptions = {
   env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
@@ -30,12 +31,6 @@ export type ResolvedDashboardProvider = {
   displayName: string;
 };
 
-export function hasFootballApiKey(
-  env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
-): boolean {
-  return Boolean(readApiFootballConfig(env).apiKey);
-}
-
 /**
  * Exclusive Data Platform selection for the Dashboard.
  */
@@ -45,7 +40,7 @@ export function resolveDashboardProvider(
   if (options.provider) {
     const kind: DashboardProviderKind =
       options.provider.id === "api-football" ? "api-football" : "mock";
-    const dataMode = resolveDataMode(options.provider, kind, false);
+    const dataMode = resolveDataMode(options.provider, kind);
     return {
       provider: options.provider,
       kind,
@@ -67,7 +62,7 @@ export function resolveDashboardProvider(
     return {
       provider,
       kind: "api-football",
-      dataMode: resolveDataMode(provider, "api-football", true),
+      dataMode: resolveDataMode(provider, "api-football"),
       hasApiKey: true,
       displayName: provider.displayName,
     };
@@ -86,11 +81,8 @@ export function resolveDashboardProvider(
 function resolveDataMode(
   provider: IDataProvider,
   kind: DashboardProviderKind,
-  hasKey: boolean,
 ): DashboardDataMode {
   if (kind === "mock") return "mock";
-  if (provider instanceof ApiFootballDataProvider) {
-    return provider.dataMode;
-  }
-  return hasKey ? "live" : "recorded";
+  const mode = dataModeOf(provider);
+  return mode === "mock" ? "live" : mode;
 }

@@ -1,15 +1,17 @@
 /**
- * Match Analysis page loader — selected API-Football fixture + PE + catalogue charts.
+ * Match Analysis page loader — selected fixture + PE + catalogue charts.
  */
 
-import { createApiFootballDataProvider, type IDataProvider } from "@/lib/data-platform";
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
-import { hasFootballApiKey } from "@/lib/dashboard/resolve-provider";
 import {
   EMPTY_MATCH_ANALYSIS_CATALOGUE,
   enrichMatchAnalysisCatalogue,
 } from "@/lib/match-analysis/catalogue";
 import type { MatchAnalysisData } from "@/lib/match-analysis/types";
+import { buildIntelligenceReport } from "@/lib/intelligence-report";
+import { scoreMatchSelection, apexScoreFromScoring } from "@/lib/scoring-engine/from-match";
+import { clubTwinsFromPreview, selectionTwinFromPreview } from "@/lib/team-intelligence/builders";
+import { ratePreview } from "@/lib/match-rating";
 import {
   EMPTY_MATCH_CENTER_ENRICHMENT,
   enrichMatchCenterContext,
@@ -20,19 +22,9 @@ import {
   listMatchCenterFixtures,
   type LoadMatchCenterOptions,
 } from "@/lib/match-center/load";
+import { createRepositories } from "@/lib/repositories";
 
 export type LoadMatchAnalysisOptions = LoadMatchCenterOptions;
-
-function resolveProvider(
-  env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
-): IDataProvider {
-  const hasKey = hasFootballApiKey(env);
-  return createApiFootballDataProvider({
-    env,
-    enrichMatch: true,
-    fallback: hasKey ? "error" : "recorded",
-  });
-}
 
 /**
  * Load Match Analysis for a selected fixture. Does not use getMockMatchAnalysis.
@@ -41,24 +33,78 @@ export async function getMatchAnalysisData(
   options: LoadMatchAnalysisOptions = {},
 ): Promise<MatchAnalysisData> {
   const env = options.env ?? process.env;
-  const provider = options.provider ?? resolveProvider(env);
+  const repos = createRepositories({
+    provider: options.provider,
+    env,
+    enrichMatch: true,
+  });
   const matchId = vendorFixtureId(options.externalMatchId);
   if (!matchId) {
     throw new Error("Selecciona un fixture de API-Football para el análisis.");
   }
 
-  const bundle = await provider.getMatch({ matchId });
+  const bundle = await repos.fixtures.getById(matchId);
   const [enrichment, catalogue] = await Promise.all([
-    enrichMatchCenterContext(provider, bundle).catch(() => ({
+    enrichMatchCenterContext(repos, bundle).catch(() => ({
       ...EMPTY_MATCH_CENTER_ENRICHMENT,
     })),
-    enrichMatchAnalysisCatalogue(provider, bundle).catch(() => ({
+    enrichMatchAnalysisCatalogue(repos, bundle).catch(() => ({
       ...EMPTY_MATCH_ANALYSIS_CATALOGUE,
     })),
   ]);
 
   const center = createMatchCenterFromApexBundle(bundle, { enrichment });
-  return attachCatalogue(center.preview.analysis, bundle, enrichment, catalogue);
+  const analysis = attachCatalogue(
+    center.preview.analysis,
+    bundle,
+    enrichment,
+    catalogue,
+  );
+  const rating = ratePreview(
+    { ...center.preview, analysis },
+    center.aiAnalysis,
+    analysis.rating.label,
+  );
+  const twins = clubTwinsFromPreview(center.match, center.preview.dashboard);
+  const extras = {
+    injuries: center.preview.dashboard.injuries,
+    homeForm: center.preview.dashboard.form.home,
+    awayForm: center.preview.dashboard.form.away,
+    weather: center.match.weather,
+    odds: center.preview.dashboard.odds,
+  };
+  const stamped = {
+    ...analysis,
+    rating,
+  };
+  const scored =
+    analysis.decision && analysis.scoring
+      ? { decision: analysis.decision, scoring: analysis.scoring }
+      : scoreMatchSelection({
+          analysis: stamped,
+          extras,
+          team: selectionTwinFromPreview(
+            center.match,
+            center.preview.dashboard,
+            stamped.predictedOutcome,
+          ),
+          season: bundle.league?.season ?? null,
+        });
+  return {
+    ...stamped,
+    decision: scored.decision,
+    scoring: scored.scoring,
+    apexScore: apexScoreFromScoring(scored.scoring),
+    report: buildIntelligenceReport({
+      data: stamped,
+      ...extras,
+    }),
+    twins,
+    context: {
+      weather: center.match.weather,
+      referee: center.match.referee,
+    },
+  };
 }
 
 function attachCatalogue(

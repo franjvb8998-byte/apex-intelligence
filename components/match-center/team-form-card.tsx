@@ -1,18 +1,22 @@
+"use client";
+
+import { useLocale, useTranslations } from "next-intl";
 import { Card, CardHeader } from "@/components/design-system";
 import type { MatchCenterFormSide, MatchCenterRecentMatch } from "@/lib/match-center/types";
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string): string {
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return "";
-  return new Date(ms).toLocaleDateString("es-ES", {
+  return new Date(ms).toLocaleDateString(locale, {
     day: "numeric",
     month: "short",
   });
 }
 
 function FormLetters({ form }: { form: string }) {
+  const t = useTranslations("matchCenter");
   return (
-    <div className="flex flex-wrap gap-1" aria-label={`Forma ${form}`}>
+    <div className="flex flex-wrap gap-1" aria-label={t("formAria", { form })}>
       {form.split("").map((letter, index) => {
         const tone =
           letter === "W"
@@ -43,10 +47,12 @@ function resultTone(result: MatchCenterRecentMatch["result"]): string {
 }
 
 function RecentMatches({ matches }: { matches: MatchCenterRecentMatch[] }) {
+  const t = useTranslations("matchCenter");
+  const locale = useLocale();
   if (matches.length === 0) {
     return (
       <p className="text-xs text-[var(--apex-fg-subtle)]">
-        Sin últimos partidos en el catálogo.
+        {t("noRecentMatches")}
       </p>
     );
   }
@@ -60,9 +66,9 @@ function RecentMatches({ matches }: { matches: MatchCenterRecentMatch[] }) {
         >
           <span className="min-w-0 truncate text-[var(--apex-fg-muted)]">
             <span className="mr-1.5 text-[var(--apex-fg-subtle)]">
-              {formatDate(match.kickoffAt)}
+              {formatDate(match.kickoffAt, locale)}
             </span>
-            {match.home ? "L" : "V"} vs {match.opponentName}
+            {match.home ? t("homeAbbr") : t("awayAbbr")} vs {match.opponentName}
           </span>
           <span className="shrink-0 font-mono tabular-nums text-[var(--apex-fg)]">
             {match.goalsFor ?? "—"}–{match.goalsAgainst ?? "—"}
@@ -77,13 +83,14 @@ function RecentMatches({ matches }: { matches: MatchCenterRecentMatch[] }) {
 }
 
 function SideStats({ side }: { side: MatchCenterFormSide }) {
+  const t = useTranslations("matchCenter");
   return (
     <div className="space-y-3">
       <p className="text-sm font-medium text-[var(--apex-fg)]">{side.teamName}</p>
       {side.form ? (
         <FormLetters form={side.form} />
       ) : (
-        <p className="text-xs text-[var(--apex-fg-subtle)]">Sin serie de forma</p>
+        <p className="text-xs text-[var(--apex-fg-subtle)]">{t("noFormSeries")}</p>
       )}
       <RecentMatches matches={side.recentMatches ?? []} />
       <dl className="grid grid-cols-3 gap-2 text-center">
@@ -117,16 +124,17 @@ type TeamFormCardProps = {
 };
 
 export function TeamFormCard({ home, away }: TeamFormCardProps) {
+  const t = useTranslations("matchCenter");
   const empty = !home && !away;
   return (
     <Card>
       <CardHeader
-        title="Últimos 5 partidos"
-        description="Forma reciente y estadísticas de temporada del catálogo"
+        title={t("formTitle")}
+        description={t("formDescription")}
       />
       {empty ? (
         <p className="text-sm text-[var(--apex-fg-muted)]">
-          Sin estadísticas de equipo en el proveedor configurado.
+          {t("noFormStats")}
         </p>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2">

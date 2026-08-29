@@ -1,10 +1,10 @@
-import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ApiQuotaCard } from "@/components/app-shell/api-quota-card";
 import { ProductShell } from "@/components/app-shell/product-shell";
 import { MatchCenterList } from "@/components/match-center/match-center-screen";
 import { getShellUser } from "@/lib/auth/get-shell-user";
-import { loadUnlessQuota } from "@/lib/data-platform/providers/api-football/quota";
+import { loadUnlessQuota } from "@/lib/repositories";
+import { localeMetadata } from "@/lib/i18n/page-meta";
 import { listMatchCenterFixtures } from "@/lib/match-center";
 import {
   firstSearchParam,
@@ -13,11 +13,9 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "APEX Match Center™ — APEX Intelligence",
-  description:
-    "Lista de fixtures. Abre un partido para ver Preview, Live y Post Match.",
-};
+export async function generateMetadata() {
+  return localeMetadata("matchCenter");
+}
 
 type MatchCenterPageProps = {
   searchParams: Promise<{

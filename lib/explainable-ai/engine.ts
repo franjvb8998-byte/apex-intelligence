@@ -5,8 +5,8 @@
 
 import type { HybridProbabilityResult } from "@/lib/intelligence/modules/probability";
 import {
+  confidenceFromHybrid,
   mostLikelyOutcome,
-  normalizedEntropy,
 } from "@/lib/intelligence/modules/probability";
 import type { ConfidenceScore, MatchOutcome } from "@/lib/intelligence/types";
 import type {
@@ -32,18 +32,10 @@ export type ExplainableAiInput = {
   dataProvider?: string | null;
 };
 
-function clamp01(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  return Math.min(1, Math.max(0, value));
-}
-
 function confidenceFromProbability(
   probability: HybridProbabilityResult,
 ): ConfidenceScore {
-  const value = clamp01(1 - normalizedEntropy(probability.oneXTwo));
-  const band: ConfidenceScore["band"] =
-    value >= 0.75 ? "high" : value >= 0.45 ? "medium" : "low";
-  return { value, band };
+  return confidenceFromHybrid(probability);
 }
 
 function outcomeLabel(

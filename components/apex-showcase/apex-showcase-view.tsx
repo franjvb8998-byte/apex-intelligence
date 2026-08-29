@@ -1,3 +1,4 @@
+import { getLocale, getTranslations } from "next-intl/server";
 import {
   Badge,
   Card,
@@ -9,7 +10,7 @@ import {
   Timeline,
   cx,
 } from "@/components/design-system";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import {
   ARCHITECTURE_FLOW,
   ROADMAP,
@@ -19,27 +20,6 @@ import {
   type RoadmapStatus,
   type SystemHealthStatus,
 } from "@/lib/apex-showcase/content";
-
-const healthTone: Record<
-  SystemHealthStatus,
-  { badge: "success" | "warning" | "danger"; label: string; dot: string }
-> = {
-  running: {
-    badge: "success",
-    label: "Running",
-    dot: "bg-[var(--apex-accent)] shadow-[0_0_12px_rgb(0_212_170/0.55)]",
-  },
-  mock: {
-    badge: "warning",
-    label: "Mock",
-    dot: "bg-[var(--apex-warning)] shadow-[0_0_12px_rgb(251_191_36/0.45)]",
-  },
-  pending: {
-    badge: "danger",
-    label: "Pending",
-    dot: "bg-[var(--apex-danger)] shadow-[0_0_12px_rgb(248_113_113/0.4)]",
-  },
-};
 
 const roadmapMark: Record<RoadmapStatus, string> = {
   done: "✅",
@@ -76,8 +56,30 @@ function SectionHeading({
 /**
  * Internal development showcase — presentation only.
  */
-export function ApexShowcaseView() {
-  const buildDate = new Intl.DateTimeFormat("es-ES", {
+export async function ApexShowcaseView() {
+  const t = await getTranslations("showcase");
+  const locale = await getLocale();
+  const healthTone: Record<
+    SystemHealthStatus,
+    { badge: "success" | "warning" | "danger"; label: string; dot: string }
+  > = {
+    running: {
+      badge: "success",
+      label: t("running"),
+      dot: "bg-[var(--apex-accent)] shadow-[0_0_12px_rgb(0_212_170/0.55)]",
+    },
+    mock: {
+      badge: "warning",
+      label: t("mock"),
+      dot: "bg-[var(--apex-warning)] shadow-[0_0_12px_rgb(251_191_36/0.45)]",
+    },
+    pending: {
+      badge: "danger",
+      label: t("pending"),
+      dot: "bg-[var(--apex-danger)] shadow-[0_0_12px_rgb(248_113_113/0.4)]",
+    },
+  };
+  const buildDate = new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date());
@@ -96,25 +98,24 @@ export function ApexShowcaseView() {
         />
         <div className="relative space-y-5">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="accent">Internal</Badge>
-            <Badge tone="info">Dev Showcase</Badge>
+            <Badge tone="accent">{t("internal")}</Badge>
+            <Badge tone="info">{t("devShowcase")}</Badge>
             <Badge>v{SHOWCASE_VERSION}</Badge>
           </div>
           <div className="space-y-3">
             <h1 className="max-w-3xl text-3xl font-bold tracking-tight text-white sm:text-5xl sm:leading-[1.08]">
-              APEX Intelligence Platform
+              {t("title")}
             </h1>
             <p className="text-base text-[var(--apex-fg-muted)] sm:text-lg">
-              Internal Development Showcase
+              {t("subtitle")}
             </p>
           </div>
           <p className="max-w-2xl text-sm leading-relaxed text-[var(--apex-fg-subtle)]">
-            Panel interno para ver salud del sistema, arquitectura, roadmap y
-            design system — no es una superficie de usuario final.
+            {t("intro")}
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
             <ButtonLink href="/match-center" variant="primary">
-              Abrir Match Center
+              {t("openMatchCenter")}
             </ButtonLink>
             <ButtonLink href="/design-system" variant="secondary">
               Design System
@@ -126,9 +127,9 @@ export function ApexShowcaseView() {
       {/* System Health */}
       <section>
         <SectionHeading
-          eyebrow="01 · Health"
-          title="System Health"
-          description="Estado actual de los módulos de la plataforma."
+          eyebrow={t("healthEyebrow")}
+          title={t("health")}
+          description={t("healthDescription")}
         />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {SYSTEM_HEALTH.map((item) => {
@@ -171,9 +172,9 @@ export function ApexShowcaseView() {
       {/* Architecture */}
       <section>
         <SectionHeading
-          eyebrow="02 · Architecture"
-          title="Architecture"
-          description="Flujo de capas — del frontend al knowledge graph."
+          eyebrow={t("architectureEyebrow")}
+          title={t("architecture")}
+          description={t("architectureDescription")}
         />
         <Card padding="lg" className="overflow-hidden">
           <div className="mx-auto flex max-w-md flex-col items-center">
@@ -213,9 +214,9 @@ export function ApexShowcaseView() {
       {/* Roadmap */}
       <section>
         <SectionHeading
-          eyebrow="03 · Roadmap"
-          title="Product Roadmap"
-          description="Línea de tiempo del progreso de producto."
+          eyebrow={t("roadmapEyebrow")}
+          title={t("roadmap")}
+          description={t("roadmapDescription")}
         />
         <Card>
           <ol className="relative space-y-0">
@@ -248,8 +249,8 @@ export function ApexShowcaseView() {
                         {item.status === "done"
                           ? "Done"
                           : item.status === "active"
-                            ? "In progress"
-                            : "Planned"}
+                            ? t("inProgress")
+                            : t("planned")}
                       </Badge>
                     </div>
                   </div>
@@ -263,9 +264,9 @@ export function ApexShowcaseView() {
       {/* Statistics */}
       <section>
         <SectionHeading
-          eyebrow="04 · Metrics"
-          title="Statistics"
-          description="Conteos internos (mock de desarrollo)."
+          eyebrow={t("metricsEyebrow")}
+          title={t("statistics")}
+          description={t("statisticsDescription")}
         />
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
           {SHOWCASE_STATS.map((stat) => (
@@ -284,25 +285,25 @@ export function ApexShowcaseView() {
       {/* Design System Preview */}
       <section>
         <SectionHeading
-          eyebrow="05 · Design System"
-          title="Design System Preview"
-          description="Muestra rápida de primitives oficiales."
+          eyebrow={t("dsEyebrow")}
+          title={t("dsPreview")}
+          description={t("dsPreviewDescription")}
         />
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>
-            <CardHeader title="Cards & Buttons" />
+            <CardHeader title={t("cardsButtons")} />
             <div className="flex flex-wrap gap-3">
-              <Button type="button" variant="primary">
+              <ButtonLink href="/design-system" variant="primary">
                 Primary
-              </Button>
-              <Button type="button" variant="secondary">
+              </ButtonLink>
+              <ButtonLink href="/design-system" variant="secondary">
                 Secondary
-              </Button>
+              </ButtonLink>
             </div>
           </Card>
 
           <Card>
-            <CardHeader title="Badges & Status" />
+            <CardHeader title={t("badgesStatus")} />
             <div className="flex flex-wrap gap-2">
               <Badge tone="success">🟢 Running</Badge>
               <Badge tone="warning">🟡 Mock</Badge>
@@ -313,7 +314,7 @@ export function ApexShowcaseView() {
           </Card>
 
           <Card>
-            <CardHeader title="Progress" description="Probability bars" />
+            <CardHeader title={t("progress")} />
             <ProbabilityBars
               aria-label="Progress showcase"
               items={[
@@ -325,15 +326,15 @@ export function ApexShowcaseView() {
           </Card>
 
           <Card>
-            <CardHeader title="Gauge & Confidence" />
+            <CardHeader title={t("gaugeConfidence")} />
             <div className="grid gap-4 sm:grid-cols-2 sm:items-center">
-              <ScoreGauge value={78} label="APEX" caption="Build health" />
+              <ScoreGauge value={78} label="APEX" caption={t("buildHealth")} />
               <div className="space-y-3">
                 <ConfidenceIndicator value={0.78} band="high" />
                 <MarketChip
                   interactive={false}
                   selected
-                  label="Signal"
+                  label={t("signal")}
                   value="Strong"
                   hint="Design-system chip"
                 />
@@ -342,7 +343,7 @@ export function ApexShowcaseView() {
           </Card>
 
           <Card className="lg:col-span-2">
-            <CardHeader title="Timeline" />
+            <CardHeader title={t("timeline")} />
             <Timeline
               items={[
                 {

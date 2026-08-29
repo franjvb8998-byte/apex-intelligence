@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import {
   Badge,
   Card,
@@ -18,30 +18,32 @@ import {
 } from "@/components/app-shell/states";
 import { ProductShell } from "@/components/app-shell/product-shell";
 import { getShellUser } from "@/lib/auth/get-shell-user";
+import { localeMetadata } from "@/lib/i18n/page-meta";
 
-export const metadata: Metadata = {
-  title: "Design System — APEX Intelligence",
-  description: "Biblioteca oficial de componentes y tokens visuales de APEX.",
-};
+export async function generateMetadata() {
+  return localeMetadata("designSystem");
+}
 
 export default async function DesignSystemPage() {
   const user = await getShellUser();
+  const t = await getTranslations("designSystem");
+  const common = await getTranslations("common");
+  const loading = await getTranslations("loading");
 
   return (
     <ProductShell user={user}>
       <div className="w-full space-y-10">
         <header className="space-y-3">
           <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Design System
+            {t("title")}
           </h2>
           <p className="max-w-2xl text-sm leading-relaxed text-[var(--apex-fg-muted)] sm:text-base">
-            Componentes reutilizables y tokens oficiales. Sin lógica de negocio
-            ni APIs — solo presentación accesible para escritorio y móvil.
+            {t("description")}
           </p>
         </header>
 
         <section className="space-y-4">
-          <h2 className="text-lg font-semibold text-white">Badges</h2>
+          <h2 className="text-lg font-semibold text-white">{t("badges")}</h2>
           <Card>
             <div className="flex flex-wrap gap-2">
               <Badge>Neutral</Badge>
@@ -56,34 +58,34 @@ export default async function DesignSystemPage() {
 
         <section className="space-y-4">
           <h2 className="text-lg font-semibold text-white">
-            Estados de producto
+            {t("productStates")}
           </h2>
           <div className="grid gap-4 lg:grid-cols-3">
-            <LoadingState label="Loading" rows={2} />
+            <LoadingState label={loading("default")} rows={2} />
             <EmptyState
-              title="Empty"
-              description="No hay elementos que mostrar en esta sección."
+              title={t("empty")}
+              description={t("emptyDescription")}
             />
             <ErrorState
-              title="Error"
-              description="Ejemplo de fallo recuperable."
+              title={common("error")}
+              description={t("errorDescription")}
             />
           </div>
         </section>
 
         <section className="grid gap-6 lg:grid-cols-2">
           <Card>
-            <CardHeader title="Score gauge" description="0–100 SVG meter" />
+            <CardHeader title={t("scoreGauge")} description={t("scoreGaugeDescription")} />
             <ScoreGauge
               value={71}
               label="APEX"
-              caption="Señal moderada — solo visual de ejemplo"
+              caption={t("scoreCaption")}
             />
           </Card>
           <Card>
             <CardHeader
-              title="Confidence indicator"
-              description="Bandas low / medium / high"
+              title={t("confidenceIndicator")}
+              description={t("confidenceBands")}
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <ConfidenceIndicator value={0.62} band="medium" />
@@ -94,22 +96,35 @@ export default async function DesignSystemPage() {
 
         <section className="grid gap-6 lg:grid-cols-2">
           <Card>
-            <CardHeader title="Probability bars" />
+            <CardHeader title={t("probabilityBars")} />
             <ProbabilityBars
-              aria-label="Ejemplo 1X2"
+              aria-label={t("example1x2")}
               items={[
-                { id: "h", label: "Local", value: 0.48 },
-                { id: "d", label: "Empate", value: 0.27 },
-                { id: "a", label: "Visitante", value: 0.25 },
+                { id: "h", label: common("home"), value: 0.48 },
+                { id: "d", label: common("draw"), value: 0.27 },
+                { id: "a", label: common("away"), value: 0.25 },
               ]}
             />
           </Card>
           <Card>
-            <CardHeader title="Market chips" />
+            <CardHeader title={t("marketChips")} />
             <div className="grid gap-2 sm:grid-cols-3">
-              <MarketChip label="Local" value="48%" selected hint="Cuota 2.05" />
-              <MarketChip label="Empate" value="27%" hint="Cuota 3.40" />
-              <MarketChip label="Visitante" value="25%" hint="Cuota 3.60" />
+              <MarketChip
+                label={common("home")}
+                value="48%"
+                selected
+                hint={t("oddsHint", { odds: "2.05" })}
+              />
+              <MarketChip
+                label={common("draw")}
+                value="27%"
+                hint={t("oddsHint", { odds: "3.40" })}
+              />
+              <MarketChip
+                label={common("away")}
+                value="25%"
+                hint={t("oddsHint", { odds: "3.60" })}
+              />
             </div>
           </Card>
         </section>
@@ -122,44 +137,43 @@ export default async function DesignSystemPage() {
                 {
                   id: "1",
                   timeLabel: "1'",
-                  title: "Inicio",
-                  description: "Saque inicial.",
+                  title: t("timelineKickoff"),
+                  description: t("timelineKickoffDescription"),
                 },
                 {
                   id: "2",
                   timeLabel: "23'",
-                  title: "Gol",
-                  description: "Remate desde el área.",
+                  title: t("timelineGoal"),
+                  description: t("timelineGoalDescription"),
                   tone: "accent",
                 },
                 {
                   id: "3",
                   timeLabel: "67'",
-                  title: "Tarjeta",
-                  description: "Falta táctica.",
+                  title: t("timelineCard"),
+                  description: t("timelineCardDescription"),
                   tone: "warning",
                 },
               ]}
             />
           </Card>
           <Card>
-            <CardHeader title="Heatmap placeholder" />
-            <HeatmapPlaceholder title="Presión ofensiva (demo)" />
+            <CardHeader title={t("heatmapTitle")} />
+            <HeatmapPlaceholder title={t("heatmapDemo")} />
           </Card>
         </section>
 
         <section>
           <ExplanationPanel
             title="Explanation panel"
-            summary="Resumen visible siempre. El detalle se revela al expandir."
+            summary={t("explanationSummary")}
             footnotes={[
-              "Componente presentacional — el contenido lo inyecta la pantalla.",
-              "Respeta prefers-reduced-motion a nivel global.",
+              t("footnotePresentational"),
+              t("footnoteMotion"),
             ]}
           >
             <p className="text-sm leading-relaxed text-[var(--apex-fg-muted)]">
-              Aquí vive la narrativa extendida, factores o notas técnicas. El
-              Design System no calcula scores ni llama a proveedores.
+              {t("explanationBody")}
             </p>
           </ExplanationPanel>
         </section>

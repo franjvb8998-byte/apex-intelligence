@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useId, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { BetSummaryCard } from "@/components/bankroll/bet-summary-card";
 import { DecimalField } from "@/components/bankroll/decimal-field";
 import { MatchPicker } from "@/components/bankroll/match-picker";
@@ -20,12 +21,19 @@ import {
 } from "@/lib/bankroll/form";
 import type { BetPreview, BankrollFixture, BetResult } from "@/lib/bankroll/types";
 
-const RESULT_OPTIONS: Array<{ value: BetResult; label: string }> = [
-  { value: "pending", label: "Pendiente" },
-  { value: "won", label: "Ganada" },
-  { value: "lost", label: "Perdida" },
-  { value: "void", label: "Nula" },
-];
+const RESULT_OPTIONS: BetResult[] = ["pending", "won", "lost", "void"];
+
+function marketLabel(
+  t: ReturnType<typeof useTranslations<"bankroll">>,
+  market: string,
+): string {
+  if (market === "1X2 · Local") return t("marketHome");
+  if (market === "1X2 · Empate") return t("marketDraw");
+  if (market === "1X2 · Visitante") return t("marketAway");
+  if (market === "BTTS · Sí") return t("marketBttsYes");
+  if (market === "BTTS · No") return t("marketBttsNo");
+  return market;
+}
 
 const selectClass =
   "apex-focusable h-12 w-full rounded-[var(--apex-radius-md)] border border-[var(--apex-border)] bg-slate-950/50 px-3 text-sm text-[var(--apex-fg)] outline-none transition-colors focus:border-[var(--apex-accent-border)]";
@@ -63,6 +71,8 @@ export function AddBetModal({
   onSubmit,
   error,
 }: AddBetModalProps) {
+  const t = useTranslations("bankroll");
+  const common = useTranslations("common");
   const titleId = useId();
   const oddsRef = useRef<HTMLInputElement>(null);
   const reduceMotion = useReducedMotion();
@@ -99,7 +109,7 @@ export function AddBetModal({
           <button
             type="button"
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            aria-label="Cerrar modal"
+            aria-label={t("closeModal")}
             onClick={onClose}
           />
           <motion.div
@@ -117,11 +127,10 @@ export function AddBetModal({
                 id={titleId}
                 className="text-lg font-semibold text-[var(--apex-fg)]"
               >
-                Añadir apuesta
+                {t("addBet")}
               </h2>
               <p className="mt-1 text-sm text-[var(--apex-fg-muted)]">
-                Fixture de Match Center. ROI y yield solo cuando el resultado
-                está liquidado.
+                {t("addBetDescription")}
               </p>
             </div>
 
@@ -135,7 +144,7 @@ export function AddBetModal({
               <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 py-1 sm:px-6">
                 <div className="space-y-1.5">
                   <span className="text-xs font-medium uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-                    Partido
+                    {t("colMatch")}
                   </span>
                   <MatchPicker
                     fixtures={fixtures}
@@ -152,7 +161,7 @@ export function AddBetModal({
 
                 <label className="block space-y-1.5">
                   <span className="text-xs font-medium uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-                    Mercado
+                    {t("colMarket")}
                   </span>
                   <select
                     value={value.market}
@@ -162,7 +171,7 @@ export function AddBetModal({
                   >
                     {BANKROLL_MARKETS.map((market) => (
                       <option key={market} value={market}>
-                        {market}
+                        {marketLabel(t, market)}
                       </option>
                     ))}
                   </select>
@@ -171,7 +180,7 @@ export function AddBetModal({
                 <div className="grid gap-4 sm:grid-cols-2">
                   <DecimalField
                     inputRef={oddsRef}
-                    label="Cuota"
+                    label={t("colOdds")}
                     value={value.odds}
                     digits={2}
                     onChange={(oddsValue) =>
@@ -179,7 +188,7 @@ export function AddBetModal({
                     }
                   />
                   <DecimalField
-                    label="Stake"
+                    label={t("colStake")}
                     value={value.stake}
                     digits={digits}
                     onChange={(stakeValue) =>
@@ -190,7 +199,7 @@ export function AddBetModal({
 
                 <div>
                   <p className="text-xs font-medium uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-                    Stake rápido
+                    {t("quickStake")}
                     <span className="ml-2 font-normal normal-case tracking-normal text-[var(--apex-fg-muted)]">
                       1u = {formatMoney(unitValue, currency)}
                     </span>
@@ -222,7 +231,7 @@ export function AddBetModal({
 
                 <label className="block space-y-1.5">
                   <span className="text-xs font-medium uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-                    Resultado
+                    {t("result")}
                   </span>
                   <select
                     value={value.result}
@@ -235,8 +244,16 @@ export function AddBetModal({
                     className={selectClass}
                   >
                     {RESULT_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
+                      <option key={option} value={option}>
+                        {t(
+                          option === "won"
+                            ? "resultWon"
+                            : option === "lost"
+                              ? "resultLost"
+                              : option === "void"
+                                ? "resultVoid"
+                                : "resultPending",
+                        )}
                       </option>
                     ))}
                   </select>
@@ -250,7 +267,7 @@ export function AddBetModal({
 
                 {pending ? (
                   <p className="text-xs text-[var(--apex-fg-muted)]">
-                    ROI — · Yield — · Win rate — (pendiente, sin liquidar)
+                    {t("pendingUnsettled")}
                   </p>
                 ) : null}
 
@@ -267,14 +284,14 @@ export function AddBetModal({
                   onClick={onClose}
                   className="apex-focusable rounded-[var(--apex-radius-md)] border border-[var(--apex-border)] px-4 py-2 text-sm text-[var(--apex-fg-muted)] transition-colors hover:text-[var(--apex-fg)]"
                 >
-                  Cancelar
+                  {common("cancel")}
                 </button>
                 <button
                   type="submit"
                   disabled={!valid}
                   className="apex-focusable rounded-[var(--apex-radius-md)] bg-[var(--apex-accent)] px-4 py-2 text-sm font-medium text-[var(--apex-fg-inverse)] transition-opacity hover:bg-[var(--apex-accent-hover)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Guardar apuesta
+                  {t("saveBet")}
                 </button>
               </div>
             </form>

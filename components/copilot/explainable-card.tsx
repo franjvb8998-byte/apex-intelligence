@@ -1,5 +1,8 @@
+"use client";
+
 import { ExplainablePredictionPanel } from "@/components/explainable-ai";
 import { Badge, Card, CardHeader } from "@/components/design-system";
+import { useTranslations } from "next-intl";
 import type { CopilotExplainableCardData } from "@/lib/copilot";
 
 type ExplainableCardProps = {
@@ -7,6 +10,7 @@ type ExplainableCardProps = {
 };
 
 export function ExplainableCard({ data }: ExplainableCardProps) {
+  const t = useTranslations("copilot");
   return (
     <Card
       padding="sm"
@@ -14,7 +18,7 @@ export function ExplainableCard({ data }: ExplainableCardProps) {
     >
       <CardHeader
         className="mb-3"
-        title="Explainable AI"
+        title={t("explainable")}
         description={data.matchLabel}
         action={<Badge tone="info">rules</Badge>}
       />

@@ -1,21 +1,21 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { ApiQuotaCard } from "@/components/app-shell/api-quota-card";
 import { ProductShell } from "@/components/app-shell/product-shell";
+import { MatchProductLinks } from "@/components/app-shell/match-product-links";
 import { MatchAnalysisView } from "@/components/match-analysis";
 import { getShellUser } from "@/lib/auth/get-shell-user";
-import { loadUnlessQuota } from "@/lib/data-platform/providers/api-football/quota";
+import { loadUnlessQuota } from "@/lib/repositories";
+import { localeMetadata } from "@/lib/i18n/page-meta";
 import { getMatchAnalysisData } from "@/lib/match-analysis/load";
 import { vendorFixtureId } from "@/lib/match-center/fixture-id";
 
 export const dynamic = "force-dynamic";
 export const dynamicParams = true;
 
-export const metadata: Metadata = {
-  title: "Match Analysis — APEX Intelligence",
-  description:
-    "Clasificación, últimos 5, H2H, goles, local/visitante y métricas del fixture.",
-};
+export async function generateMetadata() {
+  return localeMetadata("matchAnalysis");
+}
 
 type MatchAnalysisFixturePageProps = {
   params: Promise<{ fixtureId: string }>;
@@ -27,6 +27,7 @@ export default async function MatchAnalysisFixturePage({
   const { fixtureId: rawFixtureId } = await params;
   const fixtureId = vendorFixtureId(decodeURIComponent(rawFixtureId));
   const user = await getShellUser();
+  const t = await getTranslations("common");
   const loaded = await loadUnlessQuota(() =>
     getMatchAnalysisData({
       externalMatchId: fixtureId ?? rawFixtureId,
@@ -41,10 +42,18 @@ export default async function MatchAnalysisFixturePage({
           href="/match-analysis"
           className="apex-focusable inline-flex items-center text-sm text-[var(--apex-accent)] hover:text-[var(--apex-accent-hover)]"
         >
-          Volver a partidos
+          {t("backToMatches")}
         </Link>
         {loaded.ok ? (
-          <MatchAnalysisView data={loaded.data} />
+          <>
+            <MatchProductLinks
+              matchId={fixtureId ?? rawFixtureId}
+              homeName={loaded.data.homeTeam.name}
+              awayName={loaded.data.awayTeam.name}
+              current="analysis"
+            />
+            <MatchAnalysisView data={loaded.data} />
+          </>
         ) : (
           <ApiQuotaCard />
         )}

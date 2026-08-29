@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Card, CardHeader } from "@/components/design-system";
 import type { MatchCenterAbsence } from "@/lib/match-center/types";
 
@@ -40,11 +43,12 @@ function AbsenceCard({ title, description, empty, items }: AbsenceCardProps) {
 }
 
 export function InjuriesCard({ injuries }: { injuries: MatchCenterAbsence[] }) {
+  const t = useTranslations("matchCenter");
   return (
     <AbsenceCard
-      title="Lesiones"
-      description="Bajas reportadas por el catálogo, si existen"
-      empty="Sin lesiones reportadas para este partido."
+      title={t("injuries")}
+      description={t("injuriesDescription")}
+      empty={t("noInjuries")}
       items={injuries}
     />
   );
@@ -55,11 +59,12 @@ export function SuspensionsCard({
 }: {
   suspensions: MatchCenterAbsence[];
 }) {
+  const t = useTranslations("matchCenter");
   return (
     <AbsenceCard
-      title="Suspensiones"
-      description="Sanciones y bajas disciplinarias del catálogo"
-      empty="Sin suspensiones reportadas para este partido."
+      title={t("suspensions")}
+      description={t("suspensionsDescription")}
+      empty={t("noSuspensions")}
       items={suspensions}
     />
   );

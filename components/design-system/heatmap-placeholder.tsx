@@ -16,7 +16,7 @@ export function HeatmapPlaceholder({
   rows = 6,
   cols = 8,
   title = "Heatmap",
-  description = "Placeholder visual — sin datos de zona todavía.",
+  description = "Visual placeholder — no zone data yet.",
   className,
 }: HeatmapPlaceholderProps) {
   const cells = Array.from({ length: rows * cols }, (_, index) => index);
@@ -35,7 +35,7 @@ export function HeatmapPlaceholder({
     >
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-sm font-medium text-white">{title}</p>
-        <p className="text-xs text-[var(--apex-fg-subtle)]">Próximamente</p>
+        <p className="text-xs text-[var(--apex-fg-subtle)]">Demo</p>
       </div>
       <div
         className="grid gap-1 rounded-[var(--apex-radius-xl)] border border-dashed border-[var(--apex-border-strong)] bg-slate-950/40 p-3"

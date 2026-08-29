@@ -5,8 +5,8 @@
 
 import type { HybridProbabilityResult } from "@/lib/intelligence/modules/probability";
 import {
+  confidenceFromHybrid,
   mostLikelyOutcome,
-  normalizedEntropy,
 } from "@/lib/intelligence/modules/probability";
 import type {
   ConfidenceScore,
@@ -35,13 +35,7 @@ function clamp01(value: number): number {
 export function confidenceFromProbability(
   probability: HybridProbabilityResult,
 ): ConfidenceScore {
-  const value = clamp01(1 - normalizedEntropy(probability.oneXTwo));
-  const band: ConfidenceScore["band"] =
-    value >= 0.75 ? "high" : value >= 0.45 ? "medium" : "low";
-  return {
-    value,
-    band,
-  };
+  return confidenceFromHybrid(probability);
 }
 
 function outcomeLabel(

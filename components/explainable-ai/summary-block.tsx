@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Badge, Card, CardHeader } from "@/components/design-system";
 
 type SummaryBlockProps = {
@@ -11,10 +14,11 @@ export function SummaryBlock({
   predictedLabel,
   method = "rules",
 }: SummaryBlockProps) {
+  const t = useTranslations("matchCenter");
   return (
     <Card>
       <CardHeader
-        title="Explicación resumida"
+        title={t("summaryExplanation")}
         description={predictedLabel}
         action={<Badge tone="info">Explainable AI · {method}</Badge>}
       />

@@ -6,3 +6,4 @@ export { ThinkingIndicator } from "@/components/copilot/thinking-indicator";
 export { AnalysisCard } from "@/components/copilot/analysis-card";
 export { PredictionCard } from "@/components/copilot/prediction-card";
 export { ExplainableCard } from "@/components/copilot/explainable-card";
+export { BriefingCard } from "@/components/copilot/briefing-card";

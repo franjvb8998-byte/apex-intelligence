@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { MatchProductLinks } from "@/components/app-shell/match-product-links";
 import { AiMatchAnalysisPanel } from "@/components/match-center/ai-match-analysis-panel";
 import { MatchCenterHeader } from "@/components/match-center/match-center-header";
 import { PhaseTabs } from "@/components/match-center/phase-tabs";
@@ -27,6 +29,7 @@ export function MatchCenterView({
   data,
   initialPhase,
 }: MatchCenterViewProps) {
+  const t = useTranslations("matchCenter");
   const [phase, setPhase] = useState<MatchCenterPhase>(
     initialPhase ?? data.defaultPhase,
   );
@@ -36,8 +39,15 @@ export function MatchCenterView({
   }, [data.match.matchId, data.defaultPhase, initialPhase]);
 
   return (
-    <div className="w-full space-y-8">
+    <div className="w-full space-y-6">
       <MatchCenterHeader match={data.match} phase={phase} />
+      <MatchProductLinks
+        matchId={data.match.matchId}
+        externalId={data.match.externalId}
+        homeName={data.match.homeTeam.name}
+        awayName={data.match.awayTeam.name}
+        current="center"
+      />
       <PhaseTabs active={phase} onChange={setPhase} />
 
       {phase === "preview" && (
@@ -54,8 +64,8 @@ export function MatchCenterView({
 
       <Card padding="lg">
         <CardHeader
-          title="AI Match Analysis"
-          description="Data Platform · Probability Engine · Reasoning (reglas, sin LLM)."
+          title={t("aiMatchAnalysis")}
+          description={t("aiMatchAnalysisDescription")}
         />
         <AiMatchAnalysisPanel analysis={data.aiAnalysis} />
       </Card>

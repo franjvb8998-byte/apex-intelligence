@@ -1,5 +1,5 @@
-import { LoadingState } from "@/components/app-shell/states";
+import { TranslatedLoading } from "@/components/i18n/translated-loading";
 
 export default function MatchCenterLoading() {
-  return <LoadingState label="Cargando Match Center…" rows={4} />;
+  return <TranslatedLoading messageKey="matchCenter" rows={4} />;
 }

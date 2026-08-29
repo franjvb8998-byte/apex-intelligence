@@ -136,3 +136,34 @@ body {
   outline: none;
   box-shadow: var(--apex-focus-ring);
 }
+
+/* Scanner hover hints — scoped so page-level `.group` hover cannot leak */
+.apex-scanner-hint {
+  position: relative;
+  z-index: 0;
+  display: inline-flex;
+  isolation: isolate;
+}
+
+.apex-scanner-hint:hover,
+.apex-scanner-hint:focus-within {
+  z-index: 20;
+}
+
+.apex-scanner-hint > [role="tooltip"] {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 50%;
+  z-index: 30;
+  width: 14rem;
+  transform: translateX(-50%);
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+}
+
+.apex-scanner-hint:hover > [role="tooltip"],
+.apex-scanner-hint:focus-within > [role="tooltip"] {
+  visibility: visible !important;
+  opacity: 1 !important;
+}

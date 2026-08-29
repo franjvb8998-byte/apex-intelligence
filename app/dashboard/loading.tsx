@@ -1,5 +1,5 @@
-import { LoadingState } from "@/components/app-shell/states";
+import { TranslatedLoading } from "@/components/i18n/translated-loading";
 
 export default function DashboardLoading() {
-  return <LoadingState label="Cargando Dashboard…" rows={4} />;
+  return <TranslatedLoading messageKey="dashboard" rows={4} />;
 }

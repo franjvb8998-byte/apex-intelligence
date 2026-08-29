@@ -1,3 +1,6 @@
+"use client";
+
+import { useLocale, useTranslations } from "next-intl";
 import {
   Badge,
   Card,
@@ -5,11 +8,11 @@ import {
 } from "@/components/design-system";
 import type { MatchCenterMeta, MatchCenterPhase } from "@/lib/match-center/types";
 
-function formatKickoff(iso: string): string {
+function formatKickoff(iso: string, locale: string): string {
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return iso;
   try {
-    return new Intl.DateTimeFormat("es-ES", {
+    return new Intl.DateTimeFormat(locale, {
       weekday: "short",
       day: "numeric",
       month: "short",
@@ -29,18 +32,6 @@ const statusTone = {
   finished: "success" as const,
 };
 
-const statusLabel = {
-  scheduled: "Programado",
-  live: "En vivo",
-  finished: "Finalizado",
-} as const;
-
-const phaseEyebrow: Record<MatchCenterPhase, string> = {
-  preview: "Análisis pre-partido",
-  live: "Seguimiento en vivo",
-  post: "Cierre y aprendizaje",
-};
-
 type MatchCenterHeaderProps = {
   match: MatchCenterMeta;
   phase: MatchCenterPhase;
@@ -56,6 +47,19 @@ export function MatchCenterHeader({
   phase,
   sourceLabel,
 }: MatchCenterHeaderProps) {
+  const t = useTranslations("matchCenter");
+  const dashboard = useTranslations("dashboard");
+  const locale = useLocale();
+  const statusLabel = {
+    scheduled: dashboard("scheduled"),
+    live: dashboard("live"),
+    finished: dashboard("finished"),
+  } as const;
+  const phaseEyebrow: Record<MatchCenterPhase, string> = {
+    preview: t("headerPreview"),
+    live: t("headerLive"),
+    post: t("headerPost"),
+  };
   return (
     <header className="space-y-6">
       <div className="space-y-3">
@@ -67,11 +71,11 @@ export function MatchCenterHeader({
             {statusLabel[match.status]}
           </Badge>
           {(match.source === "mock" || sourceLabel) && (
-            <Badge tone="warning">{sourceLabel ?? "Datos simulados"}</Badge>
+            <Badge tone="info">{sourceLabel ?? dashboard("modeCatalog")}</Badge>
           )}
           {match.source === "data-platform" && (
             <Badge tone="info">
-              Data Platform · {match.providerLabel ?? "catálogo"}
+              Data Platform · {match.providerLabel ?? dashboard("modeCatalog")}
             </Badge>
           )}
         </div>
@@ -80,7 +84,7 @@ export function MatchCenterHeader({
           <p className="text-sm text-[var(--apex-fg-muted)]" suppressHydrationWarning>
             {match.leagueName}
             <span className="mx-2 text-[var(--apex-fg-subtle)]">·</span>
-            {formatKickoff(match.kickoffAt)}
+            {formatKickoff(match.kickoffAt, locale)}
             {match.venue?.name ? (
               <>
                 <span className="mx-2 text-[var(--apex-fg-subtle)]">·</span>
@@ -91,7 +95,7 @@ export function MatchCenterHeader({
             {match.referee ? (
               <>
                 <span className="mx-2 text-[var(--apex-fg-subtle)]">·</span>
-                Árbitro {match.referee}
+                {t("referee", { name: match.referee })}
               </>
             ) : null}
           </p>
@@ -113,8 +117,7 @@ export function MatchCenterHeader({
             {match.awayTeam.name}
           </h1>
           <p className="mt-2 text-sm text-[var(--apex-fg-muted)]">
-            {phaseEyebrow[phase]} — dashboard de decisión con probabilidad,
-            EV, mercados y contexto del catálogo.
+            {t("headerDescription", { phase: phaseEyebrow[phase] })}
           </p>
         </div>
       </div>

@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import {
   Badge,
   Card,
@@ -24,18 +27,6 @@ import type {
   MatchCenterPreviewData,
 } from "@/lib/match-center/types";
 
-const outcomeLabel = {
-  home: "Victoria local",
-  draw: "Empate",
-  away: "Victoria visitante",
-} as const;
-
-const confidenceLabel = {
-  high: "Alta",
-  medium: "Media",
-  low: "Baja",
-} as const;
-
 type PreviewPhaseProps = {
   data: MatchCenterPreviewData;
   match: MatchCenterMeta;
@@ -46,20 +37,32 @@ type PreviewPhaseProps = {
  * Probabilities from Probability Engine; odds/form/H2H/injuries from Data Platform.
  */
 export function PreviewPhase({ data, match }: PreviewPhaseProps) {
+  const t = useTranslations("matchCenter");
+  const common = useTranslations("common");
   const { analysis, hybrid, dashboard } = data;
+  const outcomeLabel = {
+    home: t("outcomeHome"),
+    draw: t("outcomeDraw"),
+    away: t("outcomeAway"),
+  } as const;
+  const confidenceLabel = {
+    high: t("confidenceHigh"),
+    medium: t("confidenceMedium"),
+    low: t("confidenceLow"),
+  } as const;
   const lead =
     analysis.predictedOutcome === "home"
       ? analysis.homeTeam.shortName
       : analysis.predictedOutcome === "away"
         ? analysis.awayTeam.shortName
-        : "Empate";
+        : t("outcomeDraw");
 
   return (
     <div className="space-y-6" role="tabpanel" aria-labelledby="match-center-tab-preview">
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="info">Preview</Badge>
         <Badge>PE · {hybrid.modelVersion}</Badge>
-        {data.source === "mock" && <Badge tone="warning">Elo estimado</Badge>}
+        {data.source === "mock" && <Badge tone="warning">{t("eloEstimated")}</Badge>}
       </div>
 
       <MatchBriefingCard match={match} />
@@ -68,19 +71,21 @@ export function PreviewPhase({ data, match }: PreviewPhaseProps) {
         <div className="space-y-6 lg:col-span-3">
           <Card>
             <CardHeader
-              title="Probabilidad de victoria / empate / derrota"
-              description={`Lectura principal: ${outcomeLabel[analysis.predictedOutcome]}`}
+              title={t("winProbTitle")}
+              description={t("winProbLead", {
+                outcome: outcomeLabel[analysis.predictedOutcome],
+              })}
               action={<Badge tone="accent">{lead}</Badge>}
             />
             <ProbabilityBars
-              aria-label="Probabilidades 1X2"
+              aria-label={t("probsAria")}
               items={[
                 {
                   id: "home",
                   label: analysis.homeTeam.shortName,
                   value: analysis.oneXTwo.home,
                 },
-                { id: "draw", label: "Empate", value: analysis.oneXTwo.draw },
+                { id: "draw", label: common("draw"), value: analysis.oneXTwo.draw },
                 {
                   id: "away",
                   label: analysis.awayTeam.shortName,
@@ -93,8 +98,10 @@ export function PreviewPhase({ data, match }: PreviewPhaseProps) {
           <div className="grid gap-6 sm:grid-cols-2">
             <Card>
               <CardHeader
-                title="Predicción de goles"
-                description={`Total ${hybrid.expectedGoals.total.toFixed(2)} xG`}
+                title={t("goalsTitle")}
+                description={t("goalsTotal", {
+                  value: hybrid.expectedGoals.total.toFixed(2),
+                })}
               />
               <dl className="grid grid-cols-2 gap-3 text-center">
                 <div>
@@ -118,20 +125,20 @@ export function PreviewPhase({ data, match }: PreviewPhaseProps) {
 
             <Card>
               <CardHeader
-                title="BTTS"
-                description="Ambos marcan (malla Poisson del PE)"
+                title={t("bttsTitle")}
+                description={t("bttsDescription")}
               />
               <div className="grid gap-2">
                 <MarketChip
                   interactive={false}
                   selected={hybrid.btts.yes >= hybrid.btts.no}
-                  label="Sí"
+                  label={common("yes")}
                   value={`${Math.round(hybrid.btts.yes * 100)}%`}
                 />
                 <MarketChip
                   interactive={false}
                   selected={hybrid.btts.no > hybrid.btts.yes}
-                  label="No"
+                  label={common("no")}
                   value={`${Math.round(hybrid.btts.no * 100)}%`}
                 />
               </div>
@@ -139,18 +146,18 @@ export function PreviewPhase({ data, match }: PreviewPhaseProps) {
           </div>
 
           <Card>
-            <CardHeader title="Over / Under 2.5" />
+            <CardHeader title={t("ou25Title")} />
             <div className="grid gap-2 sm:grid-cols-2">
               <MarketChip
                 interactive={false}
                 selected={hybrid.overUnder25.over >= 0.5}
-                label="Over 2.5"
+                label={common("over25")}
                 value={`${Math.round(hybrid.overUnder25.over * 100)}%`}
               />
               <MarketChip
                 interactive={false}
                 selected={hybrid.overUnder25.under > hybrid.overUnder25.over}
-                label="Under 2.5"
+                label={common("under25")}
                 value={`${Math.round(hybrid.overUnder25.under * 100)}%`}
               />
             </div>
@@ -159,7 +166,7 @@ export function PreviewPhase({ data, match }: PreviewPhaseProps) {
           <OddsEvCard rows={dashboard.odds} />
 
           <DsExplanationPanel
-            title="Explicación generada por IA"
+            title={t("aiExplanation")}
             summary={analysis.explanation.summary}
             footnotes={analysis.explanation.caveats}
             defaultOpen
@@ -176,8 +183,11 @@ export function PreviewPhase({ data, match }: PreviewPhaseProps) {
           <Card className="flex flex-col items-center gap-4">
             <CardHeader
               className="mb-0 w-full"
-              title="Confianza"
-              description={`Banda ${confidenceLabel[analysis.confidence.band]} · ${analysis.apexScore.label}`}
+              title={t("confidenceTitle")}
+              description={t("confidenceBand", {
+                band: confidenceLabel[analysis.confidence.band],
+                label: analysis.apexScore.label,
+              })}
             />
             <ScoreGauge
               value={analysis.apexScore.value}

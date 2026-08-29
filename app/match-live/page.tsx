@@ -1,13 +1,11 @@
-import type { Metadata } from "next";
 import { ProductShell } from "@/components/app-shell/product-shell";
 import { MatchLiveView } from "@/components/apex-vision";
 import { getShellUser } from "@/lib/auth/get-shell-user";
+import { localeMetadata } from "@/lib/i18n/page-meta";
 
-export const metadata: Metadata = {
-  title: "APEX Vision — Match Live",
-  description:
-    "Seguimiento inmersivo de partidos con campo 2D, momentum y panel de IA.",
-};
+export async function generateMetadata() {
+  return localeMetadata("vision");
+}
 
 export default async function MatchLivePage() {
   const user = await getShellUser();

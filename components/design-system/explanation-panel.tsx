@@ -17,7 +17,7 @@ type ExplanationPanelProps = {
  * no model or API calls inside the DS.
  */
 export function ExplanationPanel({
-  title = "Explicación",
+  title = "Explanation",
   summary,
   children,
   footnotes,

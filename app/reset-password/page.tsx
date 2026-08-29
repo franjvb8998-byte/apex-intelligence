@@ -1,11 +1,10 @@
-import type { Metadata } from "next";
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 import { PageShell } from "@/components/layout/page-shell";
+import { localeMetadata } from "@/lib/i18n/page-meta";
 
-export const metadata: Metadata = {
-  title: "Restablecer contraseña — APEX Intelligence",
-  description: "Crea una nueva contraseña para tu cuenta de APEX Intelligence.",
-};
+export async function generateMetadata() {
+  return localeMetadata("auth.reset");
+}
 
 export default function ResetPasswordPage() {
   return (

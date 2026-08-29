@@ -1,11 +1,14 @@
+"use client";
+
+import { useLocale, useTranslations } from "next-intl";
 import { Card, CardHeader } from "@/components/design-system";
 import { summarizeHeadToHead } from "@/lib/match-center/prematch";
 import type { MatchCenterH2HMeeting } from "@/lib/match-center/types";
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string): string {
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return iso;
-  return new Date(ms).toLocaleDateString("es-ES", {
+  return new Date(ms).toLocaleDateString(locale, {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -22,27 +25,30 @@ type HeadToHeadCardProps = {
 };
 
 export function HeadToHeadCard({ meetings }: HeadToHeadCardProps) {
+  const t = useTranslations("matchCenter");
+  const common = useTranslations("common");
+  const locale = useLocale();
   const summary = summarizeHeadToHead(meetings);
   return (
     <Card>
       <CardHeader
-        title="Head-to-head"
-        description="Últimos 5 enfrentamientos del proveedor"
+        title={t("h2hTitle")}
+        description={t("h2hDescription")}
       />
       {meetings.length === 0 ? (
         <p className="text-sm text-[var(--apex-fg-muted)]">
-          Sin historial H2H en el catálogo para estos equipos.
+          {t("noH2h")}
         </p>
       ) : (
         <div className="space-y-4">
           {summary && (
             <dl className="grid grid-cols-3 gap-2 text-center sm:grid-cols-5">
-              <SummaryStat label="Local" value={String(summary.homeWins)} />
-              <SummaryStat label="Empates" value={String(summary.draws)} />
-              <SummaryStat label="Visit." value={String(summary.awayWins)} />
+              <SummaryStat label={t("homeWins")} value={String(summary.homeWins)} />
+              <SummaryStat label={t("draws")} value={String(summary.draws)} />
+              <SummaryStat label={t("awayWins")} value={String(summary.awayWins)} />
               <SummaryStat label="BTTS" value={pct(summary.bttsPct) ?? "—"} />
               <SummaryStat
-                label="Over 2.5"
+                label={common("over25")}
                 value={pct(summary.over25Pct) ?? "—"}
               />
             </dl>
@@ -62,7 +68,7 @@ export function HeadToHeadCard({ meetings }: HeadToHeadCardProps) {
                   {meeting.awayTeamName}
                 </p>
                 <p className="text-xs text-[var(--apex-fg-subtle)]">
-                  {formatDate(meeting.kickoffAt)}
+                  {formatDate(meeting.kickoffAt, locale)}
                 </p>
               </div>
             </li>

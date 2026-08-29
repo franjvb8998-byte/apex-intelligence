@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useTranslations } from "next-intl";
 import { cx } from "@/components/design-system/utils";
 
 type PromptBoxProps = {
@@ -12,8 +13,10 @@ type PromptBoxProps = {
 export function PromptBox({
   onSubmit,
   disabled = false,
-  placeholder = "Pregunta a APEX Copilot…",
+  placeholder,
 }: PromptBoxProps) {
+  const t = useTranslations("copilot");
+  const common = useTranslations("common");
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -49,7 +52,7 @@ export function PromptBox({
       className="rounded-[var(--apex-radius-2xl)] border border-[var(--apex-border-strong)] bg-[var(--apex-bg-elevated)] p-2 shadow-[var(--apex-shadow-sm)]"
     >
       <label className="sr-only" htmlFor="apex-copilot-prompt">
-        Mensaje
+        {t("messageLabel")}
       </label>
       <textarea
         id="apex-copilot-prompt"
@@ -57,7 +60,7 @@ export function PromptBox({
         rows={1}
         value={value}
         disabled={disabled}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t("placeholder")}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={handleKeyDown}
         className={cx(
@@ -67,14 +70,14 @@ export function PromptBox({
       />
       <div className="flex items-center justify-between gap-3 px-2 pb-1 pt-1">
         <p className="text-[11px] text-[var(--apex-fg-subtle)]">
-          Demo UI · sin OpenAI · Enter para enviar
+          {t("enterToSend")}
         </p>
         <button
           type="submit"
           disabled={disabled || !value.trim()}
           className="rounded-[var(--apex-radius-md)] bg-[var(--apex-accent)] px-3.5 py-1.5 text-sm font-medium text-[var(--apex-fg-inverse)] transition-opacity disabled:cursor-not-allowed disabled:opacity-40 hover:opacity-90"
         >
-          Enviar
+          {common("send")}
         </button>
       </div>
     </form>

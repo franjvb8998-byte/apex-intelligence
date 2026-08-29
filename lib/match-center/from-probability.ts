@@ -6,13 +6,12 @@
 import {
   createEloPoissonHybridEngine,
   mostLikelyOutcome,
-  normalizedEntropy,
   bothTeamsToScoreFromLambdas,
+  confidenceFromHybrid,
   type HybridProbabilityResult,
   type ProbabilityEngine,
   type TeamEloInput,
 } from "@/lib/intelligence/modules/probability";
-import type { ConfidenceScore, MatchOutcome } from "@/lib/intelligence/types";
 import { explainPrediction } from "@/lib/explainable-ai/engine";
 import type { MatchAnalysisData } from "@/lib/match-analysis/types";
 import { placeholderPreviewDashboard } from "@/lib/match-center/dashboard";
@@ -20,6 +19,12 @@ import type {
   MatchCenterPreviewData,
   MatchCenterTeam,
 } from "@/lib/match-center/types";
+import { buildIntelligenceReport } from "@/lib/intelligence-report";
+import { rateMatch } from "@/lib/match-rating";
+import {
+  apexScoreFromScoring,
+  scoreMatchSelection,
+} from "@/lib/scoring-engine/from-match";
 
 export type PreviewNarrativeOverlay = {
   keyFactors: MatchAnalysisData["keyFactors"];
@@ -38,71 +43,11 @@ export type PreviewBuildContext = {
   eloInput: TeamEloInput;
   narrative: PreviewNarrativeOverlay;
   source?: MatchCenterPreviewData["source"];
+  /** Caller attaches Scoring Engine v2 after Match Center extras exist. */
+  skipPlatformScore?: boolean;
 };
 
-function clamp01(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  return Math.min(1, Math.max(0, value));
-}
-
-/**
- * Map PE uncertainty → ConfidenceScore for UI.
- * Lower entropy ⇒ higher confidence.
- */
-export function confidenceFromHybrid(
-  result: HybridProbabilityResult,
-): ConfidenceScore {
-  const entropy = normalizedEntropy(result.oneXTwo);
-  const value = clamp01(1 - entropy);
-  const band: ConfidenceScore["band"] =
-    value >= 0.75 ? "high" : value >= 0.45 ? "medium" : "low";
-  return { value, band };
-}
-
-function apexScoreFromHybrid(
-  result: HybridProbabilityResult,
-  predicted: MatchOutcome,
-  label?: string,
-): MatchAnalysisData["apexScore"] {
-  const lead = result.oneXTwo[predicted];
-  const clarity = Math.round(clamp01(lead - 1 / 3) * 180 + 40);
-  const model = Math.round(clamp01(1 - normalizedEntropy(result.oneXTwo)) * 100);
-  const edge = Math.round(clamp01(result.overUnder25.over) * 40 + 50);
-  const value = Math.round(
-    Math.min(100, Math.max(0, model * 0.4 + clarity * 0.35 + edge * 0.25)),
-  );
-
-  return {
-    value,
-    label:
-      label ??
-      (predicted === "home"
-        ? "Señal a favor del local"
-        : predicted === "away"
-          ? "Señal a favor del visitante"
-          : "Señal equilibrada / empate"),
-    components: [
-      {
-        key: "model",
-        label: "Convicción del modelo",
-        value: model,
-        weight: 0.4,
-      },
-      {
-        key: "edge",
-        label: "Claridad 1X2",
-        value: Math.min(100, clarity),
-        weight: 0.35,
-      },
-      {
-        key: "ou",
-        label: "Perfil Over 2.5",
-        value: Math.min(100, edge),
-        weight: 0.25,
-      },
-    ],
-  };
-}
+export { confidenceFromHybrid };
 
 /**
  * Pure map: HybridProbabilityResult → MatchAnalysisData.
@@ -114,13 +59,34 @@ export function mapHybridToMatchAnalysis(
 ): MatchAnalysisData {
   const predictedOutcome = mostLikelyOutcome(result.oneXTwo);
   const confidence = confidenceFromHybrid(result);
+  const predictedLabel =
+    predictedOutcome === "home"
+      ? `Victoria ${context.homeTeam.name}`
+      : predictedOutcome === "away"
+        ? `Victoria ${context.awayTeam.name}`
+        : "Empate";
+  const rating = rateMatch({
+    predictedOutcome,
+    predictedLabel,
+    oneXTwo: result.oneXTwo,
+    expectedGoals: result.expectedGoals,
+    confidence,
+    decimalOdds: null,
+    bookmakerCount: 0,
+    home: { form: null, recent: [], goalsFor: null, goalsAgainst: null, played: null },
+    away: { form: null, recent: [], goalsFor: null, goalsAgainst: null, played: null },
+    standings: { home: null, away: null },
+    injuries: [],
+    eloWinExpectancyHome: result.elo.winExpectancyHome,
+    headline: context.narrative.apexScoreLabel,
+  });
   const btts = bothTeamsToScoreFromLambdas({
     lambdaHome: result.poisson.lambdaHome,
     lambdaAway: result.poisson.lambdaAway,
     maxGoals: result.meta.config.maxGoals,
   });
 
-  return {
+  const analysis: Omit<MatchAnalysisData, "report" | "decision"> = {
     matchId: context.matchId,
     leagueName: context.leagueName,
     kickoffAt: context.kickoffAt,
@@ -130,11 +96,8 @@ export function mapHybridToMatchAnalysis(
     oneXTwo: result.oneXTwo,
     predictedOutcome,
     confidence,
-    apexScore: apexScoreFromHybrid(
-      result,
-      predictedOutcome,
-      context.narrative.apexScoreLabel,
-    ),
+    rating,
+    apexScore: { value: 0, label: "", components: [] },
     markets: [
       {
         id: "m-1x2",
@@ -218,6 +181,17 @@ export function mapHybridToMatchAnalysis(
     },
     matchMetrics: { home: null, away: null },
     expectedGoals: result.expectedGoals,
+  };
+  if (context.skipPlatformScore) {
+    return analysis as MatchAnalysisData;
+  }
+  const { decision, scoring } = scoreMatchSelection({ analysis });
+  return {
+    ...analysis,
+    decision,
+    scoring,
+    apexScore: apexScoreFromScoring(scoring),
+    report: buildIntelligenceReport({ data: analysis }),
   };
 }
 

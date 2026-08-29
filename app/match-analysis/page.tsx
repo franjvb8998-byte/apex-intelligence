@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { ApiQuotaCard } from "@/components/app-shell/api-quota-card";
 import { ProductShell } from "@/components/app-shell/product-shell";
 import { DashboardMatchList } from "@/components/dashboard";
 import { getShellUser } from "@/lib/auth/get-shell-user";
-import { loadUnlessQuota } from "@/lib/data-platform/providers/api-football/quota";
+import { loadUnlessQuota } from "@/lib/repositories";
+import { localeMetadata } from "@/lib/i18n/page-meta";
 import { listMatchAnalysisFixtures } from "@/lib/match-analysis/load";
 import {
   firstSearchParam,
@@ -13,11 +14,9 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Match Analysis — APEX Intelligence",
-  description:
-    "Análisis del fixture seleccionado: clasificación, forma, H2H, goles y métricas.",
-};
+export async function generateMetadata() {
+  return localeMetadata("matchAnalysis");
+}
 
 type MatchAnalysisPageProps = {
   searchParams: Promise<{
@@ -37,6 +36,7 @@ export default async function MatchAnalysisPage({
   }
 
   const user = await getShellUser();
+  const t = await getTranslations("matchAnalysis");
   const loaded = await loadUnlessQuota(() =>
     listMatchAnalysisFixtures({ requireProvider: true }),
   );
@@ -46,10 +46,10 @@ export default async function MatchAnalysisPage({
       <div className="w-full space-y-6">
         {loaded.ok ? (
           <DashboardMatchList
-            title="Match Analysis"
-            description="Elige un fixture de API-Football para ver clasificación, forma, H2H y métricas."
+            title={t("pickerTitle")}
+            description={t("pickerDescription")}
             matches={loaded.data}
-            emptyLabel="API-Football no devolvió fixtures para hoy ni Premier League 2025."
+            emptyLabel={t("pickerEmpty")}
             hrefForFixture={matchAnalysisHref}
           />
         ) : (

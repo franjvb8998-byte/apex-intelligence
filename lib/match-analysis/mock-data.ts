@@ -1,5 +1,8 @@
 import type { MatchAnalysisData } from "@/lib/match-analysis/types";
 import { getMockExplainablePrediction } from "@/lib/explainable-ai/mock";
+import { buildIntelligenceReport } from "@/lib/intelligence-report";
+import { scoreMatchSelection, apexScoreFromScoring } from "@/lib/scoring-engine/from-match";
+import { rateMatch } from "@/lib/match-rating";
 
 /**
  * Simulated Match Analysis payload.
@@ -12,7 +15,33 @@ export function getMockMatchAnalysis(): MatchAnalysisData {
     awayName: "Southport United",
   });
 
-  return {
+  const rating = rateMatch({
+    predictedOutcome: "home",
+    predictedLabel: "Victoria Northbridge FC",
+    oneXTwo: { home: 0.48, draw: 0.27, away: 0.25 },
+    expectedGoals: { home: 1.55, away: 1.1, total: 2.65 },
+    confidence: { value: 0.62, band: "medium" },
+    decimalOdds: 2.05,
+    bookmakerCount: 1,
+    home: {
+      form: "WWWDW",
+      recent: [],
+      goalsFor: null,
+      goalsAgainst: null,
+      played: null,
+    },
+    away: {
+      form: "LDLWL",
+      recent: [],
+      goalsFor: null,
+      goalsAgainst: null,
+      played: null,
+    },
+    standings: { home: null, away: null },
+    injuries: [{ teamSide: "home" }],
+  });
+
+  const data: Omit<MatchAnalysisData, "report" | "decision"> = {
     matchId: "apex:mock:match:demo-1001",
     leagueName: "Premier League",
     kickoffAt: "2026-08-15T18:00:00.000Z",
@@ -38,15 +67,6 @@ export function getMockMatchAnalysis(): MatchAnalysisData {
     confidence: {
       value: 0.62,
       band: "medium",
-    },
-    apexScore: {
-      value: 71,
-      label: "Señal moderada a favor del local",
-      components: [
-        { key: "model", label: "Convicción del modelo", value: 74, weight: 0.4 },
-        { key: "edge", label: "Claridad 1X2", value: 68, weight: 0.3 },
-        { key: "stability", label: "Estabilidad de factores", value: 70, weight: 0.3 },
-      ],
     },
     markets: [
       {
@@ -167,5 +187,15 @@ export function getMockMatchAnalysis(): MatchAnalysisData {
     },
     matchMetrics: { home: null, away: null },
     expectedGoals: { home: 1.55, away: 1.1, total: 2.65 },
+    rating,
+    apexScore: { value: 0, label: "", components: [] },
+  };
+  const { decision, scoring } = scoreMatchSelection({ analysis: data });
+  return {
+    ...data,
+    decision,
+    scoring,
+    apexScore: apexScoreFromScoring(scoring),
+    report: buildIntelligenceReport({ data }),
   };
 }

@@ -2,18 +2,19 @@
  * Match Center fixtures for Add Bet (logos + suggested odds).
  */
 
-import { createApiFootballDataProvider, type IDataProvider } from "@/lib/data-platform";
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
-import { RECORDED_API_FOOTBALL_FIXTURE_ID } from "@/lib/data-platform/providers/api-football/fixtures";
-import { loadUnlessQuota } from "@/lib/data-platform/providers/api-football/quota";
 import { matchSummaryFromBundle } from "@/lib/dashboard/map";
 import { suggestedOddsFromQuotes } from "@/lib/bankroll/odds-from-fixture";
 import type { BankrollFixture } from "@/lib/bankroll/types";
 import { fixtureIdFromMatch } from "@/lib/match-center/fixture-id";
+import { listMatchCenterFixtureBundles } from "@/lib/match-center";
 import {
-  listMatchCenterFixtureBundles,
-  resolveMatchCenterProvider,
-} from "@/lib/match-center";
+  createRecordedDataProvider,
+  createRepositories,
+  loadUnlessQuota,
+  RECORDED_API_FOOTBALL_FIXTURE_ID,
+  type ApexRepositories,
+} from "@/lib/repositories";
 
 function toBankrollFixture(bundle: ApexMatchBundle): BankrollFixture {
   return {
@@ -23,16 +24,14 @@ function toBankrollFixture(bundle: ApexMatchBundle): BankrollFixture {
   };
 }
 
-function recordedOddsProvider(): IDataProvider {
-  return createApiFootballDataProvider({
-    apiKey: null,
-    fallback: "recorded",
-    enrichMatch: true,
+function recordedOddsRepos(): ApexRepositories {
+  return createRepositories({
+    provider: createRecordedDataProvider({ enrichMatch: true }),
   });
 }
 
 async function attachOdds(
-  provider: IDataProvider,
+  repos: ApexRepositories,
   bundle: ApexMatchBundle,
 ): Promise<ApexMatchBundle> {
   const matchId = fixtureIdFromMatch({
@@ -41,7 +40,7 @@ async function attachOdds(
   });
   if (!matchId) return bundle;
   try {
-    const full = await provider.getMatch({ matchId });
+    const full = await repos.fixtures.getById(matchId);
     if (full.odds.length === 0) return bundle;
     return {
       ...bundle,
@@ -54,12 +53,12 @@ async function attachOdds(
 }
 
 async function enrichOdds(
-  provider: IDataProvider,
+  repos: ApexRepositories,
   bundles: ApexMatchBundle[],
 ): Promise<ApexMatchBundle[]> {
   if (bundles.length !== 1 || bundles[0]!.odds.length > 0) return bundles;
   const first = bundles[0]!;
-  let next = await attachOdds(provider, first);
+  let next = await attachOdds(repos, first);
   const vendorId = fixtureIdFromMatch({
     id: first.match.id,
     externalId: first.match.externalRefs[0]?.externalId ?? null,
@@ -68,27 +67,27 @@ async function enrichOdds(
     next.odds.length === 0 &&
     vendorId === RECORDED_API_FOOTBALL_FIXTURE_ID
   ) {
-    next = await attachOdds(recordedOddsProvider(), first);
+    next = await attachOdds(recordedOddsRepos(), first);
   }
   return [next];
 }
 
 async function recordedFixtures(): Promise<BankrollFixture[]> {
-  const provider = recordedOddsProvider();
+  const repos = recordedOddsRepos();
   const bundles = await enrichOdds(
-    provider,
-    await listMatchCenterFixtureBundles({ provider }),
+    repos,
+    await listMatchCenterFixtureBundles({ provider: createRecordedDataProvider() }),
   );
   return bundles.map(toBankrollFixture);
 }
 
 export async function loadBankrollFixtures(): Promise<BankrollFixture[]> {
-  const provider = resolveMatchCenterProvider();
+  const repos = createRepositories();
   const live = await loadUnlessQuota(() =>
-    listMatchCenterFixtureBundles({ provider }),
+    listMatchCenterFixtureBundles(),
   );
   if (live.ok && live.data.length > 0) {
-    const bundles = await enrichOdds(provider, live.data);
+    const bundles = await enrichOdds(repos, live.data);
     return bundles.map(toBankrollFixture);
   }
   try {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useTranslations } from "next-intl";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Badge,
@@ -61,18 +62,21 @@ function ProbabilityImpactGrid({
   homeShort: string;
   awayShort: string;
 }) {
+  const t = useTranslations("vision");
+  const common = useTranslations("common");
   return (
     <div className="grid gap-1.5 rounded-[var(--apex-radius-md)] border border-[var(--apex-border)] bg-slate-950/40 p-3">
-      <ImpactRow label={`${homeShort} win`} value={impact.homeWin} />
-      <ImpactRow label="Empate" value={impact.draw} />
-      <ImpactRow label={`${awayShort} win`} value={impact.awayWin} />
-      <ImpactRow label="Over 2.5" value={impact.over25} />
+      <ImpactRow label={t("winSuffix", { team: homeShort })} value={impact.homeWin} />
+      <ImpactRow label={common("draw")} value={impact.draw} />
+      <ImpactRow label={t("winSuffix", { team: awayShort })} value={impact.awayWin} />
+      <ImpactRow label={common("over25")} value={impact.over25} />
       <ImpactRow label="BTTS" value={impact.btts} />
     </div>
   );
 }
 
 function WhyChangedPanel({ factors }: { factors: TimelineChangeFactor[] }) {
+  const t = useTranslations("vision");
   return (
     <ul className="space-y-2">
       {factors.map((factor) => (
@@ -92,10 +96,10 @@ function WhyChangedPanel({ factors }: { factors: TimelineChangeFactor[] }) {
               }
             >
               {factor.direction === "positive"
-                ? "A favor"
+                ? t("for")
                 : factor.direction === "negative"
-                  ? "En contra"
-                  : "Neutral"}
+                  ? t("against")
+                  : t("neutral")}
             </Badge>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-[var(--apex-fg-muted)]">
@@ -118,6 +122,7 @@ function TimelineEventCard({
   awayShort: string;
   isLatest: boolean;
 }) {
+  const t = useTranslations("vision");
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const momentumPositive = event.momentumDelta >= 0;
@@ -194,7 +199,7 @@ function TimelineEventCard({
             </div>
             <div>
               <p className="mb-1 text-[11px] uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-                Explicación de la IA
+                {t("aiExplanation")}
               </p>
               <p className="text-sm leading-relaxed text-[var(--apex-fg-muted)]">
                 {event.aiExplanation}
@@ -210,7 +215,7 @@ function TimelineEventCard({
           aria-controls={panelId}
           onClick={() => setOpen((value) => !value)}
         >
-          ¿Por qué cambió?
+          {t("whyChanged")}
           <span
             className={cx(
               "ml-2 transition-transform duration-[var(--apex-duration-normal)]",
@@ -253,16 +258,17 @@ export function IntelligenceTimeline({
   homeShort,
   awayShort,
 }: IntelligenceTimelineProps) {
+  const t = useTranslations("vision");
   return (
     <Card>
       <CardHeader
-        title="APEX Intelligence Timeline™"
-        description="Registro cronológico con impacto, momentum y factores de cambio"
+        title={t("timelineTitle")}
+        description={t("timelineDescription")}
         action={<Badge tone="accent">Live</Badge>}
       />
 
       {events.length === 0 ? (
-        <p className="text-sm text-[var(--apex-fg-muted)]">Sin eventos aún.</p>
+        <p className="text-sm text-[var(--apex-fg-muted)]">{t("noEvents")}</p>
       ) : (
         <ol
           className="max-h-[40rem] overflow-y-auto pr-1"

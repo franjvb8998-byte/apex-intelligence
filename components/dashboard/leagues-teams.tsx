@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { Card, CardHeader } from "@/components/design-system/card";
 import { TeamLogo } from "@/components/design-system/team-logo";
 import type {
@@ -9,16 +10,17 @@ type DashboardLeaguesProps = {
   leagues: DashboardLeagueSummary[];
 };
 
-export function DashboardLeagues({ leagues }: DashboardLeaguesProps) {
+export async function DashboardLeagues({ leagues }: DashboardLeaguesProps) {
+  const t = await getTranslations("dashboard");
   return (
     <Card padding="md" className="h-full">
       <CardHeader
-        title="Ligas"
-        description="Derivadas del catálogo del provider activo."
+        title={t("leaguesTitle")}
+        description={t("leaguesDescription")}
       />
       {leagues.length === 0 ? (
         <p className="text-sm text-[var(--apex-fg-muted)]">
-          Sin ligas en el catálogo actual.
+          {t("leaguesEmpty")}
         </p>
       ) : (
         <ul className="space-y-3">
@@ -45,16 +47,17 @@ type DashboardFeaturedTeamsProps = {
   teams: DashboardTeamSummary[];
 };
 
-export function DashboardFeaturedTeams({ teams }: DashboardFeaturedTeamsProps) {
+export async function DashboardFeaturedTeams({ teams }: DashboardFeaturedTeamsProps) {
+  const t = await getTranslations("dashboard");
   return (
     <Card padding="md" className="h-full">
       <CardHeader
-        title="Equipos destacados"
-        description="Equipos presentes en los partidos cargados."
+        title={t("teamsTitle")}
+        description={t("teamsDescription")}
       />
       {teams.length === 0 ? (
         <p className="text-sm text-[var(--apex-fg-muted)]">
-          Sin equipos en el catálogo actual.
+          {t("teamsEmpty")}
         </p>
       ) : (
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">

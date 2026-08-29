@@ -1,5 +1,5 @@
-import { LoadingState } from "@/components/app-shell/states";
+import { TranslatedLoading } from "@/components/i18n/translated-loading";
 
 export default function BankrollLoading() {
-  return <LoadingState label="Cargando bankroll…" rows={4} />;
+  return <TranslatedLoading messageKey="bankroll" rows={4} />;
 }

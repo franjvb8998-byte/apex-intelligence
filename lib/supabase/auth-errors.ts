@@ -1,52 +1,60 @@
-export function getAuthErrorMessage(error: string): string {
+export type AuthErrorKey =
+  | "invalidCredentials"
+  | "userExists"
+  | "emailNotConfirmed"
+  | "samePassword"
+  | "tokenExpired"
+  | "rateLimit"
+  | "redirectMismatch"
+  | "passwordRequirements"
+  | "generic";
+
+export function getAuthErrorKey(error: string): AuthErrorKey {
   const normalized = error.toLowerCase();
 
   if (normalized.includes("invalid login credentials")) {
-    return "Email o contraseña incorrectos.";
+    return "invalidCredentials";
   }
-
   if (normalized.includes("user already registered")) {
-    return "Ya existe una cuenta con este email.";
+    return "userExists";
   }
-
   if (normalized.includes("email not confirmed")) {
-    return "Confirma tu email antes de iniciar sesión.";
+    return "emailNotConfirmed";
   }
-
   if (
     normalized.includes("different from the old password") ||
     normalized.includes("same password")
   ) {
-    return "La nueva contraseña debe ser distinta a la anterior.";
+    return "samePassword";
   }
-
   if (
     normalized.includes("session missing") ||
     normalized.includes("invalid token") ||
     normalized.includes("token has expired") ||
     normalized.includes("otp_expired")
   ) {
-    return "El enlace de recuperación no es válido o ha expirado. Solicita uno nuevo.";
+    return "tokenExpired";
   }
-
   if (
     normalized.includes("rate limit") ||
     normalized.includes("for security purposes") ||
     normalized.includes("over_email_send_rate_limit")
   ) {
-    return "Espera un minuto antes de solicitar otro enlace.";
+    return "rateLimit";
   }
-
   if (
     normalized.includes("redirect_to") ||
     normalized.includes("redirect uri mismatch")
   ) {
-    return "La URL de recuperación no está permitida. Añade http://localhost:3000/reset-password en Redirect URLs de Supabase.";
+    return "redirectMismatch";
   }
-
   if (normalized.includes("password")) {
-    return "La contraseña no cumple los requisitos de seguridad.";
+    return "passwordRequirements";
   }
+  return "generic";
+}
 
-  return "Ha ocurrido un error. Inténtalo de nuevo.";
+/** @deprecated Prefer getAuthErrorKey + next-intl. Kept for non-UI callers. */
+export function getAuthErrorMessage(error: string): string {
+  return getAuthErrorKey(error);
 }

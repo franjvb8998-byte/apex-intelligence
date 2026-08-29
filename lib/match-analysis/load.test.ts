@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { mapOpportunityFromCenter } from "@/lib/apex-opportunities/map";
 import { RECORDED_API_FOOTBALL_FIXTURE_ID } from "@/lib/data-platform";
 import { getMatchAnalysisData } from "@/lib/match-analysis/load";
+import { loadMatchCenterFromApiFootball } from "@/lib/match-center/load";
 import {
   matchMetricsFromFixtureStatistics,
   positionFromStandings,
@@ -83,6 +85,24 @@ describe("Match Analysis ← API-Football", () => {
     expect(data.matchMetrics.home?.possession).toBe(58);
     expect(data.matchMetrics.away?.expectedGoals).toBeCloseTo(0.94);
     expect(data.expectedGoals.total).toBeGreaterThan(0);
+    expect(data.rating.metrics).toHaveLength(10);
+    expect(data.rating.overall).toBeGreaterThanOrEqual(0);
+    expect(data.scoring?.engineId).toBe("scoring-v2");
+    expect(data.scoring?.overall).toBe(data.apexScore.value);
+
+    const center = await loadMatchCenterFromApiFootball({
+      env: {},
+      externalMatchId: RECORDED_API_FOOTBALL_FIXTURE_ID,
+    });
+    const row = mapOpportunityFromCenter(center);
+    expect(row?.score).toBe(data.scoring?.overall);
+    expect(row?.recommendation).toBe(data.scoring?.recommendation.tier);
+    expect(center.preview.analysis.scoring?.overall).toBe(data.scoring?.overall);
+
+    expect(data.decision.reasonsAgainst.length).toBeGreaterThan(0);
+    expect(data.report.breakdown).toHaveLength(9);
+    expect(data.report.narrative.length).toBeGreaterThan(20);
+    expect(data.twins).toBeDefined();
     expect(data.oneXTwo.home + data.oneXTwo.draw + data.oneXTwo.away).toBeCloseTo(
       1,
     );

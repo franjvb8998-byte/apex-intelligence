@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import {
   Badge,
   Card,
@@ -14,14 +17,6 @@ const riskTone = {
   high: "danger" as const,
 };
 
-const actionLabel = {
-  bet: "Apostar",
-  pass: "Pasar",
-  watch: "Observar",
-  reduce_stake: "Reducir stake",
-  other: "Otra",
-} as const;
-
 type AiMatchAnalysisPanelProps = {
   analysis: MatchAnalysis;
 };
@@ -31,13 +26,22 @@ type AiMatchAnalysisPanelProps = {
  * Displays Sprint 8 MatchAnalysis + Sprint 10 Explainable AI (rules, no OpenAI).
  */
 export function AiMatchAnalysisPanel({ analysis }: AiMatchAnalysisPanelProps) {
+  const t = useTranslations("matchCenter");
+  const common = useTranslations("common");
   const { prediction, confidence, riskLevel, expectedGoals, recommendation } =
     analysis;
+  const actionLabel = {
+    bet: t("actionBet"),
+    pass: t("actionPass"),
+    watch: t("actionWatch"),
+    reduce_stake: t("actionReduce"),
+    other: t("actionOther"),
+  } as const;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge tone="accent">AI Match Analysis</Badge>
+        <Badge tone="accent">{t("aiMatchAnalysis")}</Badge>
         <Badge>PE · {prediction.modelVersion}</Badge>
         <Badge tone="info">Reasoning · rules</Badge>
         <Badge tone={riskTone[riskLevel]}>Risk {riskLevel}</Badge>
@@ -47,7 +51,7 @@ export function AiMatchAnalysisPanel({ analysis }: AiMatchAnalysisPanelProps) {
         <div className="space-y-6 lg:col-span-3">
           <Card>
             <CardHeader
-              title="Prediction"
+              title={t("prediction")}
               description={prediction.label}
               action={
                 <Badge tone="accent">
@@ -65,7 +69,7 @@ export function AiMatchAnalysisPanel({ analysis }: AiMatchAnalysisPanelProps) {
 
           <Card>
             <CardHeader
-              title="Tactical Summary"
+              title={t("tacticalSummary")}
               description={analysis.recentForm.summary}
             />
             <ul className="space-y-3">
@@ -83,15 +87,15 @@ export function AiMatchAnalysisPanel({ analysis }: AiMatchAnalysisPanelProps) {
           </Card>
 
           <Card>
-            <CardHeader title="Key Factors" description="Fortalezas y debilidades" />
+            <CardHeader title={t("keyFactors")} description={t("strengthsWeaknesses")} />
             <div className="grid gap-4 sm:grid-cols-2">
-              <FactorColumn title="Strengths" items={analysis.strengths} />
-              <FactorColumn title="Weaknesses" items={analysis.weaknesses} />
+              <FactorColumn title={t("strengths")} items={analysis.strengths} />
+              <FactorColumn title={t("weaknesses")} items={analysis.weaknesses} />
             </div>
           </Card>
 
           <DsExplanationPanel
-            title="Explainability"
+            title={t("explainability")}
             summary={analysis.explainability.summary}
             footnotes={analysis.explainability.caveats}
             defaultOpen
@@ -104,7 +108,10 @@ export function AiMatchAnalysisPanel({ analysis }: AiMatchAnalysisPanelProps) {
 
         <div className="space-y-6 lg:col-span-2">
           <Card>
-            <CardHeader title="Confidence" description={`Banda ${confidence.band}`} />
+            <CardHeader
+              title={t("confidenceTitle")}
+              description={t("bandLine", { band: confidence.band })}
+            />
             <ConfidenceIndicator
               value={confidence.value}
               band={confidence.band}
@@ -113,17 +120,17 @@ export function AiMatchAnalysisPanel({ analysis }: AiMatchAnalysisPanelProps) {
           </Card>
 
           <Card>
-            <CardHeader title="Expected Goals" description="λ home / away / total" />
+            <CardHeader title={t("expectedGoals")} description={t("xgHomeAwayTotal")} />
             <dl className="grid grid-cols-3 gap-3 text-center">
-              <XgStat label="Home" value={expectedGoals.home} />
-              <XgStat label="Away" value={expectedGoals.away} />
+              <XgStat label={common("home")} value={expectedGoals.home} />
+              <XgStat label={common("away")} value={expectedGoals.away} />
               <XgStat label="Total" value={expectedGoals.total} />
             </dl>
           </Card>
 
           <Card>
             <CardHeader
-              title="Recommendation"
+              title={t("recommendation")}
               description={actionLabel[recommendation.action]}
               action={<Badge tone="accent">{recommendation.priority}</Badge>}
             />
@@ -141,20 +148,19 @@ export function AiMatchAnalysisPanel({ analysis }: AiMatchAnalysisPanelProps) {
               description={
                 analysis.valueBet
                   ? `${analysis.valueBet.market} · ${analysis.valueBet.selection}`
-                  : "Sin edge claro"
+                  : t("noClearEdge")
               }
             />
             {analysis.valueBet ? (
               <div className="space-y-2 text-sm text-[var(--apex-fg-muted)]">
                 <p>
-                  Modelo{" "}
-                  <span className="text-[var(--apex-fg)]">
-                    {(analysis.valueBet.modelProbability * 100).toFixed(0)}%
-                  </span>
+                  {t("modelPct", {
+                    pct: (analysis.valueBet.modelProbability * 100).toFixed(0),
+                  })}
                   {analysis.valueBet.impliedProbability != null && (
                     <>
                       {" "}
-                      · Implícita{" "}
+                      · {t("implied")}{" "}
                       {(analysis.valueBet.impliedProbability * 100).toFixed(0)}%
                     </>
                   )}
@@ -171,14 +177,14 @@ export function AiMatchAnalysisPanel({ analysis }: AiMatchAnalysisPanelProps) {
               </div>
             ) : (
               <p className="text-sm text-[var(--apex-fg-muted)]">
-                No hay value bet con umbral de edge suficiente.
+                {t("noValueBet")}
               </p>
             )}
           </Card>
 
           {(analysis.keyPlayers.length > 0 || analysis.injuries.length > 0) && (
             <Card>
-              <CardHeader title="Plantilla" description="Key players / injuries" />
+              <CardHeader title={t("squad")} description="Key players / injuries" />
               {analysis.keyPlayers.length > 0 && (
                 <ul className="mb-3 space-y-1">
                   {analysis.keyPlayers.map((p) => (
@@ -194,7 +200,7 @@ export function AiMatchAnalysisPanel({ analysis }: AiMatchAnalysisPanelProps) {
               )}
               {analysis.injuries.length === 0 ? (
                 <p className="text-xs text-[var(--apex-fg-subtle)]">
-                  Sin lesiones reportadas en el catálogo.
+                  {t("noPublishedInjuries")}
                 </p>
               ) : (
                 <ul className="space-y-1">

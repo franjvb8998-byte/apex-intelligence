@@ -102,3 +102,4 @@ Bridge futuro (sin acoplar ahora): adaptar `SystemPrediction` → `PredictionRec
 | `lib/intelligence/modules/learning` | Stub de contrato antiguo del core |
 | `lib/learning-engine` | **Motor oficial de aprendizaje post-partido** |
 | Probability Engine | Genera predicciones; no se modifica aquí |
+| Intelligence Learning System | Recomendaciones Scoring Engine v2, ROI y calibración de apuesta. Ver [`docs/INTELLIGENCE_LEARNING.md`](./INTELLIGENCE_LEARNING.md) |

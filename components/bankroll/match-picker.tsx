@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useTranslations } from "next-intl";
 import { TeamLogo } from "@/components/design-system";
 import { cx } from "@/components/design-system/utils";
 import { formatKickoff } from "@/lib/bankroll/format";
@@ -19,6 +20,7 @@ export function MatchPicker({
   selectedId,
   onSelect,
 }: MatchPickerProps) {
+  const t = useTranslations("bankroll");
   const listId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -96,7 +98,7 @@ export function MatchPicker({
           <MatchRow match={selected} />
         ) : (
           <span className="text-[var(--apex-fg-subtle)]">
-            Buscar equipo o elegir fixture…
+            {t("pickFixture")}
           </span>
         )}
       </button>
@@ -108,7 +110,7 @@ export function MatchPicker({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onSearchKey}
-            placeholder="Buscar por equipo"
+            placeholder={t("searchTeam")}
             className="h-11 w-full border-b border-[var(--apex-border)] bg-transparent px-3 text-sm text-[var(--apex-fg)] outline-none placeholder:text-[var(--apex-fg-subtle)]"
             aria-autocomplete="list"
             aria-controls={listId}
@@ -121,8 +123,8 @@ export function MatchPicker({
             {filtered.length === 0 ? (
               <li className="px-3 py-6 text-center text-sm text-[var(--apex-fg-muted)]">
                 {fixtures.length === 0
-                  ? "No hay fixtures de Match Center."
-                  : `Sin equipos para “${query}”.`}
+                  ? t("noFixtures")
+                  : t("noTeamsFor", { query })}
               </li>
             ) : (
               filtered.map((match, index) => {
@@ -158,12 +160,13 @@ export function MatchPicker({
 }
 
 function MatchRow({ match }: { match: BankrollFixture }) {
+  const common = useTranslations("common");
   return (
     <span className="flex min-w-0 flex-1 items-center gap-2">
       {match.leagueLogoUrl ? (
         <TeamLogo
           src={match.leagueLogoUrl}
-          name={match.leagueName ?? "Liga"}
+          name={match.leagueName ?? common("league")}
           size="sm"
         />
       ) : null}
@@ -184,7 +187,7 @@ function MatchRow({ match }: { match: BankrollFixture }) {
           {matchLabel(match)}
         </span>
         <span className="mt-0.5 block truncate text-[11px] text-[var(--apex-fg-muted)]">
-          {match.leagueName ?? "Liga"} · {formatKickoff(match.kickoffAt)}
+          {match.leagueName ?? common("league")} · {formatKickoff(match.kickoffAt)}
         </span>
       </span>
     </span>

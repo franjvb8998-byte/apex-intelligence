@@ -1,5 +1,5 @@
-import { LoadingState } from "@/components/app-shell/states";
+import { TranslatedLoading } from "@/components/i18n/translated-loading";
 
 export default function MatchAnalysisFixtureLoading() {
-  return <LoadingState label="Cargando análisis del partido…" rows={4} />;
+  return <TranslatedLoading messageKey="matchAnalysisFixture" rows={4} />;
 }

@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import {
   Badge,
   Card,
@@ -26,15 +29,18 @@ function formatEv(value: number | null): { text: string; positive: boolean | nul
   return { text: `${sign}${pct.toFixed(1)}%`, positive: pct >= 0 };
 }
 
-function selectionLabel(row: MatchCenterOddsRow): string {
+function selectionLabel(
+  row: MatchCenterOddsRow,
+  t: ReturnType<typeof useTranslations<"common">>,
+): string {
   const key = row.selection.toLowerCase();
-  if (key === "home" || key === "1") return "Local";
-  if (key === "draw" || key === "x") return "Empate";
-  if (key === "away" || key === "2") return "Visitante";
-  if (key.startsWith("over")) return "Over 2.5";
-  if (key.startsWith("under")) return "Under 2.5";
-  if (key === "yes" || key === "si" || key === "sí") return "Sí";
-  if (key === "no") return "No";
+  if (key === "home" || key === "1") return t("home");
+  if (key === "draw" || key === "x") return t("draw");
+  if (key === "away" || key === "2") return t("away");
+  if (key.startsWith("over")) return t("over25");
+  if (key.startsWith("under")) return t("under25");
+  if (key === "yes" || key === "si" || key === "sí") return t("yes");
+  if (key === "no") return t("no");
   return row.label;
 }
 
@@ -43,6 +49,8 @@ type OddsEvCardProps = {
 };
 
 export function OddsEvCard({ rows }: OddsEvCardProps) {
+  const t = useTranslations("matchCenter");
+  const common = useTranslations("common");
   const board = preMatchOddsBoard(rows);
   const bestRows = [
     ...board.oneXTwo,
@@ -51,17 +59,17 @@ export function OddsEvCard({ rows }: OddsEvCardProps) {
   ];
   const bookmakerLabel =
     board.bookmakerCount > 1
-      ? `${board.bookmakerCount} casas`
+      ? t("bookmakers", { count: board.bookmakerCount })
       : bestRows.find((row) => row.bookmaker)?.bookmaker;
 
   return (
     <Card>
       <CardHeader
-        title="Cuotas pre-partido"
+        title={t("oddsTitle")}
         description={
           board.bookmakerCount > 1
-            ? "Mejor cuota del catálogo API-Football cruzada con el Probability Engine"
-            : "EV = P(modelo) × cuota − 1"
+            ? t("oddsDescriptionMulti")
+            : t("oddsDescriptionEv")
         }
         action={
           bookmakerLabel ? <Badge tone="info">{bookmakerLabel}</Badge> : undefined
@@ -69,25 +77,24 @@ export function OddsEvCard({ rows }: OddsEvCardProps) {
       />
       {bestRows.length === 0 ? (
         <p className="text-sm text-[var(--apex-fg-muted)]">
-          Sin cuotas en el catálogo para este partido. El EV aparece cuando el
-          proveedor entrega mercado.
+          {t("oddsEmpty")}
         </p>
       ) : (
         <div className="space-y-6">
-          <OddsMarketGroup title="1X2 — Local / Empate / Visitante" rows={board.oneXTwo} />
-          <OddsMarketGroup title="Over / Under 2.5" rows={board.overUnder25} />
-          <OddsMarketGroup title="Ambos marcan (BTTS)" rows={board.btts} />
+          <OddsMarketGroup title={t("market1x2")} rows={board.oneXTwo} common={common} t={t} />
+          <OddsMarketGroup title={t("marketOu")} rows={board.overUnder25} common={common} t={t} />
+          <OddsMarketGroup title={t("marketBtts")} rows={board.btts} common={common} t={t} />
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[32rem] text-left text-sm">
               <thead>
                 <tr className="border-b border-[var(--apex-border)] text-[11px] uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-                  <th className="pb-2 font-medium">Mercado</th>
-                  <th className="pb-2 font-medium">Selección</th>
-                  <th className="pb-2 font-medium">Cuota</th>
-                  <th className="pb-2 font-medium">Casa</th>
-                  <th className="pb-2 font-medium">Modelo</th>
-                  <th className="pb-2 font-medium">Implícita</th>
+                  <th className="pb-2 font-medium">{t("colMarket")}</th>
+                  <th className="pb-2 font-medium">{t("colSelection")}</th>
+                  <th className="pb-2 font-medium">{t("colOdds")}</th>
+                  <th className="pb-2 font-medium">{t("colBook")}</th>
+                  <th className="pb-2 font-medium">{t("colModel")}</th>
+                  <th className="pb-2 font-medium">{t("colImplied")}</th>
                   <th className="pb-2 font-medium">EV</th>
                 </tr>
               </thead>
@@ -107,14 +114,14 @@ export function OddsEvCard({ rows }: OddsEvCardProps) {
                         {row.marketLabel}
                       </td>
                       <td className="py-2 text-[var(--apex-fg)]">
-                        {selectionLabel(row)}
+                        {selectionLabel(row, common)}
                       </td>
                       <td className="py-2 font-mono tabular-nums">
                         <span className="inline-flex items-center gap-2">
                           {formatOdds(row.decimalOdds)}
                           {row.isBest && (
                             <Badge tone="accent" size="sm">
-                              Mejor
+                              {common("best")}
                             </Badge>
                           )}
                         </span>
@@ -154,9 +161,13 @@ export function OddsEvCard({ rows }: OddsEvCardProps) {
 function OddsMarketGroup({
   title,
   rows,
+  common,
+  t,
 }: {
   title: string;
   rows: MatchCenterOddsRow[];
+  common: ReturnType<typeof useTranslations<"common">>;
+  t: ReturnType<typeof useTranslations<"matchCenter">>;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -176,12 +187,12 @@ function OddsMarketGroup({
             key={row.id}
             interactive={false}
             selected={row.isBest}
-            label={selectionLabel(row)}
+            label={selectionLabel(row, common)}
             value={formatOdds(row.decimalOdds)}
             hint={
               row.bookmaker
                 ? row.isBest
-                  ? `${row.bookmaker} · mejor cuota`
+                  ? t("bestOddsHint", { bookmaker: row.bookmaker })
                   : row.bookmaker
                 : undefined
             }

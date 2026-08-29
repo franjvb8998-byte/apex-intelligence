@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { formatOdds } from "@/lib/bankroll/format";
 import { useMoneyFormatter } from "@/lib/bankroll/use-money-formatter";
 import type { BankrollCurrency } from "@/lib/bankroll/currency";
@@ -17,37 +18,38 @@ export function BetSummaryCard({
   market,
   currency,
 }: BetSummaryCardProps) {
+  const t = useTranslations("bankroll");
   const { money, signed } = useMoneyFormatter(currency);
 
   const rows: Array<{ label: string; value: string }> = [
     {
-      label: "Stake",
+      label: t("colStake"),
       value: preview.stake == null ? "—" : money(preview.stake),
     },
     {
-      label: "Cuota",
+      label: t("colOdds"),
       value: formatOdds(preview.odds),
     },
     {
-      label: "Retorno potencial",
+      label: t("potentialReturn"),
       value:
         preview.potentialReturn == null ? "—" : money(preview.potentialReturn),
     },
     {
-      label: "Beneficio potencial",
+      label: t("potentialProfit"),
       value:
         preview.potentialProfit == null
           ? "—"
           : signed(preview.potentialProfit),
     },
-    { label: "Mercado", value: market || "—" },
-    { label: "Moneda", value: currencyLabel(currency) },
+    { label: t("colMarket"), value: market || "—" },
+    { label: t("currency"), value: currencyLabel(currency) },
   ];
 
   return (
     <div className="rounded-[var(--apex-radius-lg)] border border-[var(--apex-border)] bg-slate-950/40 p-3 sm:p-4">
       <p className="text-[11px] font-medium uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-        Resumen de la apuesta
+        {t("summaryTitle")}
       </p>
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
         {rows.map((row) => (

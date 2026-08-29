@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
+import { ProductLinkRow } from "@/components/app-shell/product-link-row";
+import { UnavailableDataCard } from "@/components/app-shell/states";
 import { AiSidePanel } from "@/components/apex-vision/ai-side-panel";
 import { MomentumBar } from "@/components/apex-vision/momentum-bar";
 import { PitchField } from "@/components/apex-vision/pitch-field";
@@ -10,7 +13,6 @@ import { VisionTimeline } from "@/components/apex-vision/vision-timeline";
 import {
   Badge,
   Card,
-  HeatmapPlaceholder,
 } from "@/components/design-system";
 import {
   createInitialVisionState,
@@ -30,6 +32,8 @@ type MatchLiveViewProps = {
  * Simulation is client-only mock — replace tick with realtime later.
  */
 export function MatchLiveView({ initialState }: MatchLiveViewProps) {
+  const t = useTranslations("vision");
+  const common = useTranslations("common");
   const [state, setState] = useState<VisionLiveState>(
     () => initialState ?? createInitialVisionState(),
   );
@@ -52,17 +56,24 @@ export function MatchLiveView({ initialState }: MatchLiveViewProps) {
         <div>
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <Badge tone="accent">{state.leagueName}</Badge>
-            <Badge tone="danger">EN VIVO</Badge>
-            <Badge>Mock · {TICK_MS / 1000}s</Badge>
+            <Badge>{t("previewBadge")}</Badge>
           </div>
           <h1 className="text-2xl font-bold text-white sm:text-3xl">
             {state.homeTeam.name}{" "}
-            <span className="text-[var(--apex-fg-subtle)]">vs</span>{" "}
+            <span className="text-[var(--apex-fg-subtle)]">{common("vs")}</span>{" "}
             {state.awayTeam.name}
           </h1>
           <p className="mt-1 text-sm text-[var(--apex-fg-muted)]">
-            APEX Vision — seguimiento inmersivo
+            {t("subtitle")}
           </p>
+          <div className="mt-3">
+            <ProductLinkRow
+              links={[
+                { href: "/match-center", label: "Match Center" },
+                { href: "/opportunities", label: "APEX Opportunities" },
+              ]}
+            />
+          </div>
         </div>
 
         <Card padding="sm" className="min-w-[11rem] text-center">
@@ -70,11 +81,13 @@ export function MatchLiveView({ initialState }: MatchLiveViewProps) {
             {state.score.home} – {state.score.away}
           </p>
           <p className="mt-1 text-xs uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-            Minuto {state.minute}&apos;
+            {t("minute", { minute: state.minute })}
           </p>
           <p className="mt-2 font-mono text-xs text-[var(--apex-accent)]">
-            Posesión {Math.round(state.possessionHome)}% –{" "}
-            {Math.round(100 - state.possessionHome)}%
+            {t("possession", {
+              home: Math.round(state.possessionHome),
+              away: Math.round(100 - state.possessionHome),
+            })}
           </p>
         </Card>
       </motion.header>
@@ -102,12 +115,10 @@ export function MatchLiveView({ initialState }: MatchLiveViewProps) {
             />
           </div>
 
-          <Card>
-            <HeatmapPlaceholder
-              title="Heatmap de actividad"
-              description="Placeholder del Design System — listo para datos de zona reales."
-            />
-          </Card>
+          <UnavailableDataCard
+            title={t("heatmapUnavailable")}
+            description={t("heatmapUnavailableDescription")}
+          />
 
           <VisionTimeline
             events={state.events}

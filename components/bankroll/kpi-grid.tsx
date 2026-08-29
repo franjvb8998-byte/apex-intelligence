@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Card } from "@/components/design-system";
 import { formatOdds, formatPct } from "@/lib/bankroll/format";
 import { useMoneyFormatter } from "@/lib/bankroll/use-money-formatter";
@@ -26,28 +27,29 @@ type BankrollKpiGridProps = {
 };
 
 export function BankrollKpiGrid({ metrics, currency }: BankrollKpiGridProps) {
+  const t = useTranslations("bankroll");
   const { money, signed } = useMoneyFormatter(currency);
   const items: Kpi[] = [
     {
       id: "current",
-      label: "Bankroll actual",
+      label: t("kpiCurrent"),
       value: money(metrics.currentBankroll),
       tone: "accent",
     },
     {
       id: "initial",
-      label: "Bankroll inicial",
+      label: t("kpiInitial"),
       value: money(metrics.initialBankroll),
     },
     {
       id: "today",
-      label: "P/L de hoy",
+      label: t("kpiToday"),
       value: signed(metrics.todayProfit),
       tone: toneForSigned(metrics.todayProfit),
     },
     {
       id: "profit",
-      label: "Beneficio total",
+      label: t("kpiProfit"),
       value: signed(metrics.totalProfit),
       tone: toneForSigned(metrics.totalProfit),
     },
@@ -55,14 +57,14 @@ export function BankrollKpiGrid({ metrics, currency }: BankrollKpiGridProps) {
       id: "roi",
       label: "ROI",
       value: formatPct(metrics.roi),
-      hint: "Beneficio neto / stake arriesgado",
+      hint: t("kpiRoiHint"),
       tone: toneForSigned(metrics.totalProfit),
     },
     {
       id: "yield",
       label: "Yield",
       value: formatPct(metrics.yield),
-      hint: "Misma fórmula que ROI (stake liquidado)",
+      hint: t("kpiYieldHint"),
       tone: toneForSigned(metrics.totalProfit),
     },
     {
@@ -72,12 +74,12 @@ export function BankrollKpiGrid({ metrics, currency }: BankrollKpiGridProps) {
     },
     {
       id: "odds",
-      label: "Cuota media",
+      label: t("kpiAvgOdds"),
       value: formatOdds(metrics.averageOdds),
     },
     {
       id: "count",
-      label: "Nº de apuestas",
+      label: t("kpiBetCount"),
       value: String(metrics.betCount),
     },
   ];

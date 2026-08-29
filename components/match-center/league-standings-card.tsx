@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Badge, Card, CardHeader } from "@/components/design-system";
 import type { MatchCenterStanding } from "@/lib/match-center/types";
 
@@ -76,25 +79,27 @@ export function LeagueStandingsCard({
   away,
   leagueName,
 }: LeagueStandingsCardProps) {
+  const t = useTranslations("matchCenter");
+  const common = useTranslations("common");
   const empty = !home && !away;
   return (
     <Card>
       <CardHeader
-        title="Clasificación"
+        title={t("standings")}
         description={
           leagueName
-            ? `Posición de ambos equipos en ${leagueName}`
-            : "Posición de ambos equipos en la liga"
+            ? t("standingsDescription", { league: leagueName })
+            : t("standingsDescriptionFallback")
         }
       />
       {empty ? (
         <p className="text-sm text-[var(--apex-fg-muted)]">
-          La clasificación no está disponible para este fixture.
+          {t("standingsEmpty")}
         </p>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2">
-          {home && <StandingColumn side="Local" standing={home} />}
-          {away && <StandingColumn side="Visitante" standing={away} />}
+          {home && <StandingColumn side={common("home")} standing={home} />}
+          {away && <StandingColumn side={common("away")} standing={away} />}
         </div>
       )}
     </Card>

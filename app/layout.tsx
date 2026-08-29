@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { PasswordRecoveryRedirect } from "@/components/auth/password-recovery-redirect";
 import { PASSWORD_RECOVERY_BOOTSTRAP_SCRIPT } from "@/lib/auth/password-recovery";
 import "./globals.css";
@@ -15,24 +17,31 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "APEX Intelligence — La inteligencia que transforma tus apuestas",
-  description:
-    "Analiza tu historial, mide tu rendimiento y toma decisiones basadas en datos.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("meta");
+  return {
+    title: t("title"),
+    description: t("description"),
+  };
+}
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
     <html
-      lang="es"
+      lang={locale}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <Script id="password-recovery-redirect" strategy="beforeInteractive">
-          {PASSWORD_RECOVERY_BOOTSTRAP_SCRIPT}
-        </Script>
-        <PasswordRecoveryRedirect />
-        {children}
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <Script id="password-recovery-redirect" strategy="beforeInteractive">
+            {PASSWORD_RECOVERY_BOOTSTRAP_SCRIPT}
+          </Script>
+          <PasswordRecoveryRedirect />
+          {children}
+        </NextIntlClientProvider>
       </body>
     </html>
   );

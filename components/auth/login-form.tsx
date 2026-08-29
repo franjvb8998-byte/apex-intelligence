@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { FormEvent, useState } from "react";
 import { AuthCard } from "@/components/ui/auth-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getAuthErrorMessage } from "@/lib/supabase/auth-errors";
+import { getAuthErrorKey } from "@/lib/supabase/auth-errors";
 import { createClient } from "@/lib/supabase/client";
 import { isValidEmail, validatePassword } from "@/lib/validation";
 
@@ -17,9 +18,10 @@ type LoginErrors = {
 };
 
 export function LoginForm() {
+  const t = useTranslations("auth");
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") ?? "/dashboard";
+  const redirectTo = searchParams.get("redirect") ?? "/scanner";
   const passwordUpdated = searchParams.get("password_updated") === "1";
 
   const [email, setEmail] = useState("");
@@ -31,13 +33,13 @@ export function LoginForm() {
     const nextErrors: LoginErrors = {};
 
     if (!email.trim()) {
-      nextErrors.email = "El email es obligatorio.";
+      nextErrors.email = t("validation.emailRequired");
     } else if (!isValidEmail(email)) {
-      nextErrors.email = "Introduce un email válido.";
+      nextErrors.email = t("validation.emailInvalid");
     }
 
     const passwordError = validatePassword(password);
-    if (passwordError) nextErrors.password = passwordError;
+    if (passwordError) nextErrors.password = t(`validation.${passwordError}`);
 
     return nextErrors;
   }
@@ -61,7 +63,7 @@ export function LoginForm() {
     setIsSubmitting(false);
 
     if (error) {
-      setErrors({ form: getAuthErrorMessage(error.message) });
+      setErrors({ form: t(`errors.${getAuthErrorKey(error.message)}`) });
       return;
     }
 
@@ -71,34 +73,34 @@ export function LoginForm() {
 
   return (
     <AuthCard
-      title="Iniciar sesión"
-      subtitle="Accede a tu panel de análisis deportivo"
+      title={t("login.title")}
+      subtitle={t("login.subtitle")}
       footer={
         <>
-          ¿No tienes cuenta?{" "}
+          {t("login.footerPrompt")}{" "}
           <Link
             href="/register"
             className="font-medium text-[#00D4AA] transition-colors hover:text-[#00eabb]"
           >
-            Crear cuenta
+            {t("login.footerLink")}
           </Link>
         </>
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
         <Input
-          label="Email"
+          label={t("login.email")}
           name="email"
           type="email"
           autoComplete="email"
-          placeholder="tu@email.com"
+          placeholder={t("login.emailPlaceholder")}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           error={errors.email}
         />
 
         <Input
-          label="Contraseña"
+          label={t("login.password")}
           name="password"
           type="password"
           autoComplete="current-password"
@@ -113,7 +115,7 @@ export function LoginForm() {
             href="/forgot-password"
             className="text-sm font-medium text-[#00D4AA] transition-colors hover:text-[#00eabb]"
           >
-            ¿Olvidaste tu contraseña?
+            {t("login.forgot")}
           </Link>
         </div>
 
@@ -122,7 +124,7 @@ export function LoginForm() {
             className="rounded-lg border border-[#00D4AA]/30 bg-[#00D4AA]/10 px-4 py-3 text-sm text-[#00D4AA]"
             role="status"
           >
-            Contraseña actualizada. Inicia sesión con tu nueva contraseña.
+            {t("login.passwordUpdated")}
           </p>
         )}
 
@@ -133,7 +135,7 @@ export function LoginForm() {
         )}
 
         <Button type="submit" fullWidth disabled={isSubmitting}>
-          {isSubmitting ? "Iniciando sesión..." : "Iniciar sesión"}
+          {isSubmitting ? t("login.submitting") : t("login.submit")}
         </Button>
       </form>
     </AuthCard>

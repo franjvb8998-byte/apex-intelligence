@@ -1,4 +1,8 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
+import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { BackgroundDecorations } from "@/components/ui/background-decorations";
 import { Logo } from "@/components/ui/logo";
 
@@ -13,12 +17,15 @@ export function PageShell({
   centered = false,
   showFooter = true,
 }: PageShellProps) {
+  const t = useTranslations("auth");
+
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#0B1220] text-slate-100">
       <BackgroundDecorations />
 
       <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6 sm:px-8">
         <Logo />
+        <LanguageSwitcher />
       </header>
 
       <main
@@ -33,11 +40,7 @@ export function PageShell({
 
       {showFooter && (
         <footer className="relative z-10 border-t border-slate-800/60 py-8 text-center text-sm text-slate-500">
-          <p>
-            © {new Date().getFullYear()}{" "}
-            <span className="text-[#00D4AA]">APEX</span> Intelligence. Todos los
-            derechos reservados.
-          </p>
+          <p>{t("footer", { year: new Date().getFullYear() })}</p>
         </footer>
       )}
     </div>

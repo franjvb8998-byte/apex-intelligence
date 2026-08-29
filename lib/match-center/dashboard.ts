@@ -69,7 +69,7 @@ export function placeholderPreviewDashboard(
     lineups: { home: null, away: null },
     recommendation: {
       id: "rec-pending",
-      title: "Pendiente",
+      title: "pending",
       action: "watch",
       priority: "low",
       rationale: "",

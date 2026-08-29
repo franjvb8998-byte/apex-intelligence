@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import { Breadcrumbs } from "@/components/app-shell/breadcrumbs";
 import {
@@ -15,13 +16,14 @@ import {
   ProfileMenu,
 } from "@/components/app-shell/sidebar";
 import type { ShellUser } from "@/components/app-shell/types";
+import { LanguageSwitcher } from "@/components/i18n/language-switcher";
+import { useNavLabel } from "@/components/i18n/use-nav-label";
 import {
-  ALL_NAV,
   PRIMARY_NAV,
   SECONDARY_NAV,
   breadcrumbsForPath,
   buildCommandItems,
-  titleForPath,
+  titleKeyForPath,
 } from "@/lib/navigation";
 
 type AppHeaderProps = {
@@ -32,8 +34,10 @@ type AppHeaderProps = {
 
 function AppHeader({ user, onMenuOpen, onOpenPalette }: AppHeaderProps) {
   const pathname = usePathname();
+  const t = useTranslations("chrome");
+  const navLabel = useNavLabel();
   const crumbs = breadcrumbsForPath(pathname);
-  const title = titleForPath(pathname);
+  const title = navLabel(titleKeyForPath(pathname));
 
   return (
     <header className="sticky top-0 z-30 border-b border-[var(--apex-border)] bg-[var(--apex-bg)]/90 backdrop-blur-md">
@@ -44,7 +48,7 @@ function AppHeader({ user, onMenuOpen, onOpenPalette }: AppHeaderProps) {
           onClick={onMenuOpen}
           aria-controls="apex-sidebar"
         >
-          Menú
+          {t("menu")}
         </button>
 
         <div className="min-w-0 flex-1 space-y-1">
@@ -55,13 +59,14 @@ function AppHeader({ user, onMenuOpen, onOpenPalette }: AppHeaderProps) {
         </div>
 
         <GlobalSearch onOpenPalette={onOpenPalette} />
+        <LanguageSwitcher />
         <button
           type="button"
           onClick={onOpenPalette}
           className="apex-focusable rounded-[var(--apex-radius-md)] border border-[var(--apex-border)] px-2.5 py-2 text-xs text-[var(--apex-fg-muted)] md:hidden"
-          aria-label="Abrir buscador"
+          aria-label={t("goToPageAria")}
         >
-          Buscar
+          {t("goToPageShort")}
         </button>
         <NotificationsPanel />
         <ProfileMenu user={user} />
@@ -78,6 +83,7 @@ export type AppShellProps = {
 };
 
 export function AppShell({ children, user, flush = false }: AppShellProps) {
+  const t = useTranslations("chrome");
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -107,7 +113,7 @@ export function AppShell({ children, user, flush = false }: AppShellProps) {
         href="#apex-main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[70] focus:rounded-[var(--apex-radius-md)] focus:bg-[var(--apex-accent)] focus:px-3 focus:py-2 focus:text-sm focus:text-[var(--apex-fg-inverse)]"
       >
-        Saltar al contenido
+        {t("skipToContent")}
       </a>
 
       <AppSidebar
@@ -142,14 +148,6 @@ export function AppShell({ children, user, flush = false }: AppShellProps) {
         items={commands}
         onNavigate={(href) => router.push(href)}
       />
-
-      <nav className="sr-only" aria-hidden>
-        {ALL_NAV.map((item) => (
-          <a key={item.id} href={item.href}>
-            {item.label}
-          </a>
-        ))}
-      </nav>
     </div>
   );
 }

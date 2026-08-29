@@ -25,7 +25,7 @@ type TimelineProps = {
 export function Timeline({
   items,
   className,
-  "aria-label": ariaLabel = "Cronología",
+  "aria-label": ariaLabel = "Timeline",
 }: TimelineProps) {
   return (
     <ol className={cx("relative space-y-0", className)} aria-label={ariaLabel}>

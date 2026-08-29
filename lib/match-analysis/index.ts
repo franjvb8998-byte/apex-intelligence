@@ -30,6 +30,21 @@ export {
 } from "@/lib/match-analysis/load";
 
 export {
+  buildPremiumAnalysis,
+  type PremiumAnalysis,
+  type PremiumCompareKey,
+  type PremiumCompareRow,
+  type PremiumContribution,
+  type PremiumContextFactor,
+  type PremiumContextTitleKey,
+  type PremiumEvidenceId,
+  type PremiumEvidenceSignal,
+  type PremiumMarketMove,
+  type PremiumRecKind,
+  type PremiumRecommendation,
+} from "@/lib/match-analysis/premium";
+
+export {
   analyzeMatchWithRules,
   confidenceFromProbability,
 } from "@/lib/match-analysis/rules/analyze-with-rules";

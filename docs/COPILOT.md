@@ -1,35 +1,71 @@
-# APEX Copilot UI — Sprint 9
+# APEX Copilot v1
 
 **Ruta:** `/copilot`  
-**Código:** `components/copilot/` · `lib/copilot/`
+**Código:** `lib/copilot/` · `components/copilot/` · `app/api/copilot/`
 
-Solo experiencia visual. **Sin OpenAI.** No modifica Intelligence Layer, Probability Engine ni Learning Engine.
+Asistente de análisis de apuestas. Consume datos internos APEX. No es un chatbot genérico.
 
 ---
 
-## Layout
+## Datos que consume
 
-- Sidebar: chats recientes + Nuevo análisis
-- Panel: mensaje de bienvenida + prompts sugeridos + chat
-- Respuestas mock con `analysis-card` / `prediction-card` / `explainable-card` (Sprint 10)
+- Probabilidades 1X2 / O/U 2.5 / BTTS (Probability Engine)
+- Estadísticas y forma (Match Center / Data Platform)
+- Lesiones (si el proveedor las publica)
+- Cuotas, cuota justa (`1 / P_modelo`), EV (`P × cuota − 1`), edge (`P − 1/cuota`)
+- Confianza, value bet, recomendación (reglas Match Analysis)
 
-## Componentes
+Si un campo no está en el catálogo, el informe lo declara. **Nunca se inventa.**
 
-| Componente | Rol |
+---
+
+## Informe (9 secciones)
+
+Executive Summary · Strengths · Weaknesses · Tactical Context · Market Analysis · Value Analysis · Risk Analysis · Suggested Stake · Final Recommendation
+
+Stake en **unidades** (1u = unidad de bankroll). 0u si la acción es `pass`.
+
+---
+
+## Arquitectura
+
+```text
+POST /api/copilot
+        │
+        ▼
+ CopilotService.ask
+        │  listFixtures + getMatchCenterData
+        ▼
+ CopilotMatchSnapshot  (hechos APEX)
+        │
+        ▼
+ buildLocalBriefing    (analista local, determinista)
+        │
+        ▼
+ CopilotAiClient       (opcional: reescribe SOLO el resumen)
+```
+
+### Interfaz AI (un solo puerto)
+
+`CopilotAiClient.complete({ system, user })`
+
+Proveedores registrados por id — el servicio no importa SDKs:
+
+| id | Cuándo |
 | --- | --- |
-| `chat-window` | Shell + estado de conversación |
-| `message` | Burbujas user / assistant |
-| `prompt-box` | Input |
-| `suggested-prompts` | Ejemplos |
-| `thinking-indicator` | Estado “pensando” |
-| `analysis-card` | Tarjeta de análisis mock |
-| `prediction-card` | Tarjeta de predicción mock |
-| `explainable-card` | Tarjeta Explainable AI (reglas) |
+| `local` | Default. Sin red. |
+| `openai` | `COPILOT_AI_PROVIDER=openai` + `OPENAI_API_KEY` |
+| `claude` | `COPILOT_AI_PROVIDER=claude` + `ANTHROPIC_API_KEY` |
+| `gemini` | `COPILOT_AI_PROVIDER=gemini` + `GEMINI_API_KEY` |
 
-## Prompts sugeridos
+Los vendors **no generan cifras**. Como mucho reescriben el executive summary. Si fallan o no hay clave, se usa el analista local.
 
-- ¿Quién tiene más valor hoy?
-- Analiza Real Madrid vs Barcelona.
-- ¿Por qué bajó la probabilidad?
-- Resume este partido.
-- Explícame esta predicción.
+Nuevo proveedor: `registerCopilotAiClient("id", factory)`.
+
+Si API-Football agota la cuota, Copilot no inventa el partido: usa el catálogo recorded APEX (mismo dataset que tests / Bankroll) y lo declara en el informe. Si el fixture pedido no está en ese catálogo, lo dice y no sustituye otro.
+
+---
+
+## Tono
+
+Analista de fútbol profesional. Cada conclusión cita el dato APEX (P_modelo, xG, cuota, forma).

@@ -3,10 +3,14 @@
  * Only calls provider endpoints that already exist — never invents stats/H2H/injuries.
  */
 
-import { ApiFootballDataProvider } from "@/lib/data-platform/api-football-provider";
 import { adaptApiFootballTeamStatistics } from "@/lib/data-platform/providers/api-football/adapters";
 import type { IDataProvider } from "@/lib/data-platform/provider";
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
+import {
+  createRepositories,
+  isRepositories,
+  type ApexRepositories,
+} from "@/lib/repositories";
 import type {
   MatchAnalysisInjury,
   MatchAnalysisTeamStatSnapshot,
@@ -192,15 +196,24 @@ function snapshotFromTeamStatistics(
   }
 }
 
+function toRepositories(
+  access: IDataProvider | ApexRepositories,
+): ApexRepositories {
+  return isRepositories(access)
+    ? access
+    : createRepositories({ provider: access });
+}
+
 /**
  * Pull team statistics, last-5 form, H2H, standings, injuries, suspensions
  * and lineups when the configured provider exposes them.
  */
 export async function enrichMatchCenterContext(
-  provider: IDataProvider,
+  access: IDataProvider | ApexRepositories,
   bundle: ApexMatchBundle,
 ): Promise<MatchCenterEnrichment> {
-  if (!(provider instanceof ApiFootballDataProvider)) {
+  const repos = toRepositories(access);
+  if (!repos.hasResourcePort) {
     return { ...EMPTY_MATCH_CENTER_ENRICHMENT };
   }
 
@@ -222,33 +235,33 @@ export async function enrichMatchCenterContext(
   ] = await Promise.all([
     homeId && leagueId && season
       ? safe(
-          () => provider.http.getTeamStatistics(homeId, leagueId, season),
+          () => repos.statistics.getTeamStatistics(homeId, leagueId, season),
           null,
         )
       : Promise.resolve(null),
     awayId && leagueId && season
       ? safe(
-          () => provider.http.getTeamStatistics(awayId, leagueId, season),
+          () => repos.statistics.getTeamStatistics(awayId, leagueId, season),
           null,
         )
       : Promise.resolve(null),
     homeId && awayId
-      ? safe(() => provider.http.getHeadToHead(homeId, awayId, 5), null)
+      ? safe(() => repos.fixtures.listHeadToHead(homeId, awayId, 5), null)
       : Promise.resolve(null),
     fixtureId
-      ? safe(() => provider.http.getInjuries({ fixture: fixtureId }), null)
+      ? safe(() => repos.teams.listInjuries({ fixture: fixtureId }), null)
       : Promise.resolve(null),
     homeId
-      ? safe(() => provider.http.getTeamLastFixtures(homeId, 5), null)
+      ? safe(() => repos.teams.listRecentFixtures(homeId, 5), null)
       : Promise.resolve(null),
     awayId
-      ? safe(() => provider.http.getTeamLastFixtures(awayId, 5), null)
+      ? safe(() => repos.teams.listRecentFixtures(awayId, 5), null)
       : Promise.resolve(null),
     fixtureId
-      ? safe(() => provider.http.getLineups(fixtureId), null)
+      ? safe(() => repos.fixtures.getLineups(fixtureId), null)
       : Promise.resolve(null),
     leagueId && season
-      ? safe(() => provider.http.getStandings(leagueId, season), null)
+      ? safe(() => repos.standings.getTable(leagueId, season), null)
       : Promise.resolve(null),
   ]);
 

@@ -7,6 +7,7 @@
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
 import {
   createEloPoissonHybridEngine,
+  estimateEloFromTeamId,
   type ProbabilityEngine,
 } from "@/lib/intelligence/modules/probability";
 import type {
@@ -18,15 +19,6 @@ import {
   analyzeMatchWithRules,
   confidenceFromProbability,
 } from "@/lib/match-analysis/rules/analyze-with-rules";
-
-/** Deterministic pseudo-Elo — same approach as Match Center (no PE mutation). */
-function estimateEloFromTeamId(teamId: string, base = 1500): number {
-  let hash = 0;
-  for (let i = 0; i < teamId.length; i++) {
-    hash = (hash * 31 + teamId.charCodeAt(i)) >>> 0;
-  }
-  return base + (hash % 251) - 125;
-}
 
 export type MatchAnalysisServiceOptions = {
   engine?: ProbabilityEngine;

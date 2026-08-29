@@ -2,11 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Badge } from "@/components/design-system";
 import { cx } from "@/components/design-system/utils";
+import {
+  useNavDescription,
+  useNavLabel,
+} from "@/components/i18n/use-nav-label";
 import type { ShellUser } from "@/components/app-shell/types";
+import type { NavItem } from "@/lib/navigation";
 
 export type { ShellUser } from "@/components/app-shell/types";
 
@@ -15,6 +21,7 @@ type ProfileMenuProps = {
 };
 
 export function ProfileMenu({ user }: ProfileMenuProps) {
+  const t = useTranslations("chrome");
   const [open, setOpen] = useState(false);
   const initials = (user?.displayName ?? "AP")
     .split(/\s+/)
@@ -36,7 +43,7 @@ export function ProfileMenu({ user }: ProfileMenuProps) {
           {initials}
         </span>
         <span className="hidden max-w-[8rem] truncate sm:inline">
-          {user?.displayName ?? "Invitado"}
+          {user?.displayName ?? t("guest")}
         </span>
       </button>
 
@@ -45,7 +52,7 @@ export function ProfileMenu({ user }: ProfileMenuProps) {
           <button
             type="button"
             className="fixed inset-0 z-40 cursor-default"
-            aria-label="Cerrar menú de perfil"
+            aria-label={t("closeProfile")}
             onClick={() => setOpen(false)}
           />
           <div
@@ -54,25 +61,41 @@ export function ProfileMenu({ user }: ProfileMenuProps) {
           >
             <div className="mb-3 border-b border-[var(--apex-border)] pb-3">
               <p className="text-sm font-medium text-[var(--apex-fg)]">
-                {user?.displayName ?? "Invitado"}
+                {user?.displayName ?? t("guest")}
               </p>
               <p className="mt-0.5 truncate text-xs text-[var(--apex-fg-subtle)]">
-                {user?.email ?? "Sin sesión"}
+                {user?.email ?? t("noSession")}
               </p>
               <div className="mt-2">
                 <Badge tone={user ? "accent" : "warning"}>
-                  {user ? "Autenticado" : "Público"}
+                  {user ? t("authenticated") : t("public")}
                 </Badge>
               </div>
             </div>
             <div className="space-y-1">
               <Link
                 role="menuitem"
+                href="/scanner"
+                className="block rounded-[var(--apex-radius-md)] px-2 py-2 text-sm text-[var(--apex-fg-muted)] hover:bg-slate-800/60 hover:text-[var(--apex-fg)]"
+                onClick={() => setOpen(false)}
+              >
+                {t("goScanner")}
+              </Link>
+              <Link
+                role="menuitem"
+                href="/feed"
+                className="block rounded-[var(--apex-radius-md)] px-2 py-2 text-sm text-[var(--apex-fg-muted)] hover:bg-slate-800/60 hover:text-[var(--apex-fg)]"
+                onClick={() => setOpen(false)}
+              >
+                {t("goFeed")}
+              </Link>
+              <Link
+                role="menuitem"
                 href="/dashboard"
                 className="block rounded-[var(--apex-radius-md)] px-2 py-2 text-sm text-[var(--apex-fg-muted)] hover:bg-slate-800/60 hover:text-[var(--apex-fg)]"
                 onClick={() => setOpen(false)}
               >
-                Ir al Dashboard
+                {t("goDashboard")}
               </Link>
               {!user && (
                 <Link
@@ -81,7 +104,7 @@ export function ProfileMenu({ user }: ProfileMenuProps) {
                   className="block rounded-[var(--apex-radius-md)] px-2 py-2 text-sm text-[var(--apex-accent)] hover:bg-[var(--apex-accent-muted)]"
                   onClick={() => setOpen(false)}
                 >
-                  Iniciar sesión
+                  {t("signIn")}
                 </Link>
               )}
               {user && (
@@ -100,8 +123,8 @@ export function ProfileMenu({ user }: ProfileMenuProps) {
 type AppSidebarProps = {
   open: boolean;
   onClose: () => void;
-  primary: Array<{ id: string; label: string; href: string; description: string }>;
-  secondary: Array<{ id: string; label: string; href: string; description: string }>;
+  primary: NavItem[];
+  secondary: NavItem[];
 };
 
 export function AppSidebar({
@@ -111,13 +134,16 @@ export function AppSidebar({
   secondary,
 }: AppSidebarProps) {
   const pathname = usePathname();
+  const t = useTranslations("chrome");
+  const navLabel = useNavLabel();
+  const navDescription = useNavDescription();
 
   return (
     <>
       {open && (
         <button
           type="button"
-          aria-label="Cerrar navegación"
+          aria-label={t("closeNav")}
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={onClose}
         />
@@ -131,7 +157,7 @@ export function AppSidebar({
       >
         <div className="flex items-center gap-2 border-b border-[var(--apex-border)] px-4 py-4">
           <Link
-            href="/dashboard"
+            href="/scanner"
             className="text-sm font-semibold tracking-tight apex-focusable rounded-sm"
             onClick={onClose}
           >
@@ -140,9 +166,9 @@ export function AppSidebar({
           </Link>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Principal">
+        <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label={t("primaryNav")}>
           <p className="px-2 pb-2 text-[11px] font-medium uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-            Producto
+            {t("product")}
           </p>
           <ul className="space-y-1">
             {primary.map((item) => {
@@ -161,9 +187,9 @@ export function AppSidebar({
                         : "text-[var(--apex-fg-muted)] hover:bg-slate-800/50 hover:text-[var(--apex-fg)]",
                     )}
                   >
-                    <span className="block text-sm font-medium">{item.label}</span>
+                    <span className="block text-sm font-medium">{navLabel(item.id)}</span>
                     <span className="mt-0.5 block text-xs text-[var(--apex-fg-subtle)]">
-                      {item.description}
+                      {navDescription(item.id)}
                     </span>
                   </Link>
                 </li>
@@ -172,7 +198,7 @@ export function AppSidebar({
           </ul>
 
           <p className="mt-5 px-2 pb-2 text-[11px] font-medium uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
-            Sistema
+            {t("system")}
           </p>
           <ul className="space-y-1">
             {secondary.map((item) => {
@@ -190,17 +216,13 @@ export function AppSidebar({
                         : "text-[var(--apex-fg-muted)] hover:bg-slate-800/50 hover:text-[var(--apex-fg)]",
                     )}
                   >
-                    {item.label}
+                    {navLabel(item.id)}
                   </Link>
                 </li>
               );
             })}
           </ul>
         </nav>
-
-        <div className="border-t border-[var(--apex-border)] px-4 py-3 text-xs text-[var(--apex-fg-subtle)]">
-          Release 0.1 · Product Polish
-        </div>
       </aside>
     </>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { MatchAnalysisExplanation } from "@/lib/match-analysis/types";
 
 type ExplanationPanelProps = {
@@ -12,6 +13,7 @@ export function ExplanationPanel({
   explanation,
   modelVersion,
 }: ExplanationPanelProps) {
+  const t = useTranslations("matchAnalysis");
   const [open, setOpen] = useState(false);
   const panelId = useId();
 
@@ -26,7 +28,7 @@ export function ExplanationPanel({
       >
         <div>
           <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">
-            Explicación APEX
+            {t("apexExplanation")}
           </h3>
           <p className="mt-2 text-sm leading-relaxed text-slate-300">
             {explanation.summary}
