@@ -13,6 +13,11 @@ import { createOddsRepository, type OddsRepository } from "@/lib/repositories/od
 import { createStandingsRepository, type StandingsRepository } from "@/lib/repositories/standings";
 import { createStatisticsRepository, type StatisticsRepository } from "@/lib/repositories/statistics";
 import {
+  oncePerRequestSync,
+  requestIdentityKey,
+  requestMemoKey,
+} from "@/lib/repositories/once-per-request";
+import {
   createFootballSource,
   type RepositoryContext,
 } from "@/lib/repositories/source";
@@ -30,10 +35,9 @@ export type ApexRepositories = {
   displayName: string;
 };
 
-export function createRepositories(
-  context: RepositoryContext = {},
+function buildRepositoriesFromSource(
+  source: ReturnType<typeof createFootballSource>,
 ): ApexRepositories {
-  const source = createFootballSource(context);
   const fixtures = createFixturesRepository(source);
   const teams = createTeamsRepository(source);
   const odds = createOddsRepository(source);
@@ -56,6 +60,17 @@ export function createRepositories(
     providerId: source.id,
     displayName: source.displayName,
   };
+}
+
+export function createRepositories(
+  context: RepositoryContext = {},
+): ApexRepositories {
+  const source = createFootballSource(context);
+  // One DAL graph per resolved provider in this request (Sprint 2A).
+  return oncePerRequestSync(
+    requestMemoKey("repos", [requestIdentityKey(source.provider)]),
+    () => buildRepositoriesFromSource(source),
+  );
 }
 
 export function isRepositories(

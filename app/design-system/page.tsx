@@ -25,10 +25,12 @@ export async function generateMetadata() {
 }
 
 export default async function DesignSystemPage() {
-  const user = await getShellUser();
-  const t = await getTranslations("designSystem");
-  const common = await getTranslations("common");
-  const loading = await getTranslations("loading");
+  const [user, t, common, loading] = await Promise.all([
+    getShellUser(),
+    getTranslations("designSystem"),
+    getTranslations("common"),
+    getTranslations("loading"),
+  ]);
 
   return (
     <ProductShell user={user}>

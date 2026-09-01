@@ -23,14 +23,16 @@ export default async function MatchCenterFixturePage({
 }: MatchCenterFixturePageProps) {
   const { fixtureId: rawFixtureId } = await params;
   const fixtureId = vendorFixtureId(decodeURIComponent(rawFixtureId));
-  const user = await getShellUser();
-  const loaded = await loadUnlessQuota(() =>
-    getMatchCenterData({
-      externalMatchId: fixtureId ?? rawFixtureId,
-      requireProvider: true,
-      includeFixtureList: false,
-    }),
-  );
+  const [user, loaded] = await Promise.all([
+    getShellUser(),
+    loadUnlessQuota(() =>
+      getMatchCenterData({
+        externalMatchId: fixtureId ?? rawFixtureId,
+        requireProvider: true,
+        includeFixtureList: false,
+      }),
+    ),
+  ]);
 
   return (
     <ProductShell user={user}>

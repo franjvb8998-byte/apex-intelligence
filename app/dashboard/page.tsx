@@ -24,9 +24,11 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const t = await getTranslations("dashboard");
-  const { dashboard, matchCenter, quotaExhausted } =
-    await loadDashboardWorkspace();
+  const [t, workspace] = await Promise.all([
+    getTranslations("dashboard"),
+    loadDashboardWorkspace(),
+  ]);
+  const { dashboard, matchCenter, quotaExhausted } = workspace;
   const featuredHref = dashboard.featuredMatchId
     ? `/match-center?matchId=${encodeURIComponent(dashboard.featuredMatchId)}`
     : "/match-center";

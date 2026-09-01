@@ -34,10 +34,12 @@ export default async function MatchCenterPage({
     redirect(matchCenterHref(fromQuery));
   }
 
-  const user = await getShellUser();
-  const loaded = await loadUnlessQuota(() =>
-    listMatchCenterFixtures({ requireProvider: true }),
-  );
+  const [user, loaded] = await Promise.all([
+    getShellUser(),
+    loadUnlessQuota(() =>
+      listMatchCenterFixtures({ requireProvider: true }),
+    ),
+  ]);
 
   return (
     <ProductShell user={user}>

@@ -11,8 +11,10 @@ export async function generateMetadata() {
 }
 
 export default async function SmartCombosPage() {
-  const user = await getShellUser();
-  const loaded = await loadSmartCombosDesk();
+  const [user, loaded] = await Promise.all([
+    getShellUser(),
+    loadSmartCombosDesk(),
+  ]);
 
   return (
     <ProductShell user={user} flush>

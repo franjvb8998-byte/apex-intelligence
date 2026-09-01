@@ -11,8 +11,10 @@ export async function generateMetadata() {
 }
 
 export default async function ScannerPage() {
-  const user = await getShellUser();
-  const loaded = await loadOpportunityScanner();
+  const [user, loaded] = await Promise.all([
+    getShellUser(),
+    loadOpportunityScanner(),
+  ]);
 
   return (
     <ProductShell user={user} flush>

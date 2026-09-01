@@ -26,14 +26,16 @@ export default async function MatchAnalysisFixturePage({
 }: MatchAnalysisFixturePageProps) {
   const { fixtureId: rawFixtureId } = await params;
   const fixtureId = vendorFixtureId(decodeURIComponent(rawFixtureId));
-  const user = await getShellUser();
-  const t = await getTranslations("common");
-  const loaded = await loadUnlessQuota(() =>
-    getMatchAnalysisData({
-      externalMatchId: fixtureId ?? rawFixtureId,
-      requireProvider: true,
-    }),
-  );
+  const [user, t, loaded] = await Promise.all([
+    getShellUser(),
+    getTranslations("common"),
+    loadUnlessQuota(() =>
+      getMatchAnalysisData({
+        externalMatchId: fixtureId ?? rawFixtureId,
+        requireProvider: true,
+      }),
+    ),
+  ]);
 
   return (
     <ProductShell user={user}>

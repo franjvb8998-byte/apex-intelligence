@@ -17,6 +17,8 @@ import type {
 } from "@/lib/data-platform/types";
 import {
   oncePerRequest,
+  oncePerRequestSync,
+  requestIdentityKey,
   requestMemoKey,
 } from "@/lib/repositories/once-per-request";
 
@@ -70,26 +72,43 @@ export function dataModeOf(provider: IDataProvider): DataAccessMode {
   return "live";
 }
 
+function envIdentity(
+  env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
+): string {
+  return env === process.env ? "process-env" : `custom:${requestIdentityKey(env)}`;
+}
+
 export function createProductDataProvider(
   env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
   options: { enrichMatch?: boolean } = {},
 ): IDataProvider {
-  const hasKey = hasFootballApiKey(env);
-  return createApiFootballDataProvider({
-    env,
-    enrichMatch: options.enrichMatch ?? true,
-    fallback: hasKey ? "error" : "recorded",
-  });
+  const enrichMatch = options.enrichMatch ?? true;
+  return oncePerRequestSync(
+    requestMemoKey("product-provider", [envIdentity(env), enrichMatch]),
+    () => {
+      const hasKey = hasFootballApiKey(env);
+      return createApiFootballDataProvider({
+        env,
+        enrichMatch,
+        fallback: hasKey ? "error" : "recorded",
+      });
+    },
+  );
 }
 
 export function createRecordedDataProvider(
   options: { enrichMatch?: boolean } = {},
 ): IDataProvider {
-  return createApiFootballDataProvider({
-    apiKey: null,
-    fallback: "recorded",
-    enrichMatch: options.enrichMatch ?? true,
-  });
+  const enrichMatch = options.enrichMatch ?? true;
+  return oncePerRequestSync(
+    requestMemoKey("recorded-provider", [enrichMatch]),
+    () =>
+      createApiFootballDataProvider({
+        apiKey: null,
+        fallback: "recorded",
+        enrichMatch,
+      }),
+  );
 }
 
 function extrasFrom(provider: IDataProvider): FootballExtras | null {
@@ -166,10 +185,7 @@ function resolveProvider(context: RepositoryContext = {}): IDataProvider {
   return createProductDataProvider(env, { enrichMatch: context.enrichMatch });
 }
 
-export function createFootballSource(
-  context: RepositoryContext = {},
-): FootballSource {
-  const provider = resolveProvider(context);
+function buildFootballSource(provider: IDataProvider): FootballSource {
   return {
     provider,
     id: provider.id,
@@ -195,4 +211,15 @@ export function createFootballSource(
         async () => (await provider.listFixtures?.(query)) ?? [],
       ),
   };
+}
+
+export function createFootballSource(
+  context: RepositoryContext = {},
+): FootballSource {
+  const provider = resolveProvider(context);
+  // One FootballSource per provider instance in this request (Sprint 2A).
+  return oncePerRequestSync(
+    requestMemoKey("source", [requestIdentityKey(provider)]),
+    () => buildFootballSource(provider),
+  );
 }

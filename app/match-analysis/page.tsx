@@ -35,11 +35,13 @@ export default async function MatchAnalysisPage({
     redirect(matchAnalysisHref(fromQuery));
   }
 
-  const user = await getShellUser();
-  const t = await getTranslations("matchAnalysis");
-  const loaded = await loadUnlessQuota(() =>
-    listMatchAnalysisFixtures({ requireProvider: true }),
-  );
+  const [user, t, loaded] = await Promise.all([
+    getShellUser(),
+    getTranslations("matchAnalysis"),
+    loadUnlessQuota(() =>
+      listMatchAnalysisFixtures({ requireProvider: true }),
+    ),
+  ]);
 
   return (
     <ProductShell user={user}>

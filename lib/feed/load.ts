@@ -77,13 +77,10 @@ export const loadFeedDesk = cache(async (): Promise<FeedDeskLoad> => {
 
 export const loadFeedBook = cache(async (): Promise<FeedBookLoad> => {
   const data = getMockBankroll();
-  let fixtures: BankrollFixture[] = [];
-  try {
-    fixtures = await loadBankrollFixtures();
-  } catch {
-    fixtures = [];
-  }
-  const market = await loadFeedMarket();
+  const [fixtures, market] = await Promise.all([
+    loadBankrollFixtures().catch((): BankrollFixture[] => []),
+    loadFeedMarket(),
+  ]);
   return {
     data,
     fixtures,

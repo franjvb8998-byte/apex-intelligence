@@ -12,10 +12,7 @@ import {
 } from "@/lib/match-center/enrich";
 import { fixtureIdFromMatch } from "@/lib/match-center/fixture-id";
 import { createMatchCenterFromApexBundle } from "@/lib/match-center/from-data-platform";
-import {
-  listMatchCenterFixtureBundles,
-  type LoadMatchCenterOptions,
-} from "@/lib/match-center/load";
+import type { LoadMatchCenterOptions } from "@/lib/match-center/load";
 import {
   createRepositories,
   ignoreNonQuotaErrors,
@@ -95,11 +92,9 @@ export async function getApexOpportunities(
     env,
     enrichMatch: true,
   });
-  const bundles = await listMatchCenterFixtureBundles({
-    ...options,
-    provider: options.provider,
-    env,
-  });
+  // Same catalogue as listMatchCenterFixtureBundles — reuse this graph
+  // instead of constructing a second DAL in the same request (Sprint 2A).
+  const bundles = await repos.fixtures.listCatalogue();
   const enrich = bundles.length <= ENRICH_WHEN_AT_MOST;
 
   const mapped = await mapPool(bundles, EVALUATE_CONCURRENCY, async (bundle) => {

@@ -13,10 +13,12 @@ export async function generateMetadata() {
 }
 
 export default async function PortfolioPage() {
-  const user = await getShellUser();
+  const [user, fixtures, scan] = await Promise.all([
+    getShellUser(),
+    loadBankrollFixtures(),
+    loadUnlessQuota(() => getApexOpportunities()),
+  ]);
   const data = getMockBankroll();
-  const fixtures = await loadBankrollFixtures();
-  const scan = await loadUnlessQuota(() => getApexOpportunities());
   const analyzed = scan.ok ? scan.data.analyzed : [];
 
   return (

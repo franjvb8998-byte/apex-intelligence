@@ -21,11 +21,14 @@ type CopilotPageProps = {
 };
 
 export default async function CopilotPage({ searchParams }: CopilotPageProps) {
-  const user = await getShellUser();
-  const t = await getTranslations("copilot");
-  const fixtures = await createCopilotDataLoader()
-    .listFixtures()
-    .catch(() => []);
+  const [user, t, fixtures, params] = await Promise.all([
+    getShellUser(),
+    getTranslations("copilot"),
+    createCopilotDataLoader()
+      .listFixtures()
+      .catch(() => []),
+    searchParams,
+  ]);
   const first = fixtures[0];
   const label = first ? matchLabel(first) : t("catalogueMatch");
   const prompts = [
@@ -35,7 +38,6 @@ export default async function CopilotPage({ searchParams }: CopilotPageProps) {
     t("promptStake"),
     t("promptResume", { match: label }),
   ];
-  const params = await searchParams;
   const fromPrompt = firstSearchParam(params.prompt);
   const fromFixture = firstSearchParam(params.fixture);
   const match = fromFixture

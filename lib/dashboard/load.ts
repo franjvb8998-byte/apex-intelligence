@@ -66,18 +66,19 @@ export async function getDashboardData(
   const upcomingDays = options.upcomingDays ?? 3;
   const now = options.now ?? new Date();
 
-  const todayBundles = await listForDate(repos.fixtures, today);
-
-  const upcomingBundles: ApexMatchBundle[] = [];
+  const dates = Array.from({ length: upcomingDays + 1 }, (_, offset) =>
+    addUtcDays(today, offset),
+  );
+  const listed = await Promise.all(
+    dates.map((date) => listForDate(repos.fixtures, date)),
+  );
+  const todayBundles = listed[0] ?? [];
+  const upcomingBundles: ApexMatchBundle[] = [...todayBundles];
   const seenIds = new Set(todayBundles.map((b) => b.match.id));
-
-  for (let offset = 0; offset <= upcomingDays; offset += 1) {
-    const date = addUtcDays(today, offset);
-    const bundles =
-      offset === 0 ? todayBundles : await listForDate(repos.fixtures, date);
+  for (const bundles of listed.slice(1)) {
     for (const bundle of bundles) {
-      if (seenIds.has(bundle.match.id) && offset > 0) continue;
-      if (offset > 0) seenIds.add(bundle.match.id);
+      if (seenIds.has(bundle.match.id)) continue;
+      seenIds.add(bundle.match.id);
       upcomingBundles.push(bundle);
     }
   }

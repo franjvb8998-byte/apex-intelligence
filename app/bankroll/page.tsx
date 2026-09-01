@@ -17,10 +17,13 @@ type BankrollPageProps = {
 };
 
 export default async function BankrollPage({ searchParams }: BankrollPageProps) {
-  const user = await getShellUser();
+  const [user, fixtures, params] = await Promise.all([
+    getShellUser(),
+    loadBankrollFixtures(),
+    searchParams,
+  ]);
   const data = getMockBankroll();
-  const fixtures = await loadBankrollFixtures();
-  const initialFixtureId = firstSearchParam((await searchParams).fixture);
+  const initialFixtureId = firstSearchParam(params.fixture);
 
   return (
     <ProductShell user={user}>
