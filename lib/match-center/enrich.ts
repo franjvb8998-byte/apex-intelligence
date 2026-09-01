@@ -3,6 +3,7 @@
  * Only calls provider endpoints that already exist — never invents stats/H2H/injuries.
  */
 
+import { lineupsCarriedOnBundle } from "@/lib/data-platform/providers/api-football/carried-lineups";
 import { adaptApiFootballTeamStatistics } from "@/lib/data-platform/providers/api-football/adapters";
 import type { IDataProvider } from "@/lib/data-platform/provider";
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
@@ -223,6 +224,8 @@ export async function enrichMatchCenterContext(
   const season = seasonYear(bundle.league?.season);
   const fixtureId = externalId(bundle.match.externalRefs);
 
+  const carriedLineups = lineupsCarriedOnBundle(bundle);
+
   const [
     homeStats,
     awayStats,
@@ -257,9 +260,14 @@ export async function enrichMatchCenterContext(
     awayId
       ? safe(() => repos.teams.listRecentFixtures(awayId, 5), null)
       : Promise.resolve(null),
-    fixtureId
-      ? safe(() => repos.fixtures.getLineups(fixtureId), null)
-      : Promise.resolve(null),
+    // Removed duplicate fixtures.getLineups: getById already loaded lineups
+    // onto this bundle (see carryLineupsOnBundle). Only hit the repo when
+    // the match snapshot was listed without enrichment.
+    carriedLineups
+      ? Promise.resolve({ response: carriedLineups })
+      : fixtureId
+        ? safe(() => repos.fixtures.getLineups(fixtureId), null)
+        : Promise.resolve(null),
     leagueId && season
       ? safe(() => repos.standings.getTable(leagueId, season), null)
       : Promise.resolve(null),

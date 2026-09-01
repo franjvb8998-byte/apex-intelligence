@@ -7,7 +7,11 @@ import {
   EMPTY_MATCH_ANALYSIS_CATALOGUE,
   enrichMatchAnalysisCatalogue,
 } from "@/lib/match-analysis/catalogue";
-import type { MatchAnalysisData } from "@/lib/match-analysis/types";
+import type {
+  MatchAnalysisData,
+  MatchAnalysisLeaguePosition,
+} from "@/lib/match-analysis/types";
+import type { MatchCenterStanding } from "@/lib/match-center/types";
 import { buildIntelligenceReport } from "@/lib/intelligence-report";
 import { scoreMatchSelection, apexScoreFromScoring } from "@/lib/scoring-engine/from-match";
 import { clubTwinsFromPreview, selectionTwinFromPreview } from "@/lib/team-intelligence/builders";
@@ -48,9 +52,13 @@ export async function getMatchAnalysisData(
     enrichMatchCenterContext(repos, bundle).catch(() => ({
       ...EMPTY_MATCH_CENTER_ENRICHMENT,
     })),
-    enrichMatchAnalysisCatalogue(repos, bundle).catch(() => ({
-      ...EMPTY_MATCH_ANALYSIS_CATALOGUE,
-    })),
+    // Removed duplicate standings.getTable: Match Center enrich already
+    // loads the league table. Catalogue only fetches fixture statistics.
+    enrichMatchAnalysisCatalogue(repos, bundle, { skipStandings: true }).catch(
+      () => ({
+        ...EMPTY_MATCH_ANALYSIS_CATALOGUE,
+      }),
+    ),
   ]);
 
   const center = createMatchCenterFromApexBundle(bundle, { enrichment });
@@ -107,6 +115,18 @@ export async function getMatchAnalysisData(
   };
 }
 
+function leaguePositionFromStanding(
+  standing: MatchCenterStanding | null,
+): MatchAnalysisLeaguePosition | null {
+  if (!standing) return null;
+  return {
+    rank: standing.rank,
+    points: standing.points,
+    played: standing.played,
+    teamName: standing.teamName,
+  };
+}
+
 function attachCatalogue(
   analysis: MatchAnalysisData,
   bundle: ApexMatchBundle,
@@ -120,7 +140,16 @@ function attachCatalogue(
     ...analysis,
     source: "data-platform",
     leagueName: bundle.league?.name ?? analysis.leagueName,
-    leaguePosition: catalogue.positions,
+    // Prefer standings already mapped by Match Center enrich; catalogue
+    // positions are only a fallback when skipStandings was not used.
+    leaguePosition: {
+      home:
+        leaguePositionFromStanding(enrichment.standings.home) ??
+        catalogue.positions.home,
+      away:
+        leaguePositionFromStanding(enrichment.standings.away) ??
+        catalogue.positions.away,
+    },
     recentMatches: enrichment.recent,
     h2h: enrichment.h2h,
     venueSplit: {

@@ -1,4 +1,8 @@
 import { ignoreNonQuotaErrors } from "@/lib/repositories/quota";
+import {
+  oncePerRequest,
+  requestMemoKey,
+} from "@/lib/repositories/once-per-request";
 import type { FootballSource } from "@/lib/repositories/source";
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
 import type { DataProviderFixturesQuery } from "@/lib/data-platform/types";
@@ -53,25 +57,34 @@ export function createFixturesRepository(
     },
 
     async listCatalogue(limit = CATALOGUE_LIMIT) {
-      const today = new Date().toISOString().slice(0, 10);
-      let list = await ignoreNonQuotaErrors(
-        () => source.listFixtures({ date: today }),
-        [],
+      // Removed duplicate today's date list: Dashboard fixtures.list({ date })
+      // and this path share oncePerRequest("af:listFixtures:{today}"). Do not
+      // switch Dashboard to listCatalogue — that slices to 20 and would
+      // change the overview UI. Rank/slice still run per caller.
+      return oncePerRequest(
+        requestMemoKey("af:listCatalogue", [limit]),
+        async () => {
+          const today = new Date().toISOString().slice(0, 10);
+          let list = await ignoreNonQuotaErrors(
+            () => source.listFixtures({ date: today }),
+            [],
+          );
+
+          if (list.length === 0) {
+            list = await ignoreNonQuotaErrors(
+              () =>
+                source.listFixtures({
+                  leagueId: PREMIER_LEAGUE_ID,
+                  season: PREMIER_LEAGUE_SEASON,
+                  limit,
+                }),
+              [],
+            );
+          }
+
+          return rankFixtures(list).slice(0, limit);
+        },
       );
-
-      if (list.length === 0) {
-        list = await ignoreNonQuotaErrors(
-          () =>
-            source.listFixtures({
-              leagueId: PREMIER_LEAGUE_ID,
-              season: PREMIER_LEAGUE_SEASON,
-              limit,
-            }),
-          [],
-        );
-      }
-
-      return rankFixtures(list).slice(0, limit);
     },
 
     async listHeadToHead(homeTeamId, awayTeamId, last = 5) {

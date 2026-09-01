@@ -37,6 +37,7 @@ import {
   mapApiFootballEnvelopeToApexBundle,
   mapApiFootballStatus,
 } from "@/lib/data-platform/providers/api-football/mapper";
+import { carryLineupsOnBundle } from "@/lib/data-platform/providers/api-football/carried-lineups";
 import type {
   ApiFootballFixtureItem,
   ApiFootballFixturesResponse,
@@ -304,6 +305,8 @@ export class ApiFootballDataProvider implements IDataProvider {
       { odds },
     );
     bundle.trustScore = this.quality.score(bundle);
+    // getMatch already fetched /fixtures/lineups; enrich must not call it again.
+    carryLineupsOnBundle(bundle, payload.response?.[0]?.lineups);
     return bundle;
   }
 }

@@ -57,6 +57,7 @@ export async function getMatchCenterData(
 ): Promise<MatchCenterData> {
   const repos = repositoriesFor(options);
   const requested = vendorFixtureId(options.externalMatchId);
+  // Dashboard / Copilot already listed today's catalogue in this request.
   const skipCatalogue = options.includeFixtureList === false && Boolean(requested);
   const fixtures = skipCatalogue ? [] : await repos.fixtures.listCatalogue();
   const matchId = resolveSelectedFixtureId(fixtures, requested ?? undefined);

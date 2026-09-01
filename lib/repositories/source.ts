@@ -15,6 +15,10 @@ import type {
   DataProviderFixturesQuery,
   DataProviderMatchQuery,
 } from "@/lib/data-platform/types";
+import {
+  oncePerRequest,
+  requestMemoKey,
+} from "@/lib/repositories/once-per-request";
 
 export type DataAccessProfile = "product" | "recorded";
 
@@ -92,20 +96,64 @@ function extrasFrom(provider: IDataProvider): FootballExtras | null {
   if (!(provider instanceof ApiFootballDataProvider)) return null;
   const http = provider.http;
   return {
-    getTeam: (id) => http.getTeam(id),
+    getTeam: (id) =>
+      oncePerRequest(requestMemoKey("af:team", [id]), () => http.getTeam(id)),
     getTeamStatistics: (team, league, season) =>
-      http.getTeamStatistics(team, league, season),
-    getStandings: (league, season) => http.getStandings(league, season),
-    getFixtureStatistics: (fixture) => http.getFixtureStatistics(fixture),
-    getFixtureOdds: (fixtureId) => http.getFixtureOdds(fixtureId),
+      oncePerRequest(
+        requestMemoKey("af:team-stats", [team, league, season]),
+        () => http.getTeamStatistics(team, league, season),
+      ),
+    getStandings: (league, season) =>
+      // Removed duplicate standings.getTable: Match Center enrich and Match
+      // Analysis catalogue share this in-flight table per league+season.
+      oncePerRequest(requestMemoKey("af:standings", [league, season]), () =>
+        http.getStandings(league, season),
+      ),
+    getFixtureStatistics: (fixture) =>
+      oncePerRequest(requestMemoKey("af:fixture-stats", [fixture]), () =>
+        http.getFixtureStatistics(fixture),
+      ),
+    getFixtureOdds: (fixtureId) =>
+      oncePerRequest(requestMemoKey("af:odds", [fixtureId]), () =>
+        http.getFixtureOdds(fixtureId),
+      ),
     getHeadToHead: (homeTeamId, awayTeamId, last) =>
-      http.getHeadToHead(homeTeamId, awayTeamId, last),
-    getInjuries: (query) => http.getInjuries(query),
-    getTeamLastFixtures: (team, last) => http.getTeamLastFixtures(team, last),
-    getLineups: (fixture) => http.getLineups(fixture),
-    getEvents: (fixture) => http.getEvents(fixture),
-    getPlayer: (id, season) => http.getPlayer(id, season),
-    getLeague: (id) => http.getLeague(id),
+      oncePerRequest(
+        requestMemoKey("af:h2h", [homeTeamId, awayTeamId, last]),
+        () => http.getHeadToHead(homeTeamId, awayTeamId, last),
+      ),
+    getInjuries: (query) =>
+      oncePerRequest(
+        requestMemoKey("af:injuries", [
+          query.fixture,
+          query.team,
+          query.season,
+        ]),
+        () => http.getInjuries(query),
+      ),
+    getTeamLastFixtures: (team, last) =>
+      oncePerRequest(
+        requestMemoKey("af:fixtures:team", [team, last]),
+        () => http.getTeamLastFixtures(team, last),
+      ),
+    getLineups: (fixture) =>
+      // Removed duplicate /fixtures/lineups: getById already carried lineups
+      // on the bundle; this memo covers list-only snapshots that still enrich.
+      oncePerRequest(requestMemoKey("af:lineups", [fixture]), () =>
+        http.getLineups(fixture),
+      ),
+    getEvents: (fixture) =>
+      oncePerRequest(requestMemoKey("af:events", [fixture]), () =>
+        http.getEvents(fixture),
+      ),
+    getPlayer: (id, season) =>
+      oncePerRequest(requestMemoKey("af:player", [id, season]), () =>
+        http.getPlayer(id, season),
+      ),
+    getLeague: (id) =>
+      oncePerRequest(requestMemoKey("af:league", [id]), () =>
+        http.getLeague(id),
+      ),
   };
 }
 
@@ -128,8 +176,23 @@ export function createFootballSource(
     displayName: provider.displayName,
     dataMode: dataModeOf(provider),
     extras: extrasFrom(provider),
-    getMatch: (query) => provider.getMatch(query),
-    listFixtures: async (query = {}) =>
-      (await provider.listFixtures?.(query)) ?? [],
+    // Removed duplicate getById: Dashboard featured match, Match Center,
+    // Match Analysis, and Copilot share this in-flight promise per request.
+    getMatch: (query) =>
+      oncePerRequest(requestMemoKey("af:getMatch", [query.matchId]), () =>
+        provider.getMatch(query),
+      ),
+    // Removed duplicate date/league lists: Dashboard today scan and
+    // listCatalogue both call listFixtures({ date: today }).
+    listFixtures: (query = {}) =>
+      oncePerRequest(
+        requestMemoKey("af:listFixtures", [
+          query.date,
+          query.leagueId,
+          query.season,
+          query.limit,
+        ]),
+        async () => (await provider.listFixtures?.(query)) ?? [],
+      ),
   };
 }

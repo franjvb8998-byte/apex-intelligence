@@ -68,6 +68,10 @@ export function createCopilotDataLoader(
     externalMatchId: string,
     loadEnv: NodeJS.ProcessEnv | Record<string, string | undefined> = env,
   ) {
+    // Removed duplicate listCatalogue on match load: Copilot GET already
+    // listed today's catalogue; includeFixtureList: false reuses that and
+    // only getById + enrich for the selected fixture. Same-request memo
+    // also coalesces listFixtures({ date: today }) with Dashboard.
     return getMatchCenterData({
       ...options,
       provider,

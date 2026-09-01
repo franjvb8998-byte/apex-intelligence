@@ -4,6 +4,7 @@
 
 import type { IDataProvider } from "@/lib/data-platform/provider";
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
+import type { ApiFootballStandingsResponse } from "@/lib/data-platform/providers/api-football/types";
 import type {
   MatchAnalysisLeaguePosition,
   MatchAnalysisMatchMetrics,
@@ -25,6 +26,16 @@ export type MatchAnalysisCatalogue = {
   };
 };
 
+export type MatchAnalysisCatalogueOptions = {
+  /**
+   * League table already loaded by enrichMatchCenterContext.
+   * When set, skip standings.getTable (duplicate with Match Center).
+   */
+  standings?: ApiFootballStandingsResponse | null;
+  /** Skip standings entirely; caller maps positions from Match Center enrich. */
+  skipStandings?: boolean;
+};
+
 export const EMPTY_MATCH_ANALYSIS_CATALOGUE: MatchAnalysisCatalogue = {
   positions: { home: null, away: null },
   matchMetrics: { home: null, away: null },
@@ -33,9 +44,10 @@ export const EMPTY_MATCH_ANALYSIS_CATALOGUE: MatchAnalysisCatalogue = {
 export async function enrichMatchAnalysisCatalogue(
   access: IDataProvider | ApexRepositories,
   bundle: ApexMatchBundle,
+  options?: MatchAnalysisCatalogueOptions,
 ): Promise<MatchAnalysisCatalogue> {
   const repos = isRepositories(access)
     ? access
     : createRepositories({ provider: access });
-  return repos.matchAnalysis.getCatalogue(bundle);
+  return repos.matchAnalysis.getCatalogue(bundle, options);
 }

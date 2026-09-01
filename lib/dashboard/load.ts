@@ -44,6 +44,9 @@ async function listForDate(
   fixtures: ReturnType<typeof createRepositories>["fixtures"],
   date: string,
 ): Promise<ApexMatchBundle[]> {
+  // Removed duplicate today's catalogue fetch: fixtures.list({ date }) is
+  // memoized per request (af:listFixtures:{date}). Match Center / Copilot
+  // listCatalogue reuse the same today query instead of hitting origin again.
   return ignoreNonQuotaErrors(() => fixtures.list({ date }), []);
 }
 
@@ -257,6 +260,8 @@ export async function loadDashboardWorkspace(
   const featuredId = dashboard.featuredMatchId?.trim();
   let matchCenter: MatchCenterData | null = null;
   try {
+    // Removed duplicate listCatalogue: today's fixtures already loaded above.
+    // Featured getById still runs (list snapshots omit events/lineups/odds).
     matchCenter = await getMatchCenterData({
       externalMatchId:
         dashboard.system.provider === "api-football" && featuredId

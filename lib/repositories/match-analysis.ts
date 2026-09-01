@@ -1,5 +1,8 @@
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
-import type { MatchAnalysisCatalogue } from "@/lib/match-analysis/catalogue";
+import type {
+  MatchAnalysisCatalogue,
+  MatchAnalysisCatalogueOptions,
+} from "@/lib/match-analysis/catalogue";
 import {
   fixtureStatisticsByTeam,
   matchMetricsFromFixtureStatistics,
@@ -10,7 +13,10 @@ import type { StandingsRepository } from "@/lib/repositories/standings";
 import type { StatisticsRepository } from "@/lib/repositories/statistics";
 
 export type MatchAnalysisRepository = {
-  getCatalogue(bundle: ApexMatchBundle): Promise<MatchAnalysisCatalogue>;
+  getCatalogue(
+    bundle: ApexMatchBundle,
+    options?: MatchAnalysisCatalogueOptions,
+  ): Promise<MatchAnalysisCatalogue>;
 };
 
 const EMPTY_CATALOGUE: MatchAnalysisCatalogue = {
@@ -44,7 +50,7 @@ export function createMatchAnalysisRepository(
   statistics: StatisticsRepository,
 ): MatchAnalysisRepository {
   return {
-    async getCatalogue(bundle) {
+    async getCatalogue(bundle, options = {}) {
       if (!source.extras) {
         return { ...EMPTY_CATALOGUE };
       }
@@ -55,10 +61,16 @@ export function createMatchAnalysisRepository(
       const season = seasonYear(bundle.league?.season);
       const fixtureId = externalId(bundle.match.externalRefs);
 
+      // Removed duplicate standings.getTable when Match Center enrich already
+      // holds the league table (or skipStandings maps positions from it).
       const [standingsPayload, statsPayload] = await Promise.all([
-        leagueId && season
-          ? safe(() => standings.getTable(leagueId, season), null)
-          : Promise.resolve(null),
+        options.skipStandings
+          ? Promise.resolve(null)
+          : options.standings !== undefined
+            ? Promise.resolve(options.standings)
+            : leagueId && season
+              ? safe(() => standings.getTable(leagueId, season), null)
+              : Promise.resolve(null),
         fixtureId
           ? safe(() => statistics.getFixtureStatistics(fixtureId), null)
           : Promise.resolve(null),
