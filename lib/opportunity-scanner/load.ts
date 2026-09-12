@@ -1,6 +1,11 @@
 import { cache } from "react";
 import { getApexOpportunities } from "@/lib/apex-opportunities/load";
 import { leagueOptions } from "@/lib/apex-opportunities/filters";
+import {
+  beginScannerProfile,
+  measurePhaseSync,
+  noteScannerQuotaExhausted,
+} from "@/lib/debug/scanner-profile";
 import { loadUnlessQuota } from "@/lib/repositories";
 import { countryOptions } from "@/lib/opportunity-scanner/country";
 import { teamOptions } from "@/lib/opportunity-scanner/filters";
@@ -20,8 +25,12 @@ export type OpportunityScannerLoad = {
 
 export const loadOpportunityScanner = cache(
   async (): Promise<OpportunityScannerLoad> => {
-    const loaded = await loadUnlessQuota(() => getApexOpportunities());
+    const scannerProfile = beginScannerProfile();
+    const loaded = await loadUnlessQuota(() =>
+      getApexOpportunities({ scannerProfile }),
+    );
     if (!loaded.ok) {
+      noteScannerQuotaExhausted();
       const generatedAt = new Date().toISOString();
       return {
         analyzed: [],
@@ -34,7 +43,7 @@ export const loadOpportunityScanner = cache(
       };
     }
     const analyzed = loaded.data.analyzed;
-    return {
+    return measurePhaseSync("serialization", () => ({
       analyzed,
       generatedAt: loaded.data.generatedAt,
       leagues: leagueOptions(analyzed),
@@ -42,6 +51,6 @@ export const loadOpportunityScanner = cache(
       teams: teamOptions(analyzed),
       rankings: buildScannerRankings(analyzed),
       quotaExhausted: false,
-    };
+    }));
   },
 );

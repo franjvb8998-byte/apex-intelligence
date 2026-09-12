@@ -7,6 +7,16 @@ import { mapOpportunityFromCenter } from "@/lib/apex-opportunities/map";
 import type { ApexOpportunitiesBoard } from "@/lib/apex-opportunities/types";
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
 import {
+  bindScannerProfile,
+  instrumentRepositories,
+  measurePhase,
+  measurePhaseSync,
+  noteScannerFixtureCount,
+  noteScannerFixtures,
+  noteScannerOddsAttached,
+  type ScannerProfileSession,
+} from "@/lib/debug/scanner-profile";
+import {
   EMPTY_MATCH_CENTER_ENRICHMENT,
   enrichMatchCenterContext,
 } from "@/lib/match-center/enrich";
@@ -24,7 +34,10 @@ const EVALUATE_CONCURRENCY = 3;
 /** Full form/injury enrichment is cheap on recorded catalogues; skip on busy days. */
 const ENRICH_WHEN_AT_MOST = 3;
 
-export type LoadApexOpportunitiesOptions = LoadMatchCenterOptions;
+export type LoadApexOpportunitiesOptions = LoadMatchCenterOptions & {
+  /** Sprint 2.5 — removable profile session. Does not change board output. */
+  scannerProfile?: ScannerProfileSession;
+};
 
 async function attachOdds(
   repos: ApexRepositories,
@@ -53,18 +66,33 @@ async function evaluateBundle(
   bundle: ApexMatchBundle,
   enrich: boolean,
 ) {
-  const withOdds = await attachOdds(repos, bundle);
+  const withOdds = await measurePhase(
+    "attachOdds",
+    () => attachOdds(repos, bundle),
+    { fixtures: 1 },
+  );
+  if (withOdds.odds.length > 0) noteScannerOddsAttached();
   let enrichment = EMPTY_MATCH_CENTER_ENRICHMENT;
   if (enrich) {
     try {
-      enrichment = await enrichMatchCenterContext(repos, withOdds);
+      enrichment = await measurePhase(
+        "enrichment",
+        () => enrichMatchCenterContext(repos, withOdds),
+        { fixtures: 1 },
+      );
     } catch {
       // Form/injuries are optional for the scan. Quota here must not blank the board.
       enrichment = EMPTY_MATCH_CENTER_ENRICHMENT;
     }
   }
+  noteScannerFixtures("decisionEngine", 1);
+  noteScannerFixtures("scoring", 1);
   const center = createMatchCenterFromApexBundle(withOdds, { enrichment });
-  return mapOpportunityFromCenter(center);
+  return measurePhaseSync(
+    "serialization",
+    () => mapOpportunityFromCenter(center),
+    { fixtures: 1 },
+  );
 }
 
 async function mapPool<T, R>(
@@ -86,15 +114,23 @@ async function mapPool<T, R>(
 export async function getApexOpportunities(
   options: LoadApexOpportunitiesOptions = {},
 ): Promise<ApexOpportunitiesBoard> {
+  if (options.scannerProfile) bindScannerProfile(options.scannerProfile);
   const env = options.env ?? process.env;
-  const repos = createRepositories({
-    provider: options.provider,
-    env,
-    enrichMatch: true,
-  });
+  const repos = instrumentRepositories(
+    createRepositories({
+      provider: options.provider,
+      env,
+      enrichMatch: true,
+    }),
+  );
   // Same catalogue as listMatchCenterFixtureBundles — reuse this graph
   // instead of constructing a second DAL in the same request (Sprint 2A).
-  const bundles = await repos.fixtures.listCatalogue();
+  const bundles = await measurePhase(
+    "catalogue",
+    () => repos.fixtures.listCatalogue(),
+  );
+  noteScannerFixtureCount(bundles.length);
+  noteScannerFixtures("catalogue", bundles.length);
   const enrich = bundles.length <= ENRICH_WHEN_AT_MOST;
 
   const mapped = await mapPool(bundles, EVALUATE_CONCURRENCY, async (bundle) => {

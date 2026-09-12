@@ -9,6 +9,7 @@ import {
   type DecisionMatchExtras,
   type MatchAnalysisCore,
 } from "@/lib/decision-engine/from-match";
+import { measurePhaseSync } from "@/lib/debug/scanner-profile";
 import type {
   ApexDecision,
   ApexDecisionInput,
@@ -53,15 +54,21 @@ export function scoreMatchSelection(args: {
   scoring: ApexScoring;
 } {
   const extras = args.extras ?? {};
-  const decisionInput = decisionInputFromMatch(args.analysis, extras);
-  const decision = evaluateDecision(decisionInput);
-  const scoring = evaluateScoringFromEngines({
-    selectionId: args.analysis.matchId,
-    selectionLabel: decision.selectionLabel,
-    decision,
-    decisionInput,
-    team: args.team,
-  });
+  const decisionInput = measurePhaseSync("decisionEngine", () =>
+    decisionInputFromMatch(args.analysis, extras),
+  );
+  const decision = measurePhaseSync("decisionEngine", () =>
+    evaluateDecision(decisionInput),
+  );
+  const scoring = measurePhaseSync("scoring", () =>
+    evaluateScoringFromEngines({
+      selectionId: args.analysis.matchId,
+      selectionLabel: decision.selectionLabel,
+      decision,
+      decisionInput,
+      team: args.team,
+    }),
+  );
   captureMatchRecommendation({
     analysis: args.analysis,
     decision,

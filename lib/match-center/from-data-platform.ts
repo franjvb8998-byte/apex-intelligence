@@ -21,6 +21,7 @@ import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
 import type { ApexMatchEvent } from "@/lib/data-platform/types/event";
 import type { ApexMatchStatus } from "@/lib/data-platform/types/match";
 import type { ApexPlayer } from "@/lib/data-platform/types/team";
+import { measurePhaseSync } from "@/lib/debug/scanner-profile";
 import type { MatchOutcome } from "@/lib/intelligence/types";
 import { estimateEloFromTeamId } from "@/lib/intelligence/modules/probability";
 import type { MatchAnalysisTeamStatSnapshot } from "@/lib/match-analysis/analysis-types";
@@ -493,17 +494,20 @@ export function createMatchCenterFromApexBundle(
     hasPlayed(options.enrichment?.teamStats?.home) ||
     hasPlayed(options.enrichment?.teamStats?.away);
 
-  const aiAnalysis = createMatchAnalysisService().analyzeBundle(bundle, {
-    homeElo,
-    awayElo,
-    teamStats: options.enrichment?.teamStats,
-    injuries: absencesToAnalysisInjuries([
-      ...(options.enrichment?.injuries ?? []),
-      ...(options.enrichment?.suspensions ?? []),
-    ]),
-  });
+  const aiAnalysis = measurePhaseSync("decisionEngine", () =>
+    createMatchAnalysisService().analyzeBundle(bundle, {
+      homeElo,
+      awayElo,
+      teamStats: options.enrichment?.teamStats,
+      injuries: absencesToAnalysisInjuries([
+        ...(options.enrichment?.injuries ?? []),
+        ...(options.enrichment?.suspensions ?? []),
+      ]),
+    }),
+  );
 
-  const preview = buildPreviewFromEngine({
+  const preview = measurePhaseSync("decisionEngine", () =>
+    buildPreviewFromEngine({
     matchId: bundle.match.id,
     leagueName: match.leagueName,
     kickoffAt: match.kickoffAt,
@@ -560,10 +564,12 @@ export function createMatchCenterFromApexBundle(
     },
     source: "intelligence-core",
     skipPlatformScore: true,
-  });
+    }),
+  );
 
   preview.analysis.modelVersion = `${preview.hybrid.modelVersion}+data-platform`;
-  preview.dashboard = buildPreviewDashboard({
+  preview.dashboard = measurePhaseSync("serialization", () =>
+    buildPreviewDashboard({
     btts: preview.hybrid.btts,
     oneXTwo: preview.analysis.oneXTwo,
     overUnder25: preview.hybrid.overUnder25,
@@ -579,12 +585,15 @@ export function createMatchCenterFromApexBundle(
     trends: options.enrichment?.trends,
     homeTeam,
     awayTeam,
-  });
+    }),
+  );
 
-  const rating = ratePreview(
-    preview,
-    aiAnalysis,
-    `APEX Rating · ${bundle.provenance.primaryProvider}`,
+  const rating = measurePhaseSync("serialization", () =>
+    ratePreview(
+      preview,
+      aiAnalysis,
+      `APEX Rating · ${bundle.provenance.primaryProvider}`,
+    ),
   );
   preview.analysis.rating = rating;
   const extras = {
@@ -608,13 +617,19 @@ export function createMatchCenterFromApexBundle(
   preview.analysis.decision = decision;
   preview.analysis.scoring = scoring;
   preview.analysis.apexScore = apexScoreFromScoring(scoring);
-  preview.analysis.report = buildIntelligenceReport({
-    data: preview.analysis,
-    ...extras,
-  });
+  preview.analysis.report = measurePhaseSync("serialization", () =>
+    buildIntelligenceReport({
+      data: preview.analysis,
+      ...extras,
+    }),
+  );
 
-  const live = buildLiveFromBundle(bundle, preview);
-  const post = buildPostFromBundle(bundle, preview);
+  const live = measurePhaseSync("serialization", () =>
+    buildLiveFromBundle(bundle, preview),
+  );
+  const post = measurePhaseSync("serialization", () =>
+    buildPostFromBundle(bundle, preview),
+  );
 
   return {
     match,

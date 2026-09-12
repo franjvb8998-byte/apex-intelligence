@@ -2,6 +2,8 @@
  * API-Football response cache policy: TTLs, rate-limit detection, CACHE/API logs.
  */
 
+import { noteApiFootballCacheEvent } from "@/lib/debug/scanner-profile";
+
 export const API_FOOTBALL_CACHE_TTL_MS = {
   /** Fixtures lists (by date, league, last N, H2H). */
   fixtures: 10 * 60 * 1000,
@@ -48,6 +50,7 @@ export function logApiFootballCache(
 }
 
 export function defaultApiFootballCacheLogger(event: ApiFootballCacheLogEvent): void {
+  noteApiFootballCacheEvent({ source: event.source });
   const source = event.stale ? "CACHE (stale)" : event.source;
   console.info(`[api-football] ${source} ${event.key}`);
 }
