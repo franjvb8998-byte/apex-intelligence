@@ -1,13 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { MockDataProvider } from "@/lib/data-platform/mock-provider";
 import { DEMO_MATCH_EXTERNAL_ID } from "@/lib/data-platform/providers/_shared/demo-fixture";
+import type { ApexOddsQuote } from "@/lib/data-platform/types/odds";
 import {
   createRepositories,
   createRecordedDataProvider,
   dataModeOf,
   hasFootballApiKey,
   isQuotaError,
+  RECORDED_API_FOOTBALL_FIXTURE_ID,
 } from "@/lib/repositories";
+
+function oddsMarketsAndPrices(quotes: ApexOddsQuote[]) {
+  return quotes.map((quote) => ({
+    id: quote.id,
+    matchId: quote.matchId,
+    market: quote.market,
+    line: quote.line,
+    bookmaker: quote.bookmaker,
+    sourceProvider: quote.sourceProvider,
+    externalRefs: quote.externalRefs,
+    selections: quote.selections,
+  }));
+}
 
 describe("Data Access Layer v1", () => {
   it("serves fixtures from an injected provider without extras", async () => {
@@ -50,6 +65,30 @@ describe("Data Access Layer v1", () => {
       first.match.externalRefs[0]?.externalId ?? first.match.id,
     );
     expect(loaded.match.id).toBe(first.match.id);
+  });
+
+  it("lists recorded odds without going through an enriched getMatch", async () => {
+    const oddsOnly = createRepositories({
+      provider: createRecordedDataProvider({ enrichMatch: false }),
+    });
+    const thin = await oddsOnly.fixtures.getById(RECORDED_API_FOOTBALL_FIXTURE_ID);
+    expect(thin.odds).toEqual([]);
+
+    const quotes = await oddsOnly.odds.listForFixture(
+      RECORDED_API_FOOTBALL_FIXTURE_ID,
+    );
+    expect(quotes.length).toBeGreaterThan(0);
+    expect(quotes.some((quote) => quote.market === "1x2")).toBe(true);
+    expect(quotes.some((quote) => quote.market === "over_under")).toBe(true);
+    expect(quotes.some((quote) => quote.market === "btts")).toBe(true);
+
+    const enriched = createRepositories({
+      provider: createRecordedDataProvider({ enrichMatch: true }),
+    });
+    const full = await enriched.fixtures.getById(RECORDED_API_FOOTBALL_FIXTURE_ID);
+    expect(oddsMarketsAndPrices(quotes)).toEqual(
+      oddsMarketsAndPrices(full.odds),
+    );
   });
 
   it("detects API keys and quota errors without UI importing the vendor", () => {

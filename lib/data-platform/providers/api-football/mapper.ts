@@ -269,7 +269,7 @@ function mapBttsKey(value: string): "yes" | "no" | null {
   return null;
 }
 
-function mapOdds(
+export function mapOdds(
   matchId: string,
   oddsItems: ApiFootballOddsItem[] | null | undefined,
 ): ApexOddsQuote[] {

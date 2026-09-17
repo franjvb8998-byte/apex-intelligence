@@ -10,7 +10,10 @@ import {
 } from "@/lib/data-platform";
 import { ApiFootballDataProvider } from "@/lib/data-platform/providers/api-football/api-football-provider";
 import type { ApiFootballClient } from "@/lib/data-platform/providers/api-football/client";
+import { apexIdFor } from "@/lib/data-platform/providers/_shared/demo-fixture";
+import { mapOdds } from "@/lib/data-platform/providers/api-football/mapper";
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
+import type { ApexOddsQuote } from "@/lib/data-platform/types/odds";
 import type {
   DataProviderFixturesQuery,
   DataProviderMatchQuery,
@@ -58,6 +61,7 @@ export type FootballSource = {
   readonly extras: FootballExtras | null;
   getMatch(query: DataProviderMatchQuery): Promise<ApexMatchBundle>;
   listFixtures(query?: DataProviderFixturesQuery): Promise<ApexMatchBundle[]>;
+  getOdds(matchId: string): Promise<ApexOddsQuote[]>;
 };
 
 export function hasFootballApiKey(
@@ -185,19 +189,35 @@ function resolveProvider(context: RepositoryContext = {}): IDataProvider {
   return createProductDataProvider(env, { enrichMatch: context.enrichMatch });
 }
 
+async function oddsFromExtras(
+  extras: FootballExtras,
+  matchId: string,
+): Promise<ApexOddsQuote[]> {
+  const payload = await extras.getFixtureOdds(matchId);
+  const oddsItems = payload.response ?? [];
+  if (oddsItems.length === 0) return [];
+  const externalId =
+    oddsItems[0]?.fixture?.id != null
+      ? String(oddsItems[0].fixture.id)
+      : matchId;
+  return mapOdds(apexIdFor("api-football", "match", externalId), oddsItems);
+}
+
 function buildFootballSource(provider: IDataProvider): FootballSource {
+  const extras = extrasFrom(provider);
+  const getMatch: FootballSource["getMatch"] = (query) =>
+    oncePerRequest(requestMemoKey("af:getMatch", [query.matchId]), () =>
+      provider.getMatch(query),
+    );
   return {
     provider,
     id: provider.id,
     displayName: provider.displayName,
     dataMode: dataModeOf(provider),
-    extras: extrasFrom(provider),
+    extras,
     // Removed duplicate getById: Dashboard featured match, Match Center,
     // Match Analysis, and Copilot share this in-flight promise per request.
-    getMatch: (query) =>
-      oncePerRequest(requestMemoKey("af:getMatch", [query.matchId]), () =>
-        provider.getMatch(query),
-      ),
+    getMatch,
     // Removed duplicate date/league lists: Dashboard today scan and
     // listCatalogue both call listFixtures({ date: today }).
     listFixtures: (query = {}) =>
@@ -210,6 +230,13 @@ function buildFootballSource(provider: IDataProvider): FootballSource {
         ]),
         async () => (await provider.listFixtures?.(query)) ?? [],
       ),
+    getOdds: (matchId) =>
+      oncePerRequest(requestMemoKey("af:getOdds", [matchId]), async () => {
+        if (!extras) {
+          return (await getMatch({ matchId })).odds;
+        }
+        return oddsFromExtras(extras, matchId);
+      }),
   };
 }
 

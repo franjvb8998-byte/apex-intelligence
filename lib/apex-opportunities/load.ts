@@ -49,15 +49,14 @@ async function attachOdds(
     externalId: bundle.match.externalRefs[0]?.externalId ?? null,
   });
   if (!matchId) return bundle;
-  const full = await ignoreNonQuotaErrors(
-    () => repos.fixtures.getById(matchId),
-    bundle,
+  const odds = await ignoreNonQuotaErrors(
+    () => repos.odds.listForFixture(matchId),
+    [],
   );
-  if (full.odds.length === 0) return bundle;
+  if (odds.length === 0) return bundle;
   return {
     ...bundle,
-    odds: full.odds,
-    league: full.league ?? bundle.league,
+    odds,
   };
 }
 

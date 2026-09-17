@@ -8,8 +8,7 @@ export type OddsRepository = {
 export function createOddsRepository(source: FootballSource): OddsRepository {
   return {
     async listForFixture(matchId) {
-      const bundle = await source.getMatch({ matchId });
-      return bundle.odds;
+      return source.getOdds(matchId);
     },
   };
 }
