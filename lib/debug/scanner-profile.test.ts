@@ -78,6 +78,7 @@ describe("scanner profile", () => {
         });
       });
       expect(board.analyzed.length).toBeGreaterThanOrEqual(1);
+      expect(board.quotaExhausted).toBe(false);
       printed = log.mock.calls.map((call) => String(call[0] ?? "")).join("\n");
     } finally {
       log.mockRestore();

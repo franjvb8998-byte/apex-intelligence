@@ -20,6 +20,7 @@ export type FeedMarketLoad =
       ok: true;
       analyzed: ApexOpportunity[];
       generatedAt: string;
+      quotaExhausted: boolean;
     }
   | { ok: false; quota: boolean };
 
@@ -41,10 +42,14 @@ export type FeedBookLoad = {
 export const loadFeedMarket = cache(async (): Promise<FeedMarketLoad> => {
   const loaded = await loadUnlessQuota(() => getApexOpportunities());
   if (!loaded.ok) return { ok: false, quota: true };
+  if (loaded.data.quotaExhausted && loaded.data.analyzed.length === 0) {
+    return { ok: false, quota: true };
+  }
   return {
     ok: true,
     analyzed: loaded.data.analyzed,
     generatedAt: loaded.data.generatedAt,
+    quotaExhausted: loaded.data.quotaExhausted,
   };
 });
 

@@ -18,7 +18,7 @@ export type SmartCombosDeskLoad = {
 export const loadSmartCombosDesk = cache(
   async (): Promise<SmartCombosDeskLoad> => {
     const loaded = await loadUnlessQuota(() => getApexOpportunities());
-    if (!loaded.ok) {
+    if (!loaded.ok || (loaded.data.quotaExhausted && loaded.data.analyzed.length === 0)) {
       const generatedAt = new Date().toISOString();
       return {
         analyzed: [],
@@ -46,7 +46,7 @@ export const loadSmartCombosDesk = cache(
       leagues: uniqueLeagues(analyzed),
       generatedAt: loaded.data.generatedAt,
       daily: buildDailySmartCombos(analyzed, loaded.data.generatedAt),
-      quotaExhausted: false,
+      quotaExhausted: loaded.data.quotaExhausted,
     };
   },
 );

@@ -221,6 +221,50 @@ describe("Opportunity Scanner briefing and desk UX", () => {
     expect(empty.interestingMatch).toBeNull();
   });
 
+  it("keeps partial quota rows on the desk instead of standby", () => {
+    const analyzed = [elite, value];
+    expect(analyzed.length === 0).toBe(false);
+    const briefing = buildScannerBriefing(
+      analyzed,
+      "2026-08-28T15:00:00.000Z",
+      true,
+    );
+    expect(briefing.quotaExhausted).toBe(true);
+    expect(briefing.fixturesAnalyzed).toBe(2);
+    const insight = buildScannerInsight(briefing);
+    expect(insight.catalogEmpty).toBe(false);
+    expect(insight.interestingMatch?.fixtureId).toBe(elite.fixtureId);
+
+    const status = scannerDeskStatus(
+      analyzed,
+      analyzed,
+      DEFAULT_SCANNER_FILTERS,
+      "ranked",
+      [],
+      [],
+      true,
+    );
+    expect(status.analyzed).toBe(2);
+    expect(status.mainReason).toBe("allQualified");
+    expect(status.secondaryReason).toBe("quotaPartial");
+    expect(status.mainReason).not.toBe("quotaMain");
+  });
+
+  it("uses unavailable quota reasons only when no fixture finished scoring", () => {
+    const status = scannerDeskStatus(
+      [],
+      [],
+      DEFAULT_SCANNER_FILTERS,
+      "ranked",
+      [],
+      [],
+      true,
+    );
+    expect(status.analyzed).toBe(0);
+    expect(status.mainReason).toBe("quotaMain");
+    expect(status.secondaryReason).toBe("quotaSecondary");
+  });
+
   it("summarizes analyzed vs qualified without changing ranking math", () => {
     const filters = { ...DEFAULT_SCANNER_FILTERS, minConfidence: 70 };
     const qualified = filterScanner([elite, value, dog], filters, "ranked");

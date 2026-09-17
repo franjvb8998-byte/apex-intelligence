@@ -18,12 +18,14 @@ type PortfolioViewProps = {
   data: BankrollData;
   fixtures: BankrollFixture[];
   analyzed?: ApexOpportunity[];
+  quotaExhausted?: boolean;
 };
 
 export function PortfolioView({
   data,
   fixtures,
   analyzed = [],
+  quotaExhausted = false,
 }: PortfolioViewProps) {
   const t = useTranslations("portfolio");
   const reduceMotion = useReducedMotion();
@@ -72,6 +74,15 @@ export function PortfolioView({
           </Link>
         </div>
       </motion.header>
+
+      {quotaExhausted ? (
+        <p
+          className="rounded-[var(--apex-radius-lg)] border border-amber-500/30 bg-[var(--apex-warning-muted)] px-4 py-3 text-sm text-[var(--apex-fg)]"
+          role="status"
+        >
+          {analyzed.length > 0 ? t("quotaPartial") : t("quotaUnavailable")}
+        </p>
+      ) : null}
 
       <PortfolioKpiGrid kpis={report.kpis} currency={settings.currency} />
 

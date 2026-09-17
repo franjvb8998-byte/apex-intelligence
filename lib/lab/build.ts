@@ -72,6 +72,7 @@ export function buildLabWorkspace(input: {
       ok: input.scan.ok,
       generatedAt: input.scan.ok ? input.scan.generatedAt : null,
       analyzed,
+      quotaExhausted: input.scan.ok ? input.scan.quotaExhausted : false,
     },
     comparison: buildComparison({
       analyzed,

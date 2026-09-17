@@ -24,10 +24,10 @@ const defaultSleep = (ms: number) =>
 
 export function defaultShouldRetry(error: unknown): boolean {
   if (!isDataPlatformHttpError(error)) return false;
+  if (error.code === "rate_limited" || error.status === 429) return false;
   return (
     error.code === "timeout" ||
     error.code === "network" ||
-    error.code === "rate_limited" ||
     (error.status != null && error.status >= 500)
   );
 }

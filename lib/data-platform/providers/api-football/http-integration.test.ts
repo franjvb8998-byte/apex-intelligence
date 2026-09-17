@@ -52,6 +52,74 @@ describe("API-Football retry", () => {
     ).rejects.toMatchObject({ code: "unauthorized" });
     expect(attempts).toBe(1);
   });
+
+  it("does not retry rate_limited or HTTP 429", async () => {
+    let rateLimitedAttempts = 0;
+    await expect(
+      withRetry(
+        async () => {
+          rateLimitedAttempts += 1;
+          throw new DataPlatformHttpError({
+            message: "Your rate limit is 10 requests per minute.",
+            code: "rate_limited",
+            status: 429,
+          });
+        },
+        { maxAttempts: 3, baseDelayMs: 1, sleep: async () => undefined },
+      ),
+    ).rejects.toMatchObject({ code: "rate_limited" });
+    expect(rateLimitedAttempts).toBe(1);
+
+    let tooManyAttempts = 0;
+    await expect(
+      withRetry(
+        async () => {
+          tooManyAttempts += 1;
+          throw new DataPlatformHttpError({
+            message: "Too many requests",
+            code: "http_status",
+            status: 429,
+          });
+        },
+        { maxAttempts: 3, baseDelayMs: 1, sleep: async () => undefined },
+      ),
+    ).rejects.toMatchObject({ status: 429 });
+    expect(tooManyAttempts).toBe(1);
+  });
+
+  it("still retries timeout and network failures", async () => {
+    let timeoutAttempts = 0;
+    await expect(
+      withRetry(
+        async () => {
+          timeoutAttempts += 1;
+          throw new DataPlatformHttpError({
+            message: "temp",
+            code: "timeout",
+          });
+        },
+        { maxAttempts: 3, baseDelayMs: 1, sleep: async () => undefined },
+      ),
+    ).rejects.toMatchObject({ code: "timeout" });
+    expect(timeoutAttempts).toBe(3);
+
+    let networkAttempts = 0;
+    const result = await withRetry(
+      async () => {
+        networkAttempts += 1;
+        if (networkAttempts < 2) {
+          throw new DataPlatformHttpError({
+            message: "offline",
+            code: "network",
+          });
+        }
+        return "ok";
+      },
+      { maxAttempts: 3, baseDelayMs: 1, sleep: async () => undefined },
+    );
+    expect(result).toBe("ok");
+    expect(networkAttempts).toBe(2);
+  });
 });
 
 describe("API-Football rate limiter", () => {

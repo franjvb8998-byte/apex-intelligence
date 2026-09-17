@@ -43,6 +43,14 @@ async function HeaderIsland() {
         <p className="mt-1 max-w-2xl text-sm text-[var(--apex-fg-muted)]">
           {t("description")}
         </p>
+        {scan.ok && scan.quotaExhausted ? (
+          <p
+            className="mt-2 max-w-2xl text-sm text-[var(--apex-fg-muted)]"
+            role="status"
+          >
+            {t("quotaPartial")}
+          </p>
+        ) : null}
       </div>
       <div className="text-right">
         <FeedClock />

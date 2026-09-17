@@ -19,7 +19,7 @@ export function ScannerStandby({ quota }: { quota: boolean }) {
         {t("eyebrow")}
       </p>
       <h3 className="mt-2 text-xl font-semibold tracking-tight text-[var(--apex-fg)]">
-        {t("title")}
+        {quota ? t("quotaTitle") : t("title")}
       </h3>
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[var(--apex-fg-muted)]">
         {quota ? t("quotaBody") : t("normalBody")}

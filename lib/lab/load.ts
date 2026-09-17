@@ -18,7 +18,12 @@ import type { LearningCase } from "@/lib/learning-engine/types/case";
 import type { ApexMatchRating } from "@/lib/match-rating/types";
 
 export type LabScanLoad =
-  | { ok: true; analyzed: ApexOpportunity[]; generatedAt: string }
+  | {
+      ok: true;
+      analyzed: ApexOpportunity[];
+      generatedAt: string;
+      quotaExhausted: boolean;
+    }
   | { ok: false };
 
 export type LabFeaturedLoad = {
@@ -45,10 +50,14 @@ export type LabResearchLoad = {
 export const loadLabScan = cache(async (): Promise<LabScanLoad> => {
   const loaded = await loadUnlessQuota(() => getApexOpportunities());
   if (!loaded.ok) return { ok: false };
+  if (loaded.data.quotaExhausted && loaded.data.analyzed.length === 0) {
+    return { ok: false };
+  }
   return {
     ok: true,
     analyzed: loaded.data.analyzed,
     generatedAt: loaded.data.generatedAt,
+    quotaExhausted: loaded.data.quotaExhausted,
   };
 });
 

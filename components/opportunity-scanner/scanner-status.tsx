@@ -7,6 +7,8 @@ import type { ScannerDeskStatus } from "@/lib/opportunity-scanner/status";
 export function ScannerStatus({ status }: { status: ScannerDeskStatus }) {
   const t = useTranslations("scanner.status");
   const quiet = status.analyzed === 0;
+  const quietCopy =
+    status.mainReason === "quotaMain" ? t("quietQuotaNote") : t("quietNote");
 
   return (
     <Card padding="md" aria-label={t("eyebrow")}>
@@ -14,7 +16,7 @@ export function ScannerStatus({ status }: { status: ScannerDeskStatus }) {
         {t("eyebrow")}
       </p>
       <p className="mt-1 text-sm text-[var(--apex-fg-muted)]">
-        {quiet ? t("quietNote") : t("activeNote")}
+        {quiet ? quietCopy : t("activeNote")}
       </p>
       <div className="mt-5 grid grid-cols-3 gap-3">
         <Metric label={t("fixturesAnalyzed")} value={status.analyzed} />

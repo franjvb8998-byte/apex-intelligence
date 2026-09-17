@@ -14,6 +14,7 @@ import {
   noteScannerFixtureCount,
   noteScannerFixtures,
   noteScannerOddsAttached,
+  noteScannerQuotaExhausted,
   type ScannerProfileSession,
 } from "@/lib/debug/scanner-profile";
 import {
@@ -94,17 +95,41 @@ async function evaluateBundle(
   );
 }
 
+type MapPoolResult<R> = {
+  items: R[];
+  quotaExhausted: boolean;
+};
+
+/**
+ * Drain each wave with allSettled so fulfilled catalogue rows are kept
+ * even when a sibling hits quota. Stop scheduling after a quota rejection.
+ */
 async function mapPool<T, R>(
   items: T[],
   concurrency: number,
   fn: (item: T) => Promise<R>,
-): Promise<R[]> {
+): Promise<MapPoolResult<R>> {
   const out: R[] = [];
+  let quotaExhausted = false;
   for (let i = 0; i < items.length; i += concurrency) {
     const chunk = items.slice(i, i + concurrency);
-    out.push(...(await Promise.all(chunk.map(fn))));
+    const settled = await Promise.allSettled(chunk.map(fn));
+    let unexpected: unknown;
+    for (const result of settled) {
+      if (result.status === "fulfilled") {
+        out.push(result.value);
+        continue;
+      }
+      if (isQuotaError(result.reason)) {
+        quotaExhausted = true;
+        continue;
+      }
+      unexpected ??= result.reason;
+    }
+    if (unexpected !== undefined) throw unexpected;
+    if (quotaExhausted) break;
   }
-  return out;
+  return { items: out, quotaExhausted };
 }
 
 /**
@@ -141,8 +166,13 @@ export async function getApexOpportunities(
     }
   });
 
+  if (mapped.quotaExhausted) noteScannerQuotaExhausted();
+
   return {
     generatedAt: new Date().toISOString(),
-    analyzed: mapped.filter((row): row is NonNullable<typeof row> => row != null),
+    analyzed: mapped.items.filter(
+      (row): row is NonNullable<typeof row> => row != null,
+    ),
+    quotaExhausted: mapped.quotaExhausted,
   };
 }

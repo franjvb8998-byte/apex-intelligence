@@ -102,6 +102,11 @@ export type OpportunityMarketSummary = {
 export type ApexOpportunitiesBoard = {
   generatedAt: string;
   analyzed: ApexOpportunity[];
+  /**
+   * True when odds hydration hit API-Football quota/rate-limit.
+   * Partial: analyzed.length > 0. Unavailable: analyzed.length === 0.
+   */
+  quotaExhausted: boolean;
 };
 
 export const DEFAULT_OPPORTUNITY_FILTERS: OpportunityFilters = {

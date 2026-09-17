@@ -42,6 +42,7 @@ export const SCANNER_STATUS_REASONS = [
   "quotaMain",
   "waitingFixtures",
   "quotaSecondary",
+  "quotaPartial",
   "publishWhenScored",
   "allQualified",
   "deskSettings",
@@ -176,7 +177,7 @@ export function scannerDeskStatus(
       qualified: qualifiedCount,
       rejected: 0,
       mainReason: "allQualified",
-      secondaryReason: null,
+      secondaryReason: quotaExhausted ? "quotaPartial" : null,
     };
   }
 
@@ -185,6 +186,8 @@ export function scannerDeskStatus(
     qualified: qualifiedCount,
     rejected,
     mainReason: ranked[0]?.[0] ?? "deskSettings",
-    secondaryReason: ranked[1]?.[0] ?? null,
+    secondaryReason: quotaExhausted
+      ? "quotaPartial"
+      : (ranked[1]?.[0] ?? null),
   };
 }

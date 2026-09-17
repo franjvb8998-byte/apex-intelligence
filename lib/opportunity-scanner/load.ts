@@ -43,6 +43,8 @@ export const loadOpportunityScanner = cache(
       };
     }
     const analyzed = loaded.data.analyzed;
+    const quotaExhausted = loaded.data.quotaExhausted;
+    if (quotaExhausted) noteScannerQuotaExhausted();
     return measurePhaseSync("serialization", () => ({
       analyzed,
       generatedAt: loaded.data.generatedAt,
@@ -50,7 +52,7 @@ export const loadOpportunityScanner = cache(
       countries: countryOptions(analyzed),
       teams: teamOptions(analyzed),
       rankings: buildScannerRankings(analyzed),
-      quotaExhausted: false,
+      quotaExhausted,
     }));
   },
 );

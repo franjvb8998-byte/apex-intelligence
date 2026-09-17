@@ -37,7 +37,11 @@ export function ScannerDailyBriefing({
             {t("title")}
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--apex-fg-muted)]">
-            {briefing.quotaExhausted ? t("quotaNote") : t("normalNote")}
+            {briefing.quotaExhausted
+              ? briefing.fixturesAnalyzed > 0
+                ? t("quotaPartialNote")
+                : t("quotaNote")
+              : t("normalNote")}
           </p>
         </div>
         <div className="text-right">

@@ -137,4 +137,26 @@ describe("withApiFootballClientCache", () => {
 
     await expect(client.getTeam("42")).rejects.toBeInstanceOf(ApiFootballError);
   });
+
+  it("does not cache a rate-limit failure as empty fixture odds", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        errors: { requests: "Your rate limit is 10 requests per minute." },
+        response: [],
+      }),
+    );
+    const client = withApiFootballClientCache(
+      testClient(fetchImpl),
+      createTtlCache(),
+      { logger: () => undefined, useNextDataCache: false },
+    );
+
+    await expect(client.getFixtureOdds("1035089")).rejects.toBeInstanceOf(
+      ApiFootballError,
+    );
+    await expect(client.getFixtureOdds("1035089")).rejects.toBeInstanceOf(
+      ApiFootballError,
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
 });

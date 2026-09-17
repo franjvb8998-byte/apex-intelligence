@@ -106,8 +106,8 @@ export function SmartCombosView({
           className="rounded-[var(--apex-radius-lg)] border border-amber-500/30 bg-[var(--apex-warning-muted)] px-4 py-3 text-sm text-[var(--apex-fg)]"
           role="status"
         >
-          API-Football quota is exhausted. The desk stays open; Daily Smart
-          Combos and the working slip wait for the next scan.
+          API-Football quota is exhausted. Completed scanner rows stay on the
+          desk; remaining fixtures wait until the live odds feed recovers.
         </p>
       )}
 

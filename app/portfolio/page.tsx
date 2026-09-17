@@ -20,10 +20,16 @@ export default async function PortfolioPage() {
   ]);
   const data = getMockBankroll();
   const analyzed = scan.ok ? scan.data.analyzed : [];
+  const quotaExhausted = !scan.ok || scan.data.quotaExhausted;
 
   return (
     <ProductShell user={user}>
-      <PortfolioView data={data} fixtures={fixtures} analyzed={analyzed} />
+      <PortfolioView
+        data={data}
+        fixtures={fixtures}
+        analyzed={analyzed}
+        quotaExhausted={quotaExhausted}
+      />
     </ProductShell>
   );
 }

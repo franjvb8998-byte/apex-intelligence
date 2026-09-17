@@ -52,7 +52,7 @@ async function EliteIsland() {
       eyebrow={t("eyebrowDecisionEngine")}
       icon={<IconBolt />}
       model={model}
-      badge={<LiveBadge label="SCAN" />}
+      badge={<LiveBadge label={market.quotaExhausted ? "PARTIAL" : "SCAN"} />}
     />
   );
 }

@@ -14,8 +14,15 @@ import {
   labStrategyPasses,
   paperLabStrategy,
 } from "@/lib/lab/strategy";
+import { buildLabWorkspace } from "@/lib/lab/build";
+import { getMockBankroll } from "@/lib/bankroll";
 import type { ApexOpportunity } from "@/lib/apex-opportunities/types";
 import type { EvaluationReport } from "@/lib/learning-engine/types/evaluation";
+import type {
+  LabBookLoad,
+  LabFeaturedLoad,
+  LabResearchLoad,
+} from "@/lib/lab/load";
 
 function opportunity(overrides: Partial<ApexOpportunity> = {}): ApexOpportunity {
   return {
@@ -183,4 +190,64 @@ describe("APEX Lab", () => {
     expect(factors.length).toBeGreaterThan(0);
     expect(factors.every((bar) => bar.weight >= 0 && bar.weight <= 1)).toBe(true);
   });
+
+  it("keeps a partial scan on the workspace without marking it unavailable", () => {
+    const analyzed = [opportunity({ fixtureId: "partial-1", score: 82 })];
+    const workspace = buildLabWorkspace({
+      scan: {
+        ok: true,
+        analyzed,
+        generatedAt: "2026-08-28T15:00:00.000Z",
+        quotaExhausted: true,
+      },
+      research: labResearchStub(),
+      book: labBookStub(),
+      featured: labFeaturedStub(),
+    });
+    expect(workspace.scan.ok).toBe(true);
+    expect(workspace.scan.quotaExhausted).toBe(true);
+    expect(workspace.scan.analyzed).toEqual(analyzed);
+  });
+
+  it("does not flag a complete Lab scan as quota exhausted", () => {
+    const analyzed = [opportunity()];
+    const workspace = buildLabWorkspace({
+      scan: {
+        ok: true,
+        analyzed,
+        generatedAt: "2026-08-28T15:00:00.000Z",
+        quotaExhausted: false,
+      },
+      research: labResearchStub(),
+      book: labBookStub(),
+      featured: labFeaturedStub(),
+    });
+    expect(workspace.scan.ok).toBe(true);
+    expect(workspace.scan.quotaExhausted).toBe(false);
+    expect(workspace.scan.analyzed).toHaveLength(1);
+  });
 });
+
+function labResearchStub(): LabResearchLoad {
+  return {
+    report: emptyReport(),
+    knowledge: [],
+    cases: [],
+  };
+}
+
+function labBookStub(): LabBookLoad {
+  return { data: getMockBankroll(), fixtures: [] };
+}
+
+function labFeaturedStub(): LabFeaturedLoad {
+  return {
+    label: "Arsenal vs Chelsea",
+    href: "/match-analysis/1035089",
+    decision: null,
+    rating: null,
+    explainable: null,
+    probability: null,
+    quotaExhausted: false,
+  };
+}

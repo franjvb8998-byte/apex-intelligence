@@ -159,6 +159,7 @@ export type LabWorkspace = {
     ok: boolean;
     generatedAt: string | null;
     analyzed: ApexOpportunity[];
+    quotaExhausted: boolean;
   };
   comparison: LabEngineCompareRow[];
   backtest: LabBacktest;
