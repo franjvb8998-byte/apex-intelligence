@@ -26,6 +26,7 @@ import type {
 import { matchLabel } from "@/lib/bankroll/match-search";
 import { expectedValue } from "@/lib/copilot/pricing";
 import type { DashboardMatchSummary } from "@/lib/dashboard/types";
+import { VALUE_SCAN_SAMPLE_SIZE } from "@/lib/copilot/value-scan";
 
 const HELP_TEXT =
   "I am APEX Copilot, the desk analyst. I read APEX match files — who to back, why, what worries me, and whether to wait for the live market. I do not invent data the catalogue does not publish. Try: “Analyse Arsenal vs Chelsea” or “Who has the most value today?”.";
@@ -176,10 +177,9 @@ export class CopilotService {
     fixtures: DashboardMatchSummary[],
     intent: CopilotReply["intent"],
   ): Promise<CopilotReply> {
-    const sample = fixtures.slice(0, 8);
+    const sample = fixtures.slice(0, VALUE_SCAN_SAMPLE_SIZE);
     let best: {
-      fixture: DashboardMatchSummary;
-      snapshot: CopilotMatchSnapshot;
+      id: string;
       ev: number;
       label: string;
     } | null = null;
@@ -189,15 +189,15 @@ export class CopilotService {
       const id = fixtureExternalId(fixture);
       if (!id) continue;
       try {
-        const match = await loader.loadMatch(id);
-        const snapshot = snapshotFromMatchCenter(match);
-        for (const row of snapshot.markets) {
-          const ev = row.expectedValue ?? expectedValue(row.modelProbability ?? 0, row.decimalOdds);
+        const markets = await loader.loadValueScanMarkets(id);
+        for (const row of markets) {
+          const ev =
+            row.expectedValue ??
+            expectedValue(row.modelProbability ?? 0, row.decimalOdds);
           if (ev == null) continue;
           if (!best || ev > best.ev) {
             best = {
-              fixture,
-              snapshot,
+              id,
               ev,
               label: `${row.market} ${row.label}`,
             };
@@ -234,9 +234,11 @@ export class CopilotService {
       };
     }
 
-    const briefing = buildLocalBriefing(best.snapshot, this.ai.id);
+    const match = await loader.loadMatch(best.id);
+    const snapshot = snapshotFromMatchCenter(match);
+    const briefing = buildLocalBriefing(snapshot, this.ai.id);
     return {
-      content: `The most interesting published price in this sample is ${matchLabelFromSnapshot(best.snapshot)} — ${best.label}.`,
+      content: `The most interesting published price in this sample is ${matchLabelFromSnapshot(snapshot)} — ${best.label}.`,
       card: { kind: "briefing", briefing },
       intent,
       providerId: briefing.modelId,

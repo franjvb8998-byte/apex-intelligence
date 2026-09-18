@@ -15,7 +15,12 @@ import {
   RECORDED_CATALOGUE_NOTE,
   type CopilotDataLoader,
 } from "@/lib/copilot/load";
-import { createApiFootballDataProvider } from "@/lib/data-platform";
+import { VALUE_SCAN_SAMPLE_SIZE } from "@/lib/copilot/value-scan";
+import { snapshotFromMatchCenter } from "@/lib/copilot/snapshot";
+import {
+  createApiFootballDataProvider,
+  RECORDED_API_FOOTBALL_FIXTURE_ID,
+} from "@/lib/data-platform";
 import { ApiFootballError } from "@/lib/data-platform/providers/api-football/errors";
 import type { DashboardMatchSummary } from "@/lib/dashboard/types";
 
@@ -271,6 +276,9 @@ describe("CopilotService", () => {
       loadMatch: async () => {
         throw quota;
       },
+      loadValueScanMarkets: async () => {
+        throw quota;
+      },
     };
     const service = createCopilotService({ loader });
     const reply = await service.ask({ prompt: "Analiza Arsenal vs Chelsea." });
@@ -280,5 +288,93 @@ describe("CopilotService", () => {
       expect(reply.card.briefing.matchLabel.toLowerCase()).toContain("arsenal");
       expect(reply.card.briefing.intelligence).toBeDefined();
     }
+  });
+
+  it("value_scan ranks eight candidates without a Match Center hydration each", async () => {
+    const recorded = createCopilotDataLoader({
+      provider: createApiFootballDataProvider({
+        apiKey: null,
+        fallback: "recorded",
+        enrichMatch: true,
+      }),
+      env: {},
+      useRecordedOnQuota: false,
+    });
+    const recordedMatch = await recorded.loadMatch(RECORDED_API_FOOTBALL_FIXTURE_ID);
+    const fixtures: DashboardMatchSummary[] = Array.from(
+      { length: VALUE_SCAN_SAMPLE_SIZE },
+      (_, index) => ({
+        id: `f-${index}`,
+        externalId: String(1000 + index),
+        kickoffAt: "2026-08-27T19:00:00.000Z",
+        status: "scheduled",
+        leagueName: "Premier League",
+        homeTeam: { id: "h", name: `Home ${index}`, shortName: "HOM", logoUrl: null },
+        awayTeam: { id: "a", name: `Away ${index}`, shortName: "AWY", logoUrl: null },
+        score: { home: null, away: null },
+      }),
+    );
+    const marketLoads: string[] = [];
+    const matchLoads: string[] = [];
+    const loader: CopilotDataLoader = {
+      listFixtures: async () => fixtures,
+      loadValueScanMarkets: async (id) => {
+        marketLoads.push(id);
+        const high = id === "1003";
+        return [
+          {
+            market: "1X2",
+            selection: "home",
+            label: "Home",
+            modelProbability: 0.5,
+            fairOdds: 2,
+            decimalOdds: high ? 3 : 1.8,
+            impliedProbability: high ? 1 / 3 : 1 / 1.8,
+            edge: high ? 0.5 - 1 / 3 : 0.5 - 1 / 1.8,
+            expectedValue: expectedValue(0.5, high ? 3 : 1.8),
+            bookmaker: "1xBet",
+          },
+        ];
+      },
+      loadMatch: async (id) => {
+        matchLoads.push(id);
+        return recordedMatch;
+      },
+    };
+    const reply = await createCopilotService({ loader }).ask({
+      prompt: "Who has the most value today?",
+    });
+    expect(marketLoads).toEqual(fixtures.map((row) => row.externalId));
+    expect(matchLoads).toEqual(["1003"]);
+    expect(reply.content).toContain("most interesting published price");
+    expect(reply.content).toContain("1X2 Home");
+  });
+
+  it("value_scan markets match Match Center odds semantics on the recorded fixture", async () => {
+    const loader = createCopilotDataLoader({
+      provider: createApiFootballDataProvider({
+        apiKey: null,
+        fallback: "recorded",
+        enrichMatch: true,
+      }),
+      env: {},
+      useRecordedOnQuota: false,
+    });
+    const match = await loader.loadMatch(RECORDED_API_FOOTBALL_FIXTURE_ID);
+    const fromCenter = snapshotFromMatchCenter(match).markets;
+    const thin = await loader.loadValueScanMarkets(RECORDED_API_FOOTBALL_FIXTURE_ID);
+    expect(thin.length).toBeGreaterThan(0);
+    expect(thin.map((row) => row.selection)).toEqual(
+      fromCenter.map((row) => row.selection),
+    );
+    expect(thin.map((row) => row.decimalOdds)).toEqual(
+      fromCenter.map((row) => row.decimalOdds),
+    );
+    expect(thin.map((row) => row.bookmaker)).toEqual(
+      fromCenter.map((row) => row.bookmaker),
+    );
+    expect(thin.map((row) => row.expectedValue)).toEqual(
+      fromCenter.map((row) => row.expectedValue),
+    );
   });
 });

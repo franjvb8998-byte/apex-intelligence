@@ -27,9 +27,15 @@ import {
 } from "@/lib/data-platform/providers/api-football/cache-policy";
 import { readThroughNextDataCache } from "@/lib/data-platform/providers/api-football/next-data-cache";
 import {
-  createRateLimiter,
+  getSharedApiFootballRateLimiter,
   type RateLimiter,
 } from "@/lib/data-platform/providers/api-football/rate-limiter";
+import {
+  noteApiFootballOriginCall,
+  noteApiFootballQuotaFromError,
+  noteApiFootballQuotaSignal,
+  throwIfApiFootballDailyQuotaExhausted,
+} from "@/lib/data-platform/providers/api-football/quota-circuit";
 import { withRetry } from "@/lib/data-platform/providers/api-football/retry";
 import type {
   ApiFootballEventsResponse,
@@ -144,13 +150,7 @@ export function createApiFootballClient(
     options.timeoutMs ?? options.config?.timeoutMs ?? envConfig.timeoutMs;
 
   const rateLimiter =
-    options.rateLimiter ??
-    createRateLimiter({
-      maxRequests:
-        options.config?.rateLimitMaxRequests ?? envConfig.rateLimitMaxRequests,
-      windowMs:
-        options.config?.rateLimitWindowMs ?? envConfig.rateLimitWindowMs,
-    });
+    options.rateLimiter ?? getSharedApiFootballRateLimiter();
 
   const http =
     options.httpClient ??
@@ -169,12 +169,32 @@ export function createApiFootballClient(
     query?: Record<string, string | number | boolean | undefined | null>,
   ): Promise<T> {
     const run = async () => {
+      throwIfApiFootballDailyQuotaExhausted();
       await rateLimiter.acquire();
+      throwIfApiFootballDailyQuotaExhausted();
+      noteApiFootballOriginCall();
       try {
-        const { data } = await http.get<T>(path, query);
-        return data;
+        const response = await http.get<T>(path, query);
+        noteApiFootballQuotaSignal({
+          headers: response.headers,
+          payload: response.data,
+          status: response.status,
+        });
+        if (isApiFootballRateLimitPayload(response.data)) {
+          throw new ApiFootballError({
+            message:
+              apiFootballVendorErrorText(response.data) ??
+              "API-Football rate limit",
+            code: "rate_limited",
+            status: 429,
+            details: response.data,
+          });
+        }
+        return response.data;
       } catch (error) {
-        throw toApiFootballError(error);
+        const mapped = toApiFootballError(error);
+        noteApiFootballQuotaFromError(mapped);
+        throw mapped;
       }
     };
 
@@ -294,14 +314,21 @@ export function withApiFootballClientCache(
       fromOrigin = true;
       const value = await run();
       if (isApiFootballRateLimitPayload(value)) {
-        throw new ApiFootballError({
-          message:
-            apiFootballVendorErrorText(value) ??
-            "API-Football rate limit",
+        const message =
+          apiFootballVendorErrorText(value) ?? "API-Football rate limit";
+        const error = new ApiFootballError({
+          message,
           code: "rate_limited",
           status: 429,
           details: value,
         });
+        noteApiFootballQuotaSignal({
+          message,
+          status: 429,
+          payload: value,
+          error,
+        });
+        throw error;
       }
       return value;
     };

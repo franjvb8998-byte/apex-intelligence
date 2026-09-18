@@ -17,6 +17,8 @@ import {
   isQuotaError,
   loadUnlessQuota,
 } from "@/lib/repositories";
+import { loadCopilotValueScanMarkets } from "@/lib/copilot/value-scan";
+import type { CopilotMarketLine } from "@/lib/copilot/types";
 
 export const RECORDED_CATALOGUE_NOTE =
   "El feed en vivo de API-Football no está disponible (cuota diaria). Informe del catálogo recorded APEX — cifras de ese dataset, no del mercado de hoy.";
@@ -24,6 +26,13 @@ export const RECORDED_CATALOGUE_NOTE =
 export type CopilotDataLoader = {
   listFixtures: () => Promise<DashboardMatchSummary[]>;
   loadMatch: (externalMatchId: string) => Promise<MatchCenterData>;
+  /**
+   * Odds + team-stats Elo markets for value_scan ranking.
+   * Must not hydrate a full Match Center (events/lineups/H2H/injuries/…).
+   */
+  loadValueScanMarkets: (
+    externalMatchId: string,
+  ) => Promise<CopilotMarketLine[]>;
 };
 
 export type CopilotDataLoaderOptions = LoadMatchCenterOptions & {
@@ -114,6 +123,19 @@ export function createCopilotDataLoader(
       throw live.quota
         ? new Error(RECORDED_CATALOGUE_NOTE)
         : new Error("No se pudo cargar el fixture APEX.");
+    },
+    async loadValueScanMarkets(externalMatchId: string) {
+      const run = (provider: IDataProvider, loadEnv = env) =>
+        loadCopilotValueScanMarkets(
+          { ...options, provider, env: loadEnv },
+          externalMatchId,
+        );
+      if (!useRecordedOnQuota) {
+        return run(primary);
+      }
+      const live = await loadUnlessQuota(() => run(primary));
+      if (live.ok) return live.data;
+      return run(createRecordedCopilotProvider(), {});
     },
   };
 }

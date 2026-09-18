@@ -9,6 +9,7 @@ import type { IDataProvider } from "@/lib/data-platform/provider";
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
 import {
   createRepositories,
+  isApiFootballQuotaError,
   isRepositories,
   type ApexRepositories,
 } from "@/lib/repositories";
@@ -92,6 +93,60 @@ function seasonYear(season: string | null | undefined): string | null {
   if (!season) return null;
   const match = season.match(/^(\d{4})/);
   return match?.[1] ?? season;
+}
+
+/**
+ * Pull team statistics only — Copilot value_scan ranking must not hydrate
+ * H2H / injuries / last-5 / lineups / standings for every candidate.
+ */
+export async function enrichTeamStatisticsOnly(
+  access: IDataProvider | ApexRepositories,
+  bundle: ApexMatchBundle,
+): Promise<MatchCenterEnrichment> {
+  const repos = toRepositories(access);
+  if (!repos.hasResourcePort) {
+    return { ...EMPTY_MATCH_CENTER_ENRICHMENT };
+  }
+
+  const homeId = externalId(bundle.homeTeam.externalRefs);
+  const awayId = externalId(bundle.awayTeam.externalRefs);
+  const leagueId = externalId(bundle.league?.externalRefs);
+  const season = seasonYear(bundle.league?.season);
+
+  const [homeStats, awayStats] = await Promise.all([
+    homeId && leagueId && season
+      ? ignoreNonQuotaFallback(() =>
+          repos.statistics.getTeamStatistics(homeId, leagueId, season),
+        )
+      : Promise.resolve(null),
+    awayId && leagueId && season
+      ? ignoreNonQuotaFallback(() =>
+          repos.statistics.getTeamStatistics(awayId, leagueId, season),
+        )
+      : Promise.resolve(null),
+  ]);
+
+  const teamStats: MatchAnalysisTeamStats = {};
+  const homeSnapshot = snapshotFromTeamStatistics(homeStats);
+  const awaySnapshot = snapshotFromTeamStatistics(awayStats);
+  if (homeSnapshot) teamStats.home = homeSnapshot;
+  if (awaySnapshot) teamStats.away = awaySnapshot;
+
+  return {
+    ...EMPTY_MATCH_CENTER_ENRICHMENT,
+    teamStats: teamStats.home || teamStats.away ? teamStats : undefined,
+  };
+}
+
+async function ignoreNonQuotaFallback<T>(
+  run: () => Promise<T>,
+): Promise<T | null> {
+  try {
+    return await run();
+  } catch (error) {
+    if (isApiFootballQuotaError(error)) throw error;
+    return null;
+  }
 }
 
 async function safe<T>(run: () => Promise<T>, fallback: T): Promise<T> {

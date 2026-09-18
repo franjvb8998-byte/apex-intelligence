@@ -14,9 +14,16 @@ export type ApiFootballConfig = {
   retryMaxAttempts: number;
   /** Base delay for exponential backoff in ms (default 250). */
   retryBaseDelayMs: number;
-  /** Max requests allowed in the sliding window (default 10). */
+  /**
+   * Max requests allowed in the sliding window (default 10).
+   * Free API-Football is typically 10/minute; this default is 10/10s.
+   * Configurable via API_FOOTBALL_RATE_LIMIT_MAX — not silently set to Pro.
+   */
   rateLimitMaxRequests: number;
-  /** Sliding window size in ms (default 10_000). */
+  /**
+   * Sliding window size in ms (default 10_000).
+   * Configurable via API_FOOTBALL_RATE_LIMIT_WINDOW_MS.
+   */
   rateLimitWindowMs: number;
   /** HTTP timeout in ms (default 12_000). */
   timeoutMs: number;

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { ApiFootballDataProvider } from "@/lib/data-platform/providers/api-football/api-football-provider";
 import { ApiFootballError } from "@/lib/data-platform/providers/api-football/errors";
 import {
@@ -6,6 +6,11 @@ import {
   isApiFootballQuotaError,
   loadUnlessQuota,
 } from "@/lib/data-platform/providers/api-football/quota";
+import { resetApiFootballQuotaCircuitForTests } from "@/lib/data-platform/providers/api-football/quota-circuit";
+
+afterEach(() => {
+  resetApiFootballQuotaCircuitForTests();
+});
 
 function quotaError(overrides: Partial<ConstructorParameters<typeof ApiFootballError>[0]> = {}) {
   return new ApiFootballError({

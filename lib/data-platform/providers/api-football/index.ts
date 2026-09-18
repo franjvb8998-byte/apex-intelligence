@@ -26,6 +26,8 @@ export {
 
 export {
   createRateLimiter,
+  getSharedApiFootballRateLimiter,
+  resetSharedApiFootballRateLimiterForTests,
   type RateLimiter,
   type RateLimiterOptions,
 } from "@/lib/data-platform/providers/api-football/rate-limiter";
@@ -56,6 +58,15 @@ export {
   ignoreNonQuotaErrors,
   type QuotaLoadResult,
 } from "@/lib/data-platform/providers/api-football/quota";
+
+export {
+  classifyApiFootballQuotaSignal,
+  isApiFootballDailyQuotaExhausted,
+  resetApiFootballQuotaCircuitForTests,
+  getApiFootballOriginCallCountForTests,
+  throwIfApiFootballDailyQuotaExhausted,
+  type ApiFootballQuotaKind,
+} from "@/lib/data-platform/providers/api-football/quota-circuit";
 
 export { createFixtureApiFootballClient } from "@/lib/data-platform/providers/api-football/fixture-client";
 

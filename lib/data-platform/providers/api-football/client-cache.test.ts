@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTtlCache } from "@/lib/data-platform/cache";
 import { createApiFootballClient, withApiFootballClientCache } from "@/lib/data-platform/providers/api-football/client";
 import {
@@ -9,6 +9,11 @@ import {
 import { createRateLimiter } from "@/lib/data-platform/providers/api-football/rate-limiter";
 import { createRecordedApiFootballTeamsResponse } from "@/lib/data-platform/providers/api-football/fixtures";
 import { ApiFootballError } from "@/lib/data-platform/providers/api-football/errors";
+import { resetApiFootballQuotaCircuitForTests } from "@/lib/data-platform/providers/api-football/quota-circuit";
+
+afterEach(() => {
+  resetApiFootballQuotaCircuitForTests();
+});
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
