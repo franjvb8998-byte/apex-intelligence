@@ -87,7 +87,10 @@ async function evaluateBundle(
   }
   noteScannerFixtures("decisionEngine", 1);
   noteScannerFixtures("scoring", 1);
-  const center = createMatchCenterFromApexBundle(withOdds, { enrichment });
+  const center = createMatchCenterFromApexBundle(withOdds, {
+    enrichment,
+    probabilityDiagnosticContext: "scanner",
+  });
   return measurePhaseSync(
     "serialization",
     () => mapOpportunityFromCenter(center),

@@ -21,9 +21,25 @@ import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
 import type { ApexMatchEvent } from "@/lib/data-platform/types/event";
 import type { ApexMatchStatus } from "@/lib/data-platform/types/match";
 import type { ApexPlayer } from "@/lib/data-platform/types/team";
-import { measurePhaseSync } from "@/lib/debug/scanner-profile";
+import {
+  buildProbabilityDiagnostic,
+  isProbabilityDiagnosticEnabled,
+  maybeEmitProbabilityDiagnostic,
+  type EloDerivation,
+  type ProbabilityDiagnosticContext,
+  type ProbabilityDiagnosticEnv,
+  type ProbabilityDiagnosticLog,
+} from "@/lib/debug/probability-diagnostic";
+import {
+  measurePhaseSync,
+  scannerProfileActive,
+} from "@/lib/debug/scanner-profile";
 import type { MatchOutcome } from "@/lib/intelligence/types";
-import { estimateEloFromTeamId } from "@/lib/intelligence/modules/probability";
+import {
+  createEloPoissonHybridEngine,
+  estimateEloFromTeamId,
+  type HybridProbabilityResult,
+} from "@/lib/intelligence/modules/probability";
 import type { MatchAnalysisTeamStatSnapshot } from "@/lib/match-analysis/analysis-types";
 import { createMatchAnalysisService } from "@/lib/match-analysis/match-analysis-service";
 import { buildPreviewDashboard } from "@/lib/match-center/dashboard";
@@ -32,7 +48,7 @@ import {
   type MatchCenterEnrichment,
 } from "@/lib/match-center/enrich";
 import { buildIntelligenceReport } from "@/lib/intelligence-report";
-import { buildPreviewFromEngine } from "@/lib/match-center/from-probability";
+import { buildPreviewFromHybrid } from "@/lib/match-center/from-probability";
 import { scoreMatchSelection, apexScoreFromScoring } from "@/lib/scoring-engine/from-match";
 import { selectionTwinFromPreview } from "@/lib/team-intelligence/builders";
 import { ratePreview } from "@/lib/match-rating";
@@ -85,18 +101,59 @@ function hasPlayed(snapshot?: MatchAnalysisTeamStatSnapshot | null): boolean {
   return snapshot != null && snapshot.played != null && snapshot.played > 0;
 }
 
-function eloFromCatalogue(
+/**
+ * Production Elo for one side, plus provenance for Sprint 5A diagnostics.
+ * Numeric result is identical to the previous eloFromCatalogue / explicit override.
+ */
+export function resolveEloWithProvenance(
   snapshot: MatchAnalysisTeamStatSnapshot | null | undefined,
   teamId: string,
   base: number,
-): number {
-  if (!hasPlayed(snapshot)) return estimateEloFromTeamId(teamId, base);
+  explicit?: number,
+): EloDerivation {
+  if (explicit != null) {
+    return {
+      elo: explicit,
+      source: "explicit",
+      base: null,
+      played: null,
+      wins: null,
+      goalsFor: null,
+      goalsAgainst: null,
+      goalDifference: null,
+      hashOffset: null,
+    };
+  }
+  if (!hasPlayed(snapshot)) {
+    const elo = estimateEloFromTeamId(teamId, base);
+    return {
+      elo,
+      source: "estimated_hash",
+      base,
+      played: snapshot?.played ?? null,
+      wins: snapshot?.wins ?? null,
+      goalsFor: snapshot?.goalsFor ?? null,
+      goalsAgainst: snapshot?.goalsAgainst ?? null,
+      goalDifference: null,
+      hashOffset: elo - base,
+    };
+  }
   const played = snapshot!.played!;
   const winRate = (snapshot!.wins ?? 0) / played;
   const goalDiff =
     (snapshot!.goalsFor ?? 0) - (snapshot!.goalsAgainst ?? 0);
   const clampedDiff = Math.max(-30, Math.min(30, goalDiff));
-  return Math.round(base - 80 + winRate * 220 + clampedDiff * 2.5);
+  return {
+    elo: Math.round(base - 80 + winRate * 220 + clampedDiff * 2.5),
+    source: "catalogue",
+    base,
+    played,
+    wins: snapshot!.wins ?? null,
+    goalsFor: snapshot!.goalsFor ?? null,
+    goalsAgainst: snapshot!.goalsAgainst ?? null,
+    goalDifference: goalDiff,
+    hashOffset: null,
+  };
 }
 
 const HOME_SLOTS: PitchPoint[] = [
@@ -426,7 +483,72 @@ export type MatchCenterFromBundleOptions = {
   awayElo?: number;
   /** Catalogue extras (form, H2H, injuries) from the data layer. */
   enrichment?: MatchCenterEnrichment;
+  /** Sprint 5A — which loader called this. Does not affect predictions. */
+  probabilityDiagnosticContext?: ProbabilityDiagnosticContext;
+  /** Sprint 5A — test/override env for diagnostic gating. */
+  probabilityDiagnosticEnv?: ProbabilityDiagnosticEnv;
+  /** Sprint 5A — optional log sink (tests). Default console.info when enabled. */
+  probabilityDiagnosticLog?: ProbabilityDiagnosticLog;
 };
+
+function probabilityDiagnosticContext(
+  options: MatchCenterFromBundleOptions,
+): ProbabilityDiagnosticContext {
+  if (options.probabilityDiagnosticContext) {
+    return options.probabilityDiagnosticContext;
+  }
+  return scannerProfileActive() ? "scanner" : "unknown";
+}
+
+function providerExternalId(
+  refs: Array<{ externalId: string }> | undefined,
+): string | null {
+  return refs?.[0]?.externalId ?? null;
+}
+
+function emitMatchProbabilityDiagnostic(
+  options: MatchCenterFromBundleOptions,
+  input: {
+    bundle: ApexMatchBundle;
+    match: MatchCenterMeta;
+    homeDerivation: EloDerivation;
+    awayDerivation: EloDerivation;
+    hybridResult: HybridProbabilityResult;
+  },
+): void {
+  const env = options.probabilityDiagnosticEnv ?? process.env;
+  if (!isProbabilityDiagnosticEnabled(env)) return;
+  const { bundle, match, homeDerivation, awayDerivation, hybridResult } = input;
+  maybeEmitProbabilityDiagnostic(
+    buildProbabilityDiagnostic({
+      context: probabilityDiagnosticContext(options),
+      matchId: bundle.match.id,
+      providerFixtureId:
+        providerExternalId(bundle.match.externalRefs) ??
+        match.externalId ??
+        null,
+      competition: bundle.league?.name ?? match.leagueName,
+      season: bundle.league?.season ?? null,
+      home: {
+        ...homeDerivation,
+        teamName: bundle.homeTeam.name,
+        canonicalTeamId: bundle.homeTeam.id,
+        providerTeamId: providerExternalId(bundle.homeTeam.externalRefs),
+      },
+      away: {
+        ...awayDerivation,
+        teamName: bundle.awayTeam.name,
+        canonicalTeamId: bundle.awayTeam.id,
+        providerTeamId: providerExternalId(bundle.awayTeam.externalRefs),
+      },
+      hybrid: hybridResult,
+    }),
+    {
+      env,
+      log: options.probabilityDiagnosticLog,
+    },
+  );
+}
 
 /**
  * Build Match Center view-model from a normalized ApexMatchBundle.
@@ -476,23 +598,31 @@ export function createMatchCenterFromApexBundle(
           : bundle.provenance.primaryProvider,
   };
 
-  const homeElo =
-    options.homeElo ??
-    eloFromCatalogue(
-      options.enrichment?.teamStats?.home,
-      bundle.homeTeam.id,
-      1580,
-    );
-  const awayElo =
-    options.awayElo ??
-    eloFromCatalogue(
-      options.enrichment?.teamStats?.away,
-      bundle.awayTeam.id,
-      1520,
-    );
+  const homeDerivation = resolveEloWithProvenance(
+    options.enrichment?.teamStats?.home,
+    bundle.homeTeam.id,
+    1580,
+    options.homeElo,
+  );
+  const awayDerivation = resolveEloWithProvenance(
+    options.enrichment?.teamStats?.away,
+    bundle.awayTeam.id,
+    1520,
+    options.awayElo,
+  );
+  const homeElo = homeDerivation.elo;
+  const awayElo = awayDerivation.elo;
   const eloFromStats =
     hasPlayed(options.enrichment?.teamStats?.home) ||
     hasPlayed(options.enrichment?.teamStats?.away);
+
+  const eloInput = {
+    homeElo,
+    awayElo,
+    homeTeamId: homeTeam.id,
+    awayTeamId: awayTeam.id,
+    matchId: bundle.match.id,
+  };
 
   const aiAnalysis = measurePhaseSync("decisionEngine", () =>
     createMatchAnalysisService().analyzeBundle(bundle, {
@@ -506,21 +636,16 @@ export function createMatchCenterFromApexBundle(
     }),
   );
 
-  const preview = measurePhaseSync("decisionEngine", () =>
-    buildPreviewFromEngine({
+  const preview = measurePhaseSync("decisionEngine", () => {
+    const hybridResult = createEloPoissonHybridEngine().predict(eloInput);
+    const built = buildPreviewFromHybrid(hybridResult, {
     matchId: bundle.match.id,
     leagueName: match.leagueName,
     kickoffAt: match.kickoffAt,
     status,
     homeTeam,
     awayTeam,
-    eloInput: {
-      homeElo,
-      awayElo,
-      homeTeamId: homeTeam.id,
-      awayTeamId: awayTeam.id,
-      matchId: bundle.match.id,
-    },
+    eloInput,
     narrative: {
       apexScoreLabel: `Señal APEX · ${bundle.provenance.primaryProvider}`,
       keyFactors: aiAnalysis.explainability.factors.map((f) => ({
@@ -564,8 +689,16 @@ export function createMatchCenterFromApexBundle(
     },
     source: "intelligence-core",
     skipPlatformScore: true,
-    }),
-  );
+    });
+    emitMatchProbabilityDiagnostic(options, {
+      bundle,
+      match,
+      homeDerivation,
+      awayDerivation,
+      hybridResult,
+    });
+    return built;
+  });
 
   preview.analysis.modelVersion = `${preview.hybrid.modelVersion}+data-platform`;
   preview.dashboard = measurePhaseSync("serialization", () =>

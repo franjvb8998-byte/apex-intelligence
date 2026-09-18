@@ -4,6 +4,7 @@ import {
   createEloPoissonHybridEngine,
   EloPoissonHybridEngine,
 } from "@/lib/intelligence/modules/probability/hybrid/elo-poisson-engine";
+import { confidenceFromHybrid } from "@/lib/intelligence/modules/probability/confidence-from-hybrid";
 import { eloWinExpectancy } from "@/lib/intelligence/modules/probability/math/elo";
 
 /** Example fixtures — synthetic Elos, not live API data. */
@@ -145,5 +146,23 @@ describe("Elo helpers used by the hybrid", () => {
     expect(sumOneXTwo(blended)).toBeCloseTo(1, 12);
     expect(blended.home).toBeCloseTo(0.35, 12);
     expect(blended.away).toBeCloseTo(0.35, 12);
+  });
+});
+
+describe("current production characterization — ΔElo = +232", () => {
+  it("keeps xG ≈ 5.51/0.30, hybrid 93/3/4, confidence 72% medium", () => {
+    const engine = createEloPoissonHybridEngine();
+    const result = engine.predict({
+      homeElo: 1732,
+      awayElo: 1500,
+    });
+    expect(result.expectedGoals.home).toBeCloseTo(5.51, 2);
+    expect(result.expectedGoals.away).toBeCloseTo(0.3, 2);
+    expect(Math.round(result.oneXTwo.home * 100)).toBe(93);
+    expect(Math.round(result.oneXTwo.draw * 100)).toBe(3);
+    expect(Math.round(result.oneXTwo.away * 100)).toBe(4);
+    const confidence = confidenceFromHybrid(result);
+    expect((confidence.value * 100).toFixed(0)).toBe("72");
+    expect(confidence.band).toBe("medium");
   });
 });

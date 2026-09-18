@@ -69,7 +69,10 @@ export async function getMatchCenterData(
   } catch {
     enrichment = { ...EMPTY_MATCH_CENTER_ENRICHMENT };
   }
-  const data = createMatchCenterFromApexBundle(bundle, { enrichment });
+  const data = createMatchCenterFromApexBundle(bundle, {
+    enrichment,
+    probabilityDiagnosticContext: "match_center",
+  });
   data.fixtures = skipCatalogue ? [] : withSelectedFixture(fixtures, bundle);
   return data;
 }

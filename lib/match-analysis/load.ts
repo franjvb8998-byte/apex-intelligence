@@ -61,7 +61,10 @@ export async function getMatchAnalysisData(
     ),
   ]);
 
-  const center = createMatchCenterFromApexBundle(bundle, { enrichment });
+  const center = createMatchCenterFromApexBundle(bundle, {
+    enrichment,
+    probabilityDiagnosticContext: "match_analysis",
+  });
   const analysis = attachCatalogue(
     center.preview.analysis,
     bundle,
