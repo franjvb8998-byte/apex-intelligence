@@ -68,6 +68,11 @@ export {
   type ApiFootballQuotaKind,
 } from "@/lib/data-platform/providers/api-football/quota-circuit";
 
+export {
+  singleFlightApiFootball,
+  resetApiFootballSingleFlightForTests,
+} from "@/lib/data-platform/providers/api-football/single-flight";
+
 export { createFixtureApiFootballClient } from "@/lib/data-platform/providers/api-football/fixture-client";
 
 export {

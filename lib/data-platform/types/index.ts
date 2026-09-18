@@ -6,3 +6,5 @@ export type * from "@/lib/data-platform/types/odds";
 export type * from "@/lib/data-platform/types/quality";
 export type * from "@/lib/data-platform/types/provider";
 export type * from "@/lib/data-platform/types/bundle";
+
+export { isTerminalApexMatchStatus } from "@/lib/data-platform/types/match";

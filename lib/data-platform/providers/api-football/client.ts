@@ -36,6 +36,7 @@ import {
   noteApiFootballQuotaSignal,
   throwIfApiFootballDailyQuotaExhausted,
 } from "@/lib/data-platform/providers/api-football/quota-circuit";
+import { singleFlightApiFootball } from "@/lib/data-platform/providers/api-football/single-flight";
 import { withRetry } from "@/lib/data-platform/providers/api-football/retry";
 import type {
   ApiFootballEventsResponse,
@@ -309,56 +310,60 @@ export function withApiFootballClientCache(
       return fresh;
     }
 
-    let fromOrigin = false;
-    const load = async (): Promise<T> => {
-      fromOrigin = true;
-      const value = await run();
-      if (isApiFootballRateLimitPayload(value)) {
-        const message =
-          apiFootballVendorErrorText(value) ?? "API-Football rate limit";
-        const error = new ApiFootballError({
-          message,
-          code: "rate_limited",
-          status: 429,
-          details: value,
-        });
-        noteApiFootballQuotaSignal({
-          message,
-          status: 429,
-          payload: value,
-          error,
-        });
-        throw error;
-      }
-      return value;
-    };
-
-    try {
-      const value = await readThroughNextDataCache(
-        key,
-        Math.max(1, Math.round(ttlMs / 1000)),
-        load,
-        useNextDataCache,
-      );
-      const vendorError = apiFootballVendorErrorText(value);
-      if (!vendorError) {
-        cache.set(key, value, ttlMs);
-      }
-      logApiFootballCache(
-        { source: fromOrigin ? "API" : "CACHE", key },
-        logger,
-      );
-      return value;
-    } catch (error) {
-      if (isApiFootballRateLimitError(error)) {
-        const stale = cache.getStale<T>(key);
-        if (stale !== undefined) {
-          logApiFootballCache({ source: "CACHE", key, stale: true }, logger);
-          return stale;
+    return singleFlightApiFootball(key, async () => {
+      let fromOrigin = false;
+      const load = async (): Promise<T> => {
+        fromOrigin = true;
+        const value = await run();
+        if (isApiFootballRateLimitPayload(value)) {
+          const message =
+            apiFootballVendorErrorText(value) ?? "API-Football rate limit";
+          const error = new ApiFootballError({
+            message,
+            code: "rate_limited",
+            status: 429,
+            details: value,
+          });
+          noteApiFootballQuotaSignal({
+            message,
+            status: 429,
+            payload: value,
+            error,
+          });
+          throw error;
         }
+        return value;
+      };
+
+      try {
+        const value = await readThroughNextDataCache(
+          key,
+          Math.max(1, Math.round(ttlMs / 1000)),
+          load,
+          useNextDataCache,
+        );
+        const vendorError = apiFootballVendorErrorText(value);
+        if (!vendorError) {
+          cache.set(key, value, ttlMs);
+        }
+        logApiFootballCache(
+          { source: fromOrigin ? "API" : "CACHE", key },
+          logger,
+        );
+        return value;
+      } catch (error) {
+        if (isApiFootballRateLimitError(error)) {
+          const stale = cache.getStale<T>(key);
+          if (stale !== undefined) {
+            logApiFootballCache({ source: "CACHE", key, stale: true }, logger);
+            return stale;
+          }
+        }
+        throw error instanceof ApiFootballError
+          ? error
+          : toApiFootballError(error);
       }
-      throw error instanceof ApiFootballError ? error : toApiFootballError(error);
-    }
+    });
   }
 
   return {

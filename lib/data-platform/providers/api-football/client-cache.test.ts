@@ -10,9 +10,11 @@ import { createRateLimiter } from "@/lib/data-platform/providers/api-football/ra
 import { createRecordedApiFootballTeamsResponse } from "@/lib/data-platform/providers/api-football/fixtures";
 import { ApiFootballError } from "@/lib/data-platform/providers/api-football/errors";
 import { resetApiFootballQuotaCircuitForTests } from "@/lib/data-platform/providers/api-football/quota-circuit";
+import { resetApiFootballSingleFlightForTests } from "@/lib/data-platform/providers/api-football/single-flight";
 
 afterEach(() => {
   resetApiFootballQuotaCircuitForTests();
+  resetApiFootballSingleFlightForTests();
 });
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -163,5 +165,105 @@ describe("withApiFootballClientCache", () => {
       ApiFootballError,
     );
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("coalesces three concurrent same-key cold misses into one origin call", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const fetchImpl = vi.fn(async () => {
+      await gate;
+      return jsonResponse(createRecordedApiFootballTeamsResponse());
+    });
+    const client = withApiFootballClientCache(
+      testClient(fetchImpl),
+      createTtlCache(),
+      { logger: () => undefined, useNextDataCache: false },
+    );
+
+    const pending = Promise.all([
+      client.getTeam("42"),
+      client.getTeam("42"),
+      client.getTeam("42"),
+    ]);
+    release();
+    const results = await pending;
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(results[0]).toEqual(results[1]);
+    expect(results[1]).toEqual(results[2]);
+
+    await client.getTeam("42");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs different keys independently", async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const id = url.includes("id=49") ? "49" : "42";
+      return jsonResponse(createRecordedApiFootballTeamsResponse(id));
+    });
+    const client = withApiFootballClientCache(
+      testClient(fetchImpl),
+      createTtlCache(),
+      { logger: () => undefined, useNextDataCache: false },
+    );
+
+    const [home, away] = await Promise.all([
+      client.getTeam("42"),
+      client.getTeam("49"),
+    ]);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(home.response[0]?.team.id).toBe(42);
+    expect(away.response[0]?.team.id).toBe(49);
+  });
+
+  it("shares a rejected miss and lets a later call try origin again", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ message: "upstream 502" }, 502))
+      .mockResolvedValueOnce(jsonResponse(createRecordedApiFootballTeamsResponse()));
+    const client = withApiFootballClientCache(
+      testClient(fetchImpl),
+      createTtlCache(),
+      { logger: () => undefined, useNextDataCache: false },
+    );
+
+    const first = await Promise.allSettled([
+      client.getTeam("42"),
+      client.getTeam("42"),
+      client.getTeam("42"),
+    ]);
+    expect(first.every((row) => row.status === "rejected")).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+    const recovered = await client.getTeam("42");
+    expect(recovered.response[0]?.team.id).toBe(42);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not issue another origin call after daily quota fail-fast", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        errors: {
+          requests:
+            "You have reached the request limit for the day, Go to https://dashboard.api-football.com to upgrade your plan.",
+        },
+        response: [],
+      }),
+    );
+    const client = withApiFootballClientCache(
+      testClient(fetchImpl),
+      createTtlCache(),
+      { logger: () => undefined, useNextDataCache: false },
+    );
+
+    await expect(client.getTeam("42")).rejects.toBeInstanceOf(ApiFootballError);
+    await expect(client.getTeam("42")).rejects.toBeInstanceOf(ApiFootballError);
+    await expect(client.getFixtureOdds("1035089")).rejects.toBeInstanceOf(
+      ApiFootballError,
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });

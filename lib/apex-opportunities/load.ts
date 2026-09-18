@@ -6,6 +6,7 @@
 import { mapOpportunityFromCenter } from "@/lib/apex-opportunities/map";
 import type { ApexOpportunitiesBoard } from "@/lib/apex-opportunities/types";
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
+import { isTerminalApexMatchStatus } from "@/lib/data-platform/types/match";
 import {
   bindScannerProfile,
   instrumentRepositories,
@@ -17,10 +18,7 @@ import {
   noteScannerQuotaExhausted,
   type ScannerProfileSession,
 } from "@/lib/debug/scanner-profile";
-import {
-  EMPTY_MATCH_CENTER_ENRICHMENT,
-  enrichMatchCenterContext,
-} from "@/lib/match-center/enrich";
+import { EMPTY_MATCH_CENTER_ENRICHMENT } from "@/lib/match-center/enrich";
 import { fixtureIdFromMatch } from "@/lib/match-center/fixture-id";
 import { createMatchCenterFromApexBundle } from "@/lib/match-center/from-data-platform";
 import type { LoadMatchCenterOptions } from "@/lib/match-center/load";
@@ -32,8 +30,6 @@ import {
 } from "@/lib/repositories";
 
 const EVALUATE_CONCURRENCY = 3;
-/** Full form/injury enrichment is cheap on recorded catalogues; skip on busy days. */
-const ENRICH_WHEN_AT_MOST = 3;
 
 export type LoadApexOpportunitiesOptions = LoadMatchCenterOptions & {
   /** Sprint 2.5 — removable profile session. Does not change board output. */
@@ -45,6 +41,10 @@ async function attachOdds(
   bundle: ApexMatchBundle,
 ): Promise<ApexMatchBundle> {
   if (bundle.odds.length > 0) return bundle;
+  // Finished / cancelled cannot become a betting opportunity. Keep the
+  // catalogue row and skip /odds. This is not an empty-odds error fallback
+  // and must not set quotaExhausted.
+  if (isTerminalApexMatchStatus(bundle.match.status)) return bundle;
   const matchId = fixtureIdFromMatch({
     id: bundle.match.id,
     externalId: bundle.match.externalRefs[0]?.externalId ?? null,
@@ -61,10 +61,18 @@ async function attachOdds(
   };
 }
 
+/**
+ * Sprint 3 odds-only path for every catalogue size.
+ *
+ * A previous `bundles.length <= 3` branch called enrichMatchCenterContext
+ * (team stats, H2H, injuries, last-5, lineups, standings). Those extras can
+ * change Elo and scoring vs the 4+ fixture path, but they are not required
+ * to emit a Scanner row — busy days already use EMPTY_MATCH_CENTER_ENRICHMENT.
+ * Quiet-day full hydration is removed here only. Match Center is unchanged.
+ */
 async function evaluateBundle(
   repos: ApexRepositories,
   bundle: ApexMatchBundle,
-  enrich: boolean,
 ) {
   const withOdds = await measurePhase(
     "attachOdds",
@@ -72,23 +80,10 @@ async function evaluateBundle(
     { fixtures: 1 },
   );
   if (withOdds.odds.length > 0) noteScannerOddsAttached();
-  let enrichment = EMPTY_MATCH_CENTER_ENRICHMENT;
-  if (enrich) {
-    try {
-      enrichment = await measurePhase(
-        "enrichment",
-        () => enrichMatchCenterContext(repos, withOdds),
-        { fixtures: 1 },
-      );
-    } catch {
-      // Form/injuries are optional for the scan. Quota here must not blank the board.
-      enrichment = EMPTY_MATCH_CENTER_ENRICHMENT;
-    }
-  }
   noteScannerFixtures("decisionEngine", 1);
   noteScannerFixtures("scoring", 1);
   const center = createMatchCenterFromApexBundle(withOdds, {
-    enrichment,
+    enrichment: EMPTY_MATCH_CENTER_ENRICHMENT,
     probabilityDiagnosticContext: "scanner",
   });
   return measurePhaseSync(
@@ -158,11 +153,10 @@ export async function getApexOpportunities(
   );
   noteScannerFixtureCount(bundles.length);
   noteScannerFixtures("catalogue", bundles.length);
-  const enrich = bundles.length <= ENRICH_WHEN_AT_MOST;
 
   const mapped = await mapPool(bundles, EVALUATE_CONCURRENCY, async (bundle) => {
     try {
-      return await evaluateBundle(repos, bundle, enrich);
+      return await evaluateBundle(repos, bundle);
     } catch (error) {
       if (isQuotaError(error)) throw error;
       return null;

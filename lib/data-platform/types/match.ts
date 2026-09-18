@@ -12,6 +12,18 @@ export type ApexMatchStatus =
   | "suspended"
   | "unknown";
 
+/**
+ * Canonical statuses that cannot become a future betting opportunity.
+ *
+ * `finished` ← vendor FT / AET / PEN (match is over).
+ * `cancelled` ← vendor CANC / ABD / AWD / WO (will not be played as scheduled).
+ *
+ * Not terminal: scheduled, live (incl. HT), postponed, suspended, unknown.
+ */
+export function isTerminalApexMatchStatus(status: ApexMatchStatus): boolean {
+  return status === "finished" || status === "cancelled";
+}
+
 export type ApexScore = {
   home: number | null;
   away: number | null;
