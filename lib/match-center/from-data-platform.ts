@@ -92,8 +92,8 @@ function outcomeFromScore(
 }
 
 /**
- * Stable pseudo-Elo from team id so PE gets deterministic inputs without DB ratings.
- * Re-exported from the Probability Engine helper.
+ * Missing-stat Elo prior (Sprint 5B.1). Re-exported from the PE helper.
+ * Team ids are not used as strength.
  */
 export { estimateEloFromTeamId };
 
@@ -128,14 +128,14 @@ export function resolveEloWithProvenance(
     const elo = estimateEloFromTeamId(teamId, base);
     return {
       elo,
-      source: "estimated_hash",
+      source: "base_prior",
       base,
       played: snapshot?.played ?? null,
       wins: snapshot?.wins ?? null,
       goalsFor: snapshot?.goalsFor ?? null,
       goalsAgainst: snapshot?.goalsAgainst ?? null,
       goalDifference: null,
-      hashOffset: elo - base,
+      hashOffset: null,
     };
   }
   const played = snapshot!.played!;
@@ -669,7 +669,7 @@ export function createMatchCenterFromApexBundle(
                 severity: "medium" as const,
                 title: "Elo estimado",
                 detail:
-                  "Ratings Elo se derivan del catálogo cuando hay estadísticas de equipo; si no, se estiman del team id.",
+                  "Ratings Elo se derivan del catálogo cuando hay estadísticas de equipo; si no, se usa el prior home/away (1580/1520).",
               },
             ]
           : []),

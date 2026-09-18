@@ -1,12 +1,13 @@
 /**
- * Deterministic pseudo-Elo when no EloRatingProvider / catalogue ratings exist.
- * TODO(elo-provider): replace with persisted ratings after each finished match.
+ * Missing-stat Elo prior (Sprint 5B.1).
+ *
+ * Team / provider IDs are not football strength. When catalogue stats are
+ * absent, return `base` unchanged. Home/away bases (1580 / 1520) stay with
+ * the caller — this helper must not invent a checksum offset.
+ *
+ * `teamId` is kept in the signature for call-site compatibility only.
  */
 
-export function estimateEloFromTeamId(teamId: string, base = 1500): number {
-  let hash = 0;
-  for (let i = 0; i < teamId.length; i++) {
-    hash = (hash * 31 + teamId.charCodeAt(i)) >>> 0;
-  }
-  return base + (hash % 251) - 125;
+export function estimateEloFromTeamId(_teamId: string, base = 1500): number {
+  return base;
 }

@@ -13,7 +13,6 @@ import {
 } from "@/lib/debug/probability-diagnostic";
 import {
   createEloPoissonHybridEngine,
-  estimateEloFromTeamId,
 } from "@/lib/intelligence/modules/probability";
 import { EMPTY_MATCH_CENTER_ENRICHMENT } from "@/lib/match-center/enrich";
 import {
@@ -158,12 +157,12 @@ describe("resolveEloWithProvenance", () => {
     expect(derived.elo).toBe(Math.round(1580 - 80 + 220 + 7 * 2.5));
   });
 
-  it("reports estimated_hash when stats are missing or played is zero", () => {
+  it("reports base_prior when stats are missing or played is zero", () => {
     const teamId = "apex:api-football:team:away";
     const missing = resolveEloWithProvenance(null, teamId, 1520);
-    expect(missing.source).toBe("estimated_hash");
-    expect(missing.elo).toBe(estimateEloFromTeamId(teamId, 1520));
-    expect(missing.hashOffset).toBe(missing.elo - 1520);
+    expect(missing.source).toBe("base_prior");
+    expect(missing.elo).toBe(1520);
+    expect(missing.hashOffset).toBeNull();
     expect(missing.played).toBeNull();
     expect(missing.wins).toBeNull();
     expect(missing.goalsFor).toBeNull();
@@ -175,8 +174,8 @@ describe("resolveEloWithProvenance", () => {
       teamId,
       1520,
     );
-    expect(zeroPlayed.source).toBe("estimated_hash");
-    expect(zeroPlayed.elo).toBe(estimateEloFromTeamId(teamId, 1520));
+    expect(zeroPlayed.source).toBe("base_prior");
+    expect(zeroPlayed.elo).toBe(1520);
     expect(zeroPlayed.played).toBe(0);
   });
 });
@@ -201,7 +200,7 @@ describe("Sprint 5A probability diagnostic seam", () => {
     expect(capture.records).toHaveLength(1);
     const record = capture.records[0]!;
     expect(record.home.source).toBe("catalogue");
-    expect(record.away.source).toBe("estimated_hash");
+    expect(record.away.source).toBe("base_prior");
     expect(record.eloDifference).toBe(record.homeElo - record.awayElo);
     expect(record.homeElo).toBe(record.home.elo);
     expect(record.awayElo).toBe(record.away.elo);

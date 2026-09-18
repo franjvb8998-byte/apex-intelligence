@@ -20,6 +20,7 @@ export type ProbabilityDiagnosticContext =
 
 export type EloSource =
   | "catalogue"
+  | "base_prior"
   | "estimated_hash"
   | "explicit"
   | "unknown";
@@ -27,7 +28,7 @@ export type EloSource =
 export type EloDerivation = {
   elo: number;
   source: EloSource;
-  /** Base passed into catalogue / hash derivation; null when Elo was explicit. */
+  /** Base passed into catalogue / prior derivation; null when Elo was explicit. */
   base: number | null;
   played: number | null;
   wins: number | null;
@@ -35,7 +36,10 @@ export type EloDerivation = {
   goalsAgainst: number | null;
   /** Value used by catalogue Elo: (GF ?? 0) − (GA ?? 0). Null on other sources. */
   goalDifference: number | null;
-  /** `elo - base` when source is estimated_hash; not a re-hash of the team id. */
+  /**
+   * Historical `elo - base` when source is estimated_hash (Sprint 5B forensic).
+   * Production missing-stat path is `base_prior` and always null here.
+   */
   hashOffset: number | null;
 };
 

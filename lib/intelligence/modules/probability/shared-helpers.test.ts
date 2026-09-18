@@ -6,13 +6,15 @@ import {
 import { createEloPoissonHybridEngine } from "@/lib/intelligence/modules/probability";
 
 describe("shared PE helpers", () => {
-  it("hashes team ids to a stable Elo around the base", () => {
+  it("returns the side base and ignores team id (Sprint 5B.1)", () => {
     const a = estimateEloFromTeamId("42", 1500);
     const b = estimateEloFromTeamId("42", 1500);
-    expect(a).toBe(b);
-    expect(a).toBeGreaterThanOrEqual(1375);
-    expect(a).toBeLessThanOrEqual(1625);
-    expect(estimateEloFromTeamId("49", 1500)).not.toBe(a);
+    expect(a).toBe(1500);
+    expect(b).toBe(1500);
+    expect(estimateEloFromTeamId("49", 1500)).toBe(1500);
+    expect(estimateEloFromTeamId("apex:api-football:team:17885", 1580)).toBe(
+      1580,
+    );
   });
 
   it("maps PE entropy to a 0–1 ConfidenceScore", () => {
