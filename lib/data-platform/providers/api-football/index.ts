@@ -45,6 +45,7 @@ export {
   API_FOOTBALL_CACHE_TTL_MS,
   TEAM_LOGO_CACHE_TTL_SECONDS,
   ttlForCacheKey,
+  ttlForCachedPayload,
   logApiFootballCache,
   isApiFootballRateLimitPayload,
   isApiFootballRateLimitError,

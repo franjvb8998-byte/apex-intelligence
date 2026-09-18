@@ -5,9 +5,13 @@ import {
   API_FOOTBALL_CACHE_TTL_MS,
   isApiFootballRateLimitPayload,
   ttlForCacheKey,
+  ttlForCachedPayload,
 } from "@/lib/data-platform/providers/api-football/cache-policy";
 import { createRateLimiter } from "@/lib/data-platform/providers/api-football/rate-limiter";
-import { createRecordedApiFootballTeamsResponse } from "@/lib/data-platform/providers/api-football/fixtures";
+import {
+  createRecordedApiFootballFixturesResponse,
+  createRecordedApiFootballTeamsResponse,
+} from "@/lib/data-platform/providers/api-football/fixtures";
 import { ApiFootballError } from "@/lib/data-platform/providers/api-football/errors";
 import { resetApiFootballQuotaCircuitForTests } from "@/lib/data-platform/providers/api-football/quota-circuit";
 import { resetApiFootballSingleFlightForTests } from "@/lib/data-platform/providers/api-football/single-flight";
@@ -38,12 +42,59 @@ describe("API-Football cache policy", () => {
     expect(ttlForCacheKey("af:fixtures:date:2024-04-23")).toBe(
       API_FOOTBALL_CACHE_TTL_MS.fixtures,
     );
+    expect(ttlForCacheKey("af:fixtures:league:39:2025")).toBe(
+      API_FOOTBALL_CACHE_TTL_MS.fixtures,
+    );
+    expect(ttlForCacheKey("af:fixtures:team:42:last:5")).toBe(
+      API_FOOTBALL_CACHE_TTL_MS.teamForm,
+    );
+    expect(ttlForCacheKey("af:h2h:42:49:5")).toBe(API_FOOTBALL_CACHE_TTL_MS.h2h);
     expect(ttlForCacheKey("af:fixture:1035089")).toBe(API_FOOTBALL_CACHE_TTL_MS.match);
+    expect(ttlForCacheKey("af:odds:1035089")).toBe(API_FOOTBALL_CACHE_TTL_MS.match);
+    expect(ttlForCacheKey("af:lineups:1035089")).toBe(API_FOOTBALL_CACHE_TTL_MS.match);
+    expect(ttlForCacheKey("af:events:1035089")).toBe(API_FOOTBALL_CACHE_TTL_MS.match);
+    expect(ttlForCacheKey("af:injuries:1035089::")).toBe(
+      API_FOOTBALL_CACHE_TTL_MS.match,
+    );
     expect(ttlForCacheKey("af:team:42")).toBe(API_FOOTBALL_CACHE_TTL_MS.team);
     expect(ttlForCacheKey("af:league:39")).toBe(API_FOOTBALL_CACHE_TTL_MS.league);
     expect(ttlForCacheKey("af:standings:39:2023")).toBe(
       API_FOOTBALL_CACHE_TTL_MS.standings,
     );
+  });
+
+  it("lengthens TTL only for a terminal single-fixture payload", () => {
+    const finished = createRecordedApiFootballFixturesResponse();
+    expect(
+      ttlForCachedPayload(
+        "af:fixture:1035089",
+        finished,
+        API_FOOTBALL_CACHE_TTL_MS.match,
+      ),
+    ).toBe(API_FOOTBALL_CACHE_TTL_MS.finishedMatch);
+    const scheduled = structuredClone(finished);
+    scheduled.response[0]!.fixture.status.short = "NS";
+    expect(
+      ttlForCachedPayload(
+        "af:fixture:1035089",
+        scheduled,
+        API_FOOTBALL_CACHE_TTL_MS.match,
+      ),
+    ).toBe(API_FOOTBALL_CACHE_TTL_MS.match);
+    expect(
+      ttlForCachedPayload(
+        "af:odds:1035089",
+        finished,
+        API_FOOTBALL_CACHE_TTL_MS.match,
+      ),
+    ).toBe(API_FOOTBALL_CACHE_TTL_MS.match);
+    expect(
+      ttlForCachedPayload(
+        "af:fixtures:date:2024-04-23",
+        finished,
+        API_FOOTBALL_CACHE_TTL_MS.fixtures,
+      ),
+    ).toBe(API_FOOTBALL_CACHE_TTL_MS.fixtures);
   });
 
   it("detects vendor daily quota payloads", () => {
@@ -265,5 +316,43 @@ describe("withApiFootballClientCache", () => {
       ApiFootballError,
     );
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a finished fixture-by-id in process cache past the live match TTL", async () => {
+    let now = 1_000;
+    const cache = createTtlCache({ now: () => now });
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse(createRecordedApiFootballFixturesResponse()),
+    );
+    const client = withApiFootballClientCache(testClient(fetchImpl), cache, {
+      logger: () => undefined,
+      useNextDataCache: false,
+    });
+
+    await client.getFixture("1035089");
+    now += API_FOOTBALL_CACHE_TTL_MS.match + 1;
+    await client.getFixture("1035089");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+    now += API_FOOTBALL_CACHE_TTL_MS.finishedMatch;
+    await client.getFixture("1035089");
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not lengthen odds TTL", async () => {
+    let now = 1_000;
+    const cache = createTtlCache({ now: () => now });
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({ response: [], errors: [], results: 0 }),
+    );
+    const client = withApiFootballClientCache(testClient(fetchImpl), cache, {
+      logger: () => undefined,
+      useNextDataCache: false,
+    });
+
+    await client.getFixtureOdds("1035089");
+    now += API_FOOTBALL_CACHE_TTL_MS.match + 1;
+    await client.getFixtureOdds("1035089");
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 });

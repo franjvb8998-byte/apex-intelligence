@@ -23,6 +23,7 @@ import {
   isApiFootballRateLimitPayload,
   logApiFootballCache,
   ttlForCacheKey,
+  ttlForCachedPayload,
   type ApiFootballCacheLogger,
 } from "@/lib/data-platform/providers/api-football/cache-policy";
 import { readThroughNextDataCache } from "@/lib/data-platform/providers/api-football/next-data-cache";
@@ -344,7 +345,7 @@ export function withApiFootballClientCache(
         );
         const vendorError = apiFootballVendorErrorText(value);
         if (!vendorError) {
-          cache.set(key, value, ttlMs);
+          cache.set(key, value, ttlForCachedPayload(key, value, ttlMs));
         }
         logApiFootballCache(
           { source: fromOrigin ? "API" : "CACHE", key },

@@ -3,7 +3,13 @@
  * Catalogue + odds come from API-Football (recorded fallback when no key).
  */
 
+import { cache } from "react";
 import { mapOpportunityFromCenter } from "@/lib/apex-opportunities/map";
+import {
+  defaultApexOpportunitiesShareKey,
+  shareApexOpportunitiesBoard,
+  snapshotApexOpportunitiesBoard,
+} from "@/lib/apex-opportunities/shared-board";
 import type { ApexOpportunitiesBoard } from "@/lib/apex-opportunities/types";
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
 import { isTerminalApexMatchStatus } from "@/lib/data-platform/types/match";
@@ -132,10 +138,62 @@ async function mapPool<T, R>(
 
 /**
  * Scan today's (or Premier League fallback) fixtures through the Decision Engine.
+ *
+ * Default product calls (no provider/env/profiler) share one in-flight board
+ * and, outside unit tests, one React-request memo. Injected provider/env and
+ * scannerProfile stay unshared so tests and the profiler observe real work.
  */
 export async function getApexOpportunities(
   options: LoadApexOpportunitiesOptions = {},
 ): Promise<ApexOpportunitiesBoard> {
+  if (!isShareableApexOpportunitiesOptions(options)) {
+    return computeApexOpportunitiesBoard(options);
+  }
+  if (inUnitTest()) {
+    return shareApexOpportunitiesBoard(defaultApexOpportunitiesShareKey(), () =>
+      computeApexOpportunitiesBoard({}),
+    );
+  }
+  return snapshotApexOpportunitiesBoard(await defaultApexOpportunitiesForRequest());
+}
+
+function inUnitTest(): boolean {
+  return process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+}
+
+function isShareableApexOpportunitiesOptions(
+  options: LoadApexOpportunitiesOptions,
+): boolean {
+  return (
+    options.provider == null &&
+    options.env == null &&
+    options.scannerProfile == null
+  );
+}
+
+const defaultApexOpportunitiesForRequest = cache(() =>
+  computeApexOpportunitiesBoard({}),
+);
+
+const computeCountSlot = Symbol.for("apex.opportunities.computeCount");
+
+type ComputeGlobal = typeof globalThis & {
+  [computeCountSlot]?: number;
+};
+
+export function getApexOpportunitiesComputeCountForTests(): number {
+  return (globalThis as ComputeGlobal)[computeCountSlot] ?? 0;
+}
+
+export function resetApexOpportunitiesComputeCountForTests(): void {
+  (globalThis as ComputeGlobal)[computeCountSlot] = 0;
+}
+
+async function computeApexOpportunitiesBoard(
+  options: LoadApexOpportunitiesOptions,
+): Promise<ApexOpportunitiesBoard> {
+  const g = globalThis as ComputeGlobal;
+  g[computeCountSlot] = (g[computeCountSlot] ?? 0) + 1;
   if (options.scannerProfile) bindScannerProfile(options.scannerProfile);
   const env = options.env ?? process.env;
   const repos = instrumentRepositories(
