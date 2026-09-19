@@ -547,3 +547,30 @@ export {
   verifyBatchHashes,
 } from "@/lib/debug/calibration/prospective/capture/capture-integrity";
 export { createEvidenceSnapshot } from "@/lib/debug/calibration/prospective/capture/capture-evidence";
+export {
+  LIVE_CAPTURE_WINDOW,
+  LIVE_PROTOCOL_API_BUDGET,
+  LIVE_PROTOCOL_CONFIG,
+  assertFiniteApiBudget,
+  liveProtocolCaptureWindow,
+} from "@/lib/debug/calibration/prospective/protocol/protocol-config";
+export {
+  LIVE_PROTOCOL_FINGERPRINT,
+  assertProtocolFingerprintsDistinct,
+  computeProtocolFingerprint,
+  protocolCanonicalJson,
+} from "@/lib/debug/calibration/prospective/protocol/protocol-fingerprint";
+export {
+  LIVE_PROTOCOL_BASE_COMMIT,
+  LIVE_PROTOCOL_VERSION,
+  OFFLINE_SYNTHETIC_SEASON,
+  PLANNER_DISPOSITIONS,
+  PROSPECTIVE_COMPETITION_ID,
+  PROSPECTIVE_SEASON_UNVERIFIED,
+  SAMPLE_DISPOSITIONS,
+} from "@/lib/debug/calibration/prospective/protocol/protocol-types";
+export { planDiscoveredFixtures, protocolDryRun } from "@/lib/debug/calibration/prospective/protocol/protocol-planner";
+export { planFirstLiveDiscovery, FIRST_LIVE_PHASE } from "@/lib/debug/calibration/prospective/protocol/protocol-discovery";
+export { countPrimarySampleN, reportingCheckpoints } from "@/lib/debug/calibration/prospective/protocol/protocol-sample";
+export { isEligiblePriorEvidence, selectPriorEvidenceFixtures } from "@/lib/debug/calibration/prospective/protocol/protocol-evidence";
+export { toUtcIso } from "@/lib/debug/calibration/prospective/protocol/protocol-utc";
