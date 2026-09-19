@@ -102,6 +102,7 @@ export type SeasonListPaging = {
 export type LeagueSeasonSelection = {
   leagueId: string;
   season: string;
+  /** 1 for the single unpaged season response. Not pages traversed. */
   pageCount: number;
 };
 
@@ -114,7 +115,32 @@ export type CollectionRunMetadata = {
   pageCounts: number[];
   fixtureCountBeforeDedupe: number;
   fixtureCountAfterDedupe: number;
+  /** Requested target count (15 for the 5B.3B microcollection). */
+  requestedTargetCount?: number;
+  /** Rows actually written after selection/reconstruction. */
   targetRowCount: number;
   oddsCoverageCount: number;
+  /**
+   * Observed oddsTiming histogram. Timing stays "unknown" unless proven.
+   * Do not read this as pre-match / opening / closing.
+   */
   oddsTimingClassification: Record<CalibrationOddsTiming, number>;
+  selectionRule?: string;
+  /** Logical fixture-list lookups (1 for the unpaged collector). */
+  fixtureListLogicalCalls?: number;
+  /** Logical GET /odds lookups. Not origin HTTP attempts. */
+  oddsLogicalCalls?: number;
+  /**
+   * Observed LOGICAL lookups (fixture-list + odds).
+   * Not origin HTTP attempts; retries can add more HTTP than this number.
+   */
+  logicalCallCount?: number;
+  /** Historical alias of logicalCallCount. */
+  originCallCount?: number;
+  /**
+   * Explicit: the microcollection ceiling counts logical lookups, not
+   * origin HTTP attempts (retries / limiter waits are outside this number).
+   */
+  callBudgetKind?: "logical_lookups_not_origin_http_attempts";
+  leagueName?: string;
 };

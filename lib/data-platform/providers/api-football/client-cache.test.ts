@@ -356,3 +356,31 @@ describe("withApiFootballClientCache", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("getFixturesByLeague unpaged production contract", () => {
+  it("sends only league and season and uses the unpaged cache key", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        get: "fixtures",
+        results: 0,
+        paging: { current: 1, total: 1 },
+        response: [],
+      }),
+    );
+    const keys: string[] = [];
+    const client = withApiFootballClientCache(testClient(fetchImpl), createTtlCache(), {
+      logger: (event) => keys.push(event.key),
+      useNextDataCache: false,
+    });
+
+    await client.getFixturesByLeague("39", "2024");
+    const firstCall = fetchImpl.mock.calls[0] as unknown as [RequestInfo | URL];
+    const url = new URL(String(firstCall[0]));
+    expect(url.pathname.endsWith("/fixtures")).toBe(true);
+    expect(url.searchParams.get("league")).toBe("39");
+    expect(url.searchParams.get("season")).toBe("2024");
+    expect(url.searchParams.has("page")).toBe(false);
+    expect([...url.searchParams.keys()].sort()).toEqual(["league", "season"]);
+    expect(keys).toEqual(["af:fixtures:league:39:2024"]);
+  });
+});

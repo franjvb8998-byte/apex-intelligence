@@ -102,3 +102,35 @@ export {
   planFixtureListPages,
   prepareCalibrationFixtures,
 } from "@/lib/debug/calibration/collector-integrity";
+
+export {
+  MICROCOLLECTION_FIXTURE_LIST_LOGICAL_CALLS,
+  MICROCOLLECTION_LEAGUE_ID,
+  MICROCOLLECTION_LEAGUE_NAME,
+  MICROCOLLECTION_LOGICAL_CALL_CEILING,
+  MICROCOLLECTION_ORIGIN_CEILING,
+  MICROCOLLECTION_SEASON,
+  MICROCOLLECTION_SELECTION_RULE,
+  MICROCOLLECTION_TARGET_COUNT,
+} from "@/lib/debug/calibration/micro-shape";
+
+export {
+  collectMicrodataset,
+  MicrocollectOddsLookupError,
+  reportMicrocollectCliResult,
+} from "@/lib/debug/calibration/microcollect";
+export {
+  assertCalibrationFixtureEnvelope,
+  assertMicrocollectionTargetContract,
+  MicrocollectEmptySeasonError,
+  MicrocollectNoEligibleTargetsError,
+  MicrocollectTargetShortfallError,
+  MicrocollectVendorEnvelopeError,
+} from "@/lib/debug/calibration/season-contract";
+export { loadCalibrationDataset } from "@/lib/debug/calibration/persist";
+export {
+  assertLiveCollectionAuthorized,
+  CallBudgetExceededError,
+  LiveCollectionGuardError,
+  planMicrocollectionLogicalCalls,
+} from "@/lib/debug/calibration/live-guard";

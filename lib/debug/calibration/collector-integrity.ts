@@ -2,9 +2,9 @@
  * Offline collector integrity contracts.
  * Does not call API-Football. Does not modify the production client.
  *
- * Production getFixturesByLeague does not send `page` and listFixtures
- * discards paging. A future collector MUST read paging from the raw
- * fixtures response and either fetch every page or fail loudly.
+ * Production listFixtures still discards paging.
+ * The debug collector uses unpaged getFixturesByLeague(league, season).
+ * In-memory reconstruction still refuses paging.total > 1.
  */
 
 import {
@@ -40,8 +40,8 @@ export function planFixtureListPages(totalPages: number): number[] {
 }
 
 /**
- * Option B until the production client can request page=N:
- * refuse any season list that is not a proven single complete page.
+ * Unpaged collector requires a single complete season envelope.
+ * paging.total > 1 is refused; additional fixture pages are not fetched.
  */
 export function assertSeasonListCompleteForCalibration(
   paging: SeasonListPaging | null | undefined,
@@ -53,12 +53,12 @@ export function assertSeasonListCompleteForCalibration(
   }
   if (paging.total > 1) {
     throw new IncompleteSeasonListError(
-      `Season list paging.total=${paging.total}; fetch every page before building a dataset (page support is not in the production client)`,
+      `Season list paging.total=${paging.total}; unpaged collector requires a single complete season envelope`,
     );
   }
   if (paging.total !== 1 || paging.current !== 1) {
     throw new IncompleteSeasonListError(
-      `Season list paging is not a complete single page (current=${paging.current}, total=${paging.total})`,
+      `Season list paging is not a complete single envelope (current=${paging.current}, total=${paging.total})`,
     );
   }
 }
@@ -120,22 +120,41 @@ export function createCollectionRunMetadata(input: {
   fixtureCountAfterDedupe: number;
   rows: readonly CalibrationRow[];
   collectionTimestamp?: string;
+  selectionRule?: string;
+  requestedTargetCount?: number;
+  fixtureListLogicalCalls?: number;
+  oddsLogicalCalls?: number;
+  logicalCallCount?: number;
+  originCallCount?: number;
+  leagueName?: string;
+  collectorVersion?: string;
 }): CollectionRunMetadata {
   const pageCounts = input.selectedLeagueSeasons.map((item) => item.pageCount);
+  const logicalCallCount = input.logicalCallCount ?? input.originCallCount;
+  const fixtureListLogicalCalls = input.fixtureListLogicalCalls;
+  const oddsLogicalCalls = input.oddsLogicalCalls;
   return {
     datasetSchemaVersion: CALIBRATION_SCHEMA_VERSION,
     reconstructionVersion: CALIBRATION_RECONSTRUCTION_VERSION,
-    collectorVersion: CALIBRATION_COLLECTOR_VERSION,
+    collectorVersion: input.collectorVersion ?? CALIBRATION_COLLECTOR_VERSION,
     collectionTimestamp:
       input.collectionTimestamp ?? "not-collected-offline-harness",
     selectedLeagueSeasons: input.selectedLeagueSeasons,
     pageCounts,
     fixtureCountBeforeDedupe: input.fixtureCountBeforeDedupe,
     fixtureCountAfterDedupe: input.fixtureCountAfterDedupe,
+    requestedTargetCount: input.requestedTargetCount,
     targetRowCount: input.rows.length,
     oddsCoverageCount: input.rows.filter(
       (row) => row.homeOdds != null && row.drawOdds != null && row.awayOdds != null,
     ).length,
     oddsTimingClassification: classifyOddsTiming(input.rows),
+    selectionRule: input.selectionRule,
+    fixtureListLogicalCalls,
+    oddsLogicalCalls,
+    logicalCallCount,
+    originCallCount: logicalCallCount,
+    callBudgetKind: "logical_lookups_not_origin_http_attempts",
+    leagueName: input.leagueName,
   };
 }
