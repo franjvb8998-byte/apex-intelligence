@@ -37,6 +37,9 @@ yarn-error.log*
 # Offline calibration artifacts (never commit collected datasets)
 /data/calibration/
 
+# Prospective captured prediction data (never commit pending/scored batches)
+/data/prospective/
+
 
 # vercel
 .vercel

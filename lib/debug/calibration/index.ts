@@ -519,3 +519,31 @@ export {
   sortDeterministic,
 } from "@/lib/debug/calibration/prospective/candidate-integrity";
 export { applyCandidateHighEqual } from "@/lib/debug/calibration/prospective/candidate-high-equal";
+export {
+  CAPTURE_WINDOW_PLACEHOLDER,
+  FORBIDDEN_CAPTURE_INPUT_KEYS,
+  PROSPECTIVE_DATA_DIR,
+  PROSPECTIVE_PENDING_DIR,
+  PROSPECTIVE_SCORED_DIR,
+} from "@/lib/debug/calibration/prospective/capture/capture-types";
+export { createFixedClock, createInjectedClock } from "@/lib/debug/calibration/prospective/capture/capture-clock";
+export { captureProspectiveBatch } from "@/lib/debug/calibration/prospective/capture/capture-runner";
+export {
+  canonicalJson,
+  deriveBatchId,
+  hashEvidenceManifest,
+  hashRecords,
+  sha256Canonical,
+} from "@/lib/debug/calibration/prospective/capture/capture-manifest";
+export {
+  findPriorFixtureCapture,
+  loadPendingBatch,
+  loadPriorCaptureIndex,
+  persistPendingBatch,
+} from "@/lib/debug/calibration/prospective/capture/capture-persist";
+export { buildCaptureReport, formatCaptureReport } from "@/lib/debug/calibration/prospective/capture/capture-report";
+export {
+  assertCaptureBatchIntegrity,
+  verifyBatchHashes,
+} from "@/lib/debug/calibration/prospective/capture/capture-integrity";
+export { createEvidenceSnapshot } from "@/lib/debug/calibration/prospective/capture/capture-evidence";
