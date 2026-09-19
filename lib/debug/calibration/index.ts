@@ -489,3 +489,33 @@ export {
   poolHoldoutLocal,
 } from "@/lib/debug/calibration/lm-5b16-evaluate";
 export { classifyLocalMass } from "@/lib/debug/calibration/lm-5b16-report";
+export {
+  CANDIDATE_ARMS,
+  CANDIDATE_MANIFEST,
+  CANDIDATE_MANIFEST_FINGERPRINT,
+  CONTROL_PRODUCTION_GEOMETRY,
+  HIGH_EQUAL_SPECIAL_RULE,
+  PRIMARY_PROSPECTIVE_METRICS,
+  PROSPECTIVE_PROMOTION_RULES,
+  SECONDARY_PROSPECTIVE_METRICS,
+  assertExactlyFiveArms,
+  candidateArm,
+} from "@/lib/debug/calibration/prospective/candidate-config";
+export {
+  PRODUCTION_BASE_COMMIT,
+  PROSPECTIVE_CANDIDATE_IDS,
+  PROSPECTIVE_CANDIDATE_VERSION,
+  PROSPECTIVE_CHECKPOINTS,
+  USED_HISTORICAL_SEASONS,
+} from "@/lib/debug/calibration/prospective/candidate-types";
+export { resolveCandidateElos } from "@/lib/debug/calibration/prospective/candidate-input";
+export { predictCandidate } from "@/lib/debug/calibration/prospective/candidate-engine";
+export { capturePrediction, scorePredictionRecord } from "@/lib/debug/calibration/prospective/candidate-record";
+export {
+  HistoricalFirewallError,
+  ProspectiveIntegrityError,
+  assertNotHistoricalOutcomeDataset,
+  assertNotUsedHistoricalSeason,
+  sortDeterministic,
+} from "@/lib/debug/calibration/prospective/candidate-integrity";
+export { applyCandidateHighEqual } from "@/lib/debug/calibration/prospective/candidate-high-equal";
