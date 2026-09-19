@@ -9,7 +9,20 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "calibration:microcollect": "npx --yes tsx lib/debug/calibration/run-microcollect.ts --execute"
+    "calibration:microcollect": "npx --yes tsx lib/debug/calibration/run-microcollect.ts --execute",
+    "calibration:pilot": "npx --yes tsx lib/debug/calibration/run-pilot.ts --execute",
+    "calibration:experiment-5b5": "npx --yes tsx lib/debug/calibration/experiment-5b5-run.ts",
+    "calibration:validate-5b6": "npx --yes tsx lib/debug/calibration/validation-5b6-run.ts --execute",
+    "calibration:draw-5b7": "npx --yes tsx lib/debug/calibration/draw-5b7-run.ts",
+    "calibration:dc-5b8": "npx --yes tsx lib/debug/calibration/dc-5b8-run.ts",
+    "calibration:xg-5b9": "npx --yes tsx lib/debug/calibration/xg-5b9-run.ts",
+    "calibration:cat-5b10": "npx --yes tsx lib/debug/calibration/cat-5b10-run.ts",
+    "calibration:ig-5b11": "npx --yes tsx lib/debug/calibration/ig-5b11-run.ts",
+    "calibration:xg-5b12": "npx --yes tsx lib/debug/calibration/xg-5b12-run.ts",
+    "calibration:draw-5b13": "npx --yes tsx lib/debug/calibration/draw-5b13-run.ts",
+    "calibration:hs-5b14": "npx --yes tsx lib/debug/calibration/hs-5b14-run.ts",
+    "calibration:tr-5b15": "npx --yes tsx lib/debug/calibration/tr-5b15-run.ts",
+    "calibration:lm-5b16": "npx --yes tsx lib/debug/calibration/lm-5b16-run.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

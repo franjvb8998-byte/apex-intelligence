@@ -7,6 +7,7 @@ import {
   tryCreateApiFootballClientFromEnv,
   type ApiFootballClientOptions,
 } from "@/lib/data-platform/providers/api-football/client";
+import type { FixtureSeasonTransport } from "@/lib/debug/calibration/fetch-season";
 import { LiveCollectionGuardError } from "@/lib/debug/calibration/live-guard";
 import type { MicrocollectTransport } from "@/lib/debug/calibration/microcollect";
 
@@ -29,5 +30,37 @@ export function createLiveMicrocollectTransport(
   return {
     getFixtures: (league, season) => client.getFixturesByLeague(league, season),
     getFixtureOdds: (fixtureId) => client.getFixtureOdds(fixtureId),
+  };
+}
+
+/** Fixtures-only live transport. No odds method. */
+export function createLivePilotTransport(
+  env: Record<string, string | undefined> = process.env,
+  overrides: Omit<ApiFootballClientOptions, "apiKey" | "baseUrl"> = {},
+): FixtureSeasonTransport {
+  const client = tryCreateApiFootballClientFromEnv(env, overrides);
+  if (!client) {
+    throw new LiveCollectionGuardError(
+      "API_FOOTBALL_KEY is required for the historical calibration pilot",
+    );
+  }
+  return {
+    getFixtures: (league, season) => client.getFixturesByLeague(league, season),
+  };
+}
+
+/** Fixtures-only live transport for 5B.6 holdout seasons. No odds method. */
+export function createLiveValidationTransport(
+  env: Record<string, string | undefined> = process.env,
+  overrides: Omit<ApiFootballClientOptions, "apiKey" | "baseUrl"> = {},
+): FixtureSeasonTransport {
+  const client = tryCreateApiFootballClientFromEnv(env, overrides);
+  if (!client) {
+    throw new LiveCollectionGuardError(
+      "API_FOOTBALL_KEY is required for multi-season validation collection",
+    );
+  }
+  return {
+    getFixtures: (league, season) => client.getFixturesByLeague(league, season),
   };
 }

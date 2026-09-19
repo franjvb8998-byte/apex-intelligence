@@ -144,3 +144,67 @@ export type CollectionRunMetadata = {
   callBudgetKind?: "logical_lookups_not_origin_http_attempts";
   leagueName?: string;
 };
+
+export type EvidenceBucketCounts = Record<EvidenceBucket, number>;
+
+/**
+ * Metadata for the 5B.4 historical probability pilot.
+ * Distinct from microcollection metadata. Odds are never requested.
+ */
+export type PilotRunMetadata = {
+  schemaVersion: string;
+  reconstructionVersion: string;
+  collectorVersion: string;
+  leagueId: string;
+  season: string;
+  leagueName: string;
+  generatedAt: string;
+  requestedTargetCount: number;
+  targetRowCount: number;
+  fullEligiblePopulationCount: number;
+  fullPopulationEvidenceBuckets: EvidenceBucketCounts;
+  selectedEvidenceBuckets: EvidenceBucketCounts;
+  fixtureCountBeforeDedupe: number;
+  fixtureCountAfterDedupe: number;
+  fixtureListLogicalCalls: number;
+  logicalCallCount: number;
+  callBudgetKind: "logical_lookups_not_origin_http_attempts";
+  oddsRequested: false;
+  oddsLogicalCalls: 0;
+  leakageViolationCount: number;
+  selectionAlgorithm: string;
+  selectionRule: string;
+  /** Basename of the full eligible-population JSONL. */
+  populationArtifact?: string;
+  /** Basename of the stratified-sample JSONL. */
+  sampleArtifact?: string;
+  populationRowCount?: number;
+  sampleRowCount?: number;
+};
+
+/**
+ * Metadata for a 5B.6 holdout-season natural population.
+ * No stratified sample. Odds are never requested.
+ */
+export type ValidationSeasonMetadata = {
+  schemaVersion: string;
+  reconstructionVersion: string;
+  collectorVersion: string;
+  datasetKind: "NATURAL FULL POPULATION";
+  validationRole: "HOLDOUT" | "DEVELOPMENT";
+  leagueId: string;
+  season: string;
+  leagueName: string;
+  generatedAt: string;
+  populationRowCount: number;
+  evidenceBuckets: EvidenceBucketCounts;
+  fixtureCountBeforeDedupe: number;
+  fixtureCountAfterDedupe: number;
+  fixtureListLogicalCalls: 1;
+  logicalCallCount: number;
+  callBudgetKind: "logical_lookups_not_origin_http_attempts";
+  oddsRequested: false;
+  oddsLogicalCalls: 0;
+  leakageViolationCount: number;
+  populationArtifact: string;
+};
