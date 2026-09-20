@@ -116,3 +116,8 @@ export function liveFixturesCacheKey(
 ): string {
   return `${LIVE_CACHE_PREFIX}fixtures:${buildFixtureIdsQuery(fixtureIds)}`;
 }
+
+export function liveEventsCacheKey(fixtureId: string | number): string {
+  const [id] = normalizePositiveIntegerIds([fixtureId], { maxCount: 1 });
+  return `${LIVE_CACHE_PREFIX}events:${id}`;
+}

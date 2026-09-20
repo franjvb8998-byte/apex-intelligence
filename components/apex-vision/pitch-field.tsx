@@ -11,6 +11,10 @@ type PitchFieldProps = {
   ball: PitchPoint;
   homeShort: string;
   awayShort: string;
+  /** Provider-backed matches: schematic formation, not live tracking. */
+  schematic?: boolean;
+  showBall?: boolean;
+  highlightClass?: "GOAL" | "CARD" | "SUBSTITUTION" | "VAR" | null;
 };
 
 /**
@@ -21,15 +25,28 @@ export function PitchField({
   ball,
   homeShort,
   awayShort,
+  schematic = false,
+  showBall = true,
+  highlightClass = null,
 }: PitchFieldProps) {
   const t = useTranslations("vision");
   return (
-    <Card padding="sm" className="overflow-hidden" aria-label={t("pitchAria")}>
+    <Card
+      padding="sm"
+      className="overflow-hidden"
+      aria-label={schematic ? t("pitchSchematicAria") : t("pitchAria")}
+    >
       <div className="mb-3 flex items-center justify-between px-1 text-xs text-[var(--apex-fg-subtle)]">
         <span className="font-semibold text-[var(--apex-accent)]">{homeShort}</span>
-        <span>{t("pitch2d")}</span>
+        <span>{schematic ? t("pitchSchematic") : t("pitch2d")}</span>
         <span className="font-semibold text-sky-400">{awayShort}</span>
       </div>
+
+      {schematic && (
+        <p className="mb-2 px-1 text-[11px] uppercase tracking-[var(--apex-tracking-wider)] text-amber-200/90">
+          {t("schematicBanner")}
+        </p>
+      )}
 
       <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[var(--apex-radius-xl)] border border-emerald-800/40 bg-[#14532d]">
         {/* Grass stripes */}
@@ -56,8 +73,33 @@ export function PitchField({
         <div className="absolute top-[35%] bottom-[35%] left-[3%] w-[6%] border-2 border-l-0 border-white/60" aria-hidden />
         <div className="absolute top-[35%] bottom-[35%] right-[3%] w-[6%] border-2 border-r-0 border-white/60" aria-hidden />
 
-        <PlayerMarkers players={players} />
-        <BallMarker position={ball} />
+        {highlightClass === "GOAL" && (
+          <div
+            className="pointer-events-none absolute inset-0 animate-pulse bg-amber-300/15"
+            aria-hidden
+          />
+        )}
+        {highlightClass === "CARD" && (
+          <div
+            className="pointer-events-none absolute inset-0 bg-yellow-400/10"
+            aria-hidden
+          />
+        )}
+        {highlightClass === "VAR" && (
+          <div
+            className="pointer-events-none absolute inset-0 bg-violet-400/10"
+            aria-hidden
+          />
+        )}
+        {highlightClass === "SUBSTITUTION" && (
+          <div
+            className="pointer-events-none absolute inset-0 bg-sky-400/10"
+            aria-hidden
+          />
+        )}
+
+        <PlayerMarkers players={players} schematic={schematic} />
+        {showBall && !schematic ? <BallMarker position={ball} /> : null}
       </div>
     </Card>
   );

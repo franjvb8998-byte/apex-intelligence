@@ -9,16 +9,26 @@ type MomentumBarProps = {
   value: number;
   homeLabel: string;
   awayLabel: string;
+  heuristic?: boolean;
 };
 
-export function MomentumBar({ value, homeLabel, awayLabel }: MomentumBarProps) {
+export function MomentumBar({
+  value,
+  homeLabel,
+  awayLabel,
+  heuristic = false,
+}: MomentumBarProps) {
   const t = useTranslations("vision");
   const normalized = (value + 100) / 2; // 0–100
   const homeLead = value >= 0;
 
   return (
     <Card padding="sm">
-      <CardHeader title={t("momentumTitle")} className="mb-3" />
+      <CardHeader
+        title={t("momentumTitle")}
+        action={heuristic ? <span className="text-[11px] uppercase text-amber-200/90">{t("heuristicBadge")}</span> : undefined}
+        className="mb-3"
+      />
       <div className="mb-2 flex justify-between text-xs">
         <span className={cx(homeLead ? "text-[var(--apex-accent)]" : "text-[var(--apex-fg-muted)]")}>
           {homeLabel}

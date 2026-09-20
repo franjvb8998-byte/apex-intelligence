@@ -54,6 +54,7 @@ export function buildTimelineIntelligence(input: BuildIntelInput): {
     corner: `El córner concentra xG de set-piece a favor de ${team}.`,
     cambio: `El cambio de ${team} altera el perfil de intensidad; el modelo reestima el tramo final.`,
     ataque_peligroso: `La secuencia peligrosa de ${team} empuja momentum y probabilidad de victoria.`,
+    other: `Evento observado de tipo no clasificado. No se infiere un pase ni se recalculan mercados.`,
   };
 
   const whyChanged: TimelineChangeFactor[] = [

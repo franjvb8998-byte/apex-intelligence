@@ -96,6 +96,9 @@ export function createFixtureApiFootballClient(): ApiFootballClient {
         response: events,
       };
     },
+    async getLiveEvents(fixture) {
+      return client.getEvents(fixture);
+    },
     async getFixtureById(fixtureId) {
       return client.getFixture(fixtureId);
     },

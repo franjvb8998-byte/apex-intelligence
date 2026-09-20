@@ -6,6 +6,7 @@
  */
 
 import type { VisionLiveState } from "@/lib/apex-vision/types";
+import type { MatchCenterLiveView } from "@/lib/apex-vision/live/view";
 import type { DashboardMatchSummary } from "@/lib/dashboard/types";
 import type {
   ConfidenceScore,
@@ -44,8 +45,16 @@ export type MatchCenterMeta = {
   externalId?: string | null;
   leagueName: string;
   kickoffAt: string;
-  /** Canonical match status from the catalogue layer. */
-  status: "scheduled" | "live" | "finished";
+  /** Canonical match status. PST/CANC/ABD/SUSP are not scheduled. */
+  status:
+    | "scheduled"
+    | "live"
+    | "finished"
+    | "postponed"
+    | "cancelled"
+    | "abandoned"
+    | "suspended"
+    | "unknown";
   homeTeam: MatchCenterTeam;
   awayTeam: MatchCenterTeam;
   venue: MatchCenterVenue | null;
@@ -209,6 +218,12 @@ export type MatchCenterLiveData = {
     away: MatchCenterLineup | null;
   };
   source: "mock" | "realtime" | "data-platform";
+  /** Numeric API-Football fixture id for APEX live refresh. */
+  fixtureId: number | null;
+  /** True when the catalogue status is in-play (includes HT). */
+  catalogueLive: boolean;
+  /** Provider-backed live view. Null until the coordinator attaches it. */
+  providerLive: MatchCenterLiveView | null;
 };
 
 export type MatchCenterMarketVerdict = {

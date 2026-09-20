@@ -11,6 +11,8 @@ import {
   EMPTY_MATCH_CENTER_ENRICHMENT,
   enrichMatchCenterContext,
 } from "@/lib/match-center/enrich";
+import { parseTrackedFixtureId } from "@/lib/apex-vision/live/parse-id";
+import { getVisionLiveCoordinator } from "@/lib/apex-vision/live/coordinator";
 import { vendorFixtureId } from "@/lib/match-center/fixture-id";
 import { createMatchCenterFromApexBundle } from "@/lib/match-center/from-data-platform";
 import type { MatchCenterData } from "@/lib/match-center/types";
@@ -32,6 +34,11 @@ export type LoadMatchCenterOptions = {
    * Default true for `/match-center`.
    */
   includeFixtureList?: boolean;
+  /**
+   * Attach Vision live coordinator state on first paint.
+   * Default false so catalogue/budget tests do not spend a live snapshot.
+   */
+  includeLiveRefresh?: boolean;
 };
 
 export function resolveMatchCenterProvider(
@@ -74,6 +81,13 @@ export async function getMatchCenterData(
     probabilityDiagnosticContext: "match_center",
   });
   data.fixtures = skipCatalogue ? [] : withSelectedFixture(fixtures, bundle);
+  if (options.includeLiveRefresh && data.match.status === "live") {
+    const liveId = data.live.fixtureId ?? parseTrackedFixtureId(matchId);
+    if (liveId != null) {
+      data.live.providerLive =
+        await getVisionLiveCoordinator().refreshFixture(liveId);
+    }
+  }
   return data;
 }
 

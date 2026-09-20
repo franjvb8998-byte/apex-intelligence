@@ -8,6 +8,7 @@ import {
   buildProbabilityImpact,
   buildTimelineIntelligence,
 } from "@/lib/apex-vision";
+import { parseTrackedFixtureId } from "@/lib/apex-vision/live/parse-id";
 import type {
   PitchPoint,
   VisionEventType,
@@ -68,11 +69,15 @@ function shortName(name: string, fallback: string | null): string {
   return (parts[0]![0]! + parts[parts.length - 1]!.slice(0, 2)).toUpperCase();
 }
 
-function toCenterStatus(
+export function matchCenterStatusFromApex(
   status: ApexMatchStatus,
 ): MatchCenterMeta["status"] {
   if (status === "live") return "live";
   if (status === "finished") return "finished";
+  if (status === "postponed") return "postponed";
+  if (status === "cancelled") return "cancelled";
+  if (status === "suspended") return "suspended";
+  if (status === "unknown") return "unknown";
   return "scheduled";
 }
 
@@ -217,7 +222,9 @@ function visionPlayersFromBundle(bundle: ApexMatchBundle): VisionPlayer[] {
   ];
 }
 
-function visionEventType(type: ApexMatchEvent["type"]): VisionEventType {
+export function mapApexEventTypeToVisionType(
+  type: ApexMatchEvent["type"],
+): VisionEventType {
   switch (type) {
     case "goal":
     case "own_goal":
@@ -232,7 +239,7 @@ function visionEventType(type: ApexMatchEvent["type"]): VisionEventType {
     case "var":
       return "falta";
     default:
-      return "pase";
+      return "other";
   }
 }
 
@@ -254,8 +261,9 @@ function eventLabel(type: ApexMatchEvent["type"]): string {
       return "Cambio";
     case "var":
       return "VAR";
+    case "other":
     default:
-      return type.replaceAll("_", " ");
+      return "OTRO";
   }
 }
 
@@ -278,9 +286,9 @@ function visionEventsFromBundle(
   return bundle.events.slice(-12).map((event) => {
     const side: VisionSide =
       event.teamId === bundle.awayTeam.id ? "away" : "home";
-    const type = visionEventType(event.type);
+    const type = mapApexEventTypeToVisionType(event.type);
     const momentumDelta =
-      type === "disparo" ? 6 : type === "tarjeta" ? -3 : type === "cambio" ? 1 : 2;
+      type === "disparo" ? 6 : type === "tarjeta" ? -3 : type === "cambio" ? 1 : 0;
     const signed = side === "home" ? momentumDelta : -momentumDelta;
     const intel = buildTimelineIntelligence({
       type,
@@ -371,6 +379,11 @@ function buildLiveFromBundle(
     vision,
     lineups: preview.dashboard.lineups,
     source: "data-platform",
+    fixtureId:
+      parseTrackedFixtureId(bundle.match.externalRefs[0]?.externalId) ??
+      parseTrackedFixtureId(bundle.match.id),
+    catalogueLive: bundle.match.status === "live",
+    providerLive: null,
   };
 }
 
@@ -557,7 +570,7 @@ export function createMatchCenterFromApexBundle(
   bundle: ApexMatchBundle,
   options: MatchCenterFromBundleOptions = {},
 ): MatchCenterData {
-  const status = toCenterStatus(bundle.match.status);
+  const status = matchCenterStatusFromApex(bundle.match.status);
   const homeTeam: MatchCenterTeam = {
     id: bundle.homeTeam.id,
     name: bundle.homeTeam.name,
@@ -642,7 +655,8 @@ export function createMatchCenterFromApexBundle(
     matchId: bundle.match.id,
     leagueName: match.leagueName,
     kickoffAt: match.kickoffAt,
-    status,
+    status:
+      status === "finished" ? "finished" : status === "live" ? "live" : "scheduled",
     homeTeam,
     awayTeam,
     eloInput,

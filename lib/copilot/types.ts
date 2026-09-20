@@ -7,6 +7,7 @@ import type { ApexDecision } from "@/lib/decision-engine/types";
 import type { ApexScoring } from "@/lib/scoring-engine/types";
 import type { MatchOutcome } from "@/lib/intelligence/types";
 import type { Recommendation } from "@/lib/intelligence/reasoning/contracts/types";
+import type { MatchCenterMeta } from "@/lib/match-center/types";
 
 export type CopilotRole = "user" | "assistant" | "system";
 
@@ -67,7 +68,7 @@ export type CopilotMatchSnapshot = {
   externalId: string | null;
   leagueName: string;
   kickoffAt: string;
-  status: "scheduled" | "live" | "finished";
+  status: MatchCenterMeta["status"];
   home: CopilotTeamBlock;
   away: CopilotTeamBlock;
   oneXTwo: { home: number; draw: number; away: number };

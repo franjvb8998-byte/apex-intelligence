@@ -75,6 +75,11 @@ function eventCopy(
         label: "Ataque peligroso",
         detail: `${team} llega con peligro al área rival.`,
       };
+    case "other":
+      return {
+        label: "OTRO",
+        detail: `Evento observado sin clasificación. No es un pase.`,
+      };
   }
 }
 
@@ -104,6 +109,8 @@ function ballForEvent(type: VisionEventType, side: VisionSide): PitchPoint {
         x: clamp(jitter(50, 10), 40, 60),
         y: 96,
       };
+    case "other":
+      return { x: 50, y: 50 };
     case "pase":
     default:
       return {

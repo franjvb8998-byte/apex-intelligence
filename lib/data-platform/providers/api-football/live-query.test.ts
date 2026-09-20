@@ -16,6 +16,7 @@ import {
   buildLiveLeaguesQuery,
   liveFixturesCacheKey,
   liveLeaguesCacheKey,
+  liveEventsCacheKey,
   normalizePositiveIntegerIds,
 } from "@/lib/data-platform/providers/api-football/live-query";
 
@@ -156,6 +157,12 @@ describe("live cache isolation vs prematch", () => {
     expect(ttlForCacheKey("af:fixture:1035089")).toBe(
       API_FOOTBALL_CACHE_TTL_MS.match,
     );
+    expect(ttlForCacheKey("af:live:events:1510455")).toBe(
+      API_FOOTBALL_CACHE_TTL_MS.live,
+    );
+    expect(ttlForCacheKey("af:events:1510455")).toBe(
+      API_FOOTBALL_CACHE_TTL_MS.match,
+    );
   });
 
   it("cached live heartbeat does not use the prematch fixtures key", async () => {
@@ -209,5 +216,32 @@ describe("Vision live retry budget", () => {
       status: 500,
     });
     expect(eventsFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("C Vision getLiveEvents uses at most one HTTP attempt and the live events cache key", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ message: "fail" }, 500));
+    const client = retryingClient(fetchImpl);
+    await expect(client.getLiveEvents("1510455")).rejects.toMatchObject({
+      status: 500,
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(firstFetchUrl(fetchImpl)).toContain("/fixtures/events");
+    expect(firstFetchUrl(fetchImpl)).toContain("fixture=1510455");
+    expect(liveEventsCacheKey(1510455)).toBe("af:live:events:1510455");
+    expect(liveEventsCacheKey(1510455)).not.toBe("af:events:1510455");
+  });
+
+  it("cached getLiveEvents does not share the prematch events key", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ response: [] }));
+    const cache = createTtlCache();
+    const client = withApiFootballClientCache(testClient(fetchImpl), cache, {
+      logger: () => undefined,
+      useNextDataCache: false,
+    });
+    await client.getLiveEvents("1510455");
+    await client.getLiveEvents("1510455");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(cache.has("af:live:events:1510455")).toBe(true);
+    expect(cache.has("af:events:1510455")).toBe(false);
   });
 });

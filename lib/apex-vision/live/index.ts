@@ -14,7 +14,10 @@ export {
   isHalftimeStatus,
   isTerminalStatus,
   shouldKeepLiveTracking,
+  liveStatusCopyKey,
+  isOrdinaryScheduledStatus,
   type LiveStatusKind,
+  type LiveStatusCopyKey,
 } from "@/lib/apex-vision/live/status";
 
 export {
@@ -46,3 +49,33 @@ export {
   type VisionLiveTransport,
   type VisionLiveTransportOptions,
 } from "@/lib/apex-vision/live/service";
+
+export {
+  createVisionLiveCoordinator,
+  getVisionLiveCoordinator,
+  resetVisionLiveCoordinatorForTests,
+  setVisionLiveCoordinatorForTests,
+  type VisionLiveCoordinator,
+  type VisionLiveCoordinatorOptions,
+} from "@/lib/apex-vision/live/coordinator";
+
+export { parseTrackedFixtureId } from "@/lib/apex-vision/live/parse-id";
+
+export {
+  LIVE_REFRESH_INTERVAL_MS,
+  HT_REFRESH_INTERVAL_MS,
+  LIVE_FRESHNESS_WINDOW_MS,
+  MATCH_CENTER_LIVE_API_PATH,
+  matchCenterLiveApiHref,
+  shouldStartMatchCenterLivePoll,
+  matchCenterLivePollIntervalMs,
+  classifyLiveFreshness,
+  toMatchCenterLiveView,
+  unavailableLiveView,
+  heuristicFromScore,
+  cardToneFromDetail,
+  type LiveFreshness,
+  type LiveRefreshSource,
+  type MatchCenterLiveView,
+  type MatchCenterLiveViewEvent,
+} from "@/lib/apex-vision/live/view";

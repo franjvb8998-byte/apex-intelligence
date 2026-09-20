@@ -152,7 +152,14 @@ function buildLive(): MatchCenterLiveData {
     homeTeam: { ...HOME },
     awayTeam: { ...AWAY },
   };
-  return { vision, lineups: { home: null, away: null }, source: "mock" };
+  return {
+    vision,
+    lineups: { home: null, away: null },
+    source: "mock",
+    fixtureId: null,
+    catalogueLive: false,
+    providerLive: null,
+  };
 }
 
 function buildPost(
@@ -299,7 +306,12 @@ export function getMockMatchCenter(
       homeTeamId: HOME.id,
       awayTeamId: AWAY.id,
       kickoffAt: match.kickoffAt,
-      status,
+      status:
+        status === "finished"
+          ? "finished"
+          : status === "live"
+            ? "live"
+            : "scheduled",
       score: { home: null, away: null },
       venue: null,
       minute: null,

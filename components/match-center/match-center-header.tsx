@@ -30,6 +30,11 @@ const statusTone = {
   scheduled: "info" as const,
   live: "danger" as const,
   finished: "success" as const,
+  postponed: "warning" as const,
+  cancelled: "neutral" as const,
+  abandoned: "neutral" as const,
+  suspended: "warning" as const,
+  unknown: "neutral" as const,
 };
 
 type MatchCenterHeaderProps = {
@@ -51,9 +56,14 @@ export function MatchCenterHeader({
   const dashboard = useTranslations("dashboard");
   const locale = useLocale();
   const statusLabel = {
-    scheduled: dashboard("scheduled"),
-    live: dashboard("live"),
-    finished: dashboard("finished"),
+    scheduled: t("statusScheduled"),
+    live: t("statusLive"),
+    finished: t("statusFinished"),
+    postponed: t("statusPostponed"),
+    cancelled: t("statusCancelled"),
+    abandoned: t("statusAbandoned"),
+    suspended: t("statusSuspended"),
+    unknown: t("statusUnknown"),
   } as const;
   const phaseEyebrow: Record<MatchCenterPhase, string> = {
     preview: t("headerPreview"),

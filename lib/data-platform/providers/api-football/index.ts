@@ -63,6 +63,7 @@ export {
   buildFixtureIdsQuery,
   liveLeaguesCacheKey,
   liveFixturesCacheKey,
+  liveEventsCacheKey,
 } from "@/lib/data-platform/providers/api-football/live-query";
 
 export {

@@ -38,17 +38,27 @@ function buildMeta(
   };
 }
 
+export type WithApiHandlerOptions = {
+  /**
+   * Stamps success-default and error `meta.provider`.
+   * Live Match Center uses this so validation errors are not labelled
+   * as a direct API-Football contact. Generic callers omit it.
+   */
+  provider?: string;
+};
+
 /**
  * Wrap a Route Handler body with uniform success/error envelopes + logging.
  */
 export async function withApiHandler<T>(
   request: Request,
   handler: (ctx: ApiHandlerContext) => Promise<ApiHandlerResult<T> | T>,
+  options?: WithApiHandlerOptions,
 ): Promise<NextResponse> {
   const requestId = randomUUID();
   const url = new URL(request.url);
   const started = Date.now();
-  const defaultProvider = readDataProviderConfig().provider;
+  const defaultProvider = options?.provider ?? readDataProviderConfig().provider;
 
   try {
     const raw = await handler({

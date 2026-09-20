@@ -33,6 +33,8 @@ export {
 export {
   createMatchCenterFromApexBundle,
   estimateEloFromTeamId,
+  mapApexEventTypeToVisionType,
+  matchCenterStatusFromApex,
   resolveEloWithProvenance,
   type MatchCenterFromBundleOptions,
 } from "@/lib/match-center/from-data-platform";

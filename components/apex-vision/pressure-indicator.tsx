@@ -10,6 +10,7 @@ type PressureIndicatorProps = {
   side: VisionSide;
   homeLabel: string;
   awayLabel: string;
+  heuristic?: boolean;
 };
 
 export function PressureIndicator({
@@ -17,6 +18,7 @@ export function PressureIndicator({
   side,
   homeLabel,
   awayLabel,
+  heuristic = false,
 }: PressureIndicatorProps) {
   const t = useTranslations("vision");
   const team = side === "home" ? homeLabel : awayLabel;
@@ -26,9 +28,16 @@ export function PressureIndicator({
       <CardHeader
         title={t("pressure")}
         action={
-          <Badge tone={side === "home" ? "accent" : "info"}>
-            {team}
-          </Badge>
+          <span className="flex items-center gap-2">
+            {heuristic ? (
+              <span className="text-[11px] uppercase text-amber-200/90">
+                {t("heuristicBadge")}
+              </span>
+            ) : null}
+            <Badge tone={side === "home" ? "accent" : "info"}>
+              {team}
+            </Badge>
+          </span>
         }
         className="mb-3"
       />

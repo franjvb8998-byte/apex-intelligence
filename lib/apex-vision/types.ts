@@ -19,7 +19,8 @@ export type VisionEventType =
   | "tarjeta"
   | "corner"
   | "cambio"
-  | "ataque_peligroso";
+  | "ataque_peligroso"
+  | "other";
 
 export type VisionPlayer = {
   id: string;

@@ -44,6 +44,7 @@ import {
   buildLiveLeaguesQuery,
   liveFixturesCacheKey,
   liveLeaguesCacheKey,
+  liveEventsCacheKey,
   LIVE_TRANSPORT_MAX_ATTEMPTS,
 } from "@/lib/data-platform/providers/api-football/live-query";
 import type {
@@ -128,6 +129,11 @@ export type ApiFootballClient = {
     fixture: string,
     request?: { maxAttempts?: number },
   ): Promise<ApiFootballEventsResponse>;
+  /**
+   * Vision live dedicated-events fallback. One HTTP attempt.
+   * Cached under `af:live:events:` (≈60s), not `af:events:` (prematch).
+   */
+  getLiveEvents(fixture: string): Promise<ApiFootballEventsResponse>;
   getFixtureStatistics(
     fixture: string,
   ): Promise<ApiFootballFixtureStatisticsResponse>;
@@ -302,6 +308,13 @@ export function createApiFootballClient(
         request,
       );
     },
+    getLiveEvents(fixture) {
+      return get<ApiFootballEventsResponse>(
+        "/fixtures/events",
+        { fixture },
+        { maxAttempts: LIVE_TRANSPORT_MAX_ATTEMPTS },
+      );
+    },
     getFixtureStatistics(fixture) {
       return get<ApiFootballFixtureStatisticsResponse>(
         "/fixtures/statistics",
@@ -454,6 +467,8 @@ export function withApiFootballClientCache(
       cached(`af:lineups:${fixture}`, () => client.getLineups(fixture)),
     getEvents: (fixture, request) =>
       cached(`af:events:${fixture}`, () => client.getEvents(fixture, request)),
+    getLiveEvents: (fixture) =>
+      cached(liveEventsCacheKey(fixture), () => client.getLiveEvents(fixture)),
     getFixtureStatistics: (fixture) =>
       cached(`af:fixture-stats:${fixture}`, () =>
         client.getFixtureStatistics(fixture),

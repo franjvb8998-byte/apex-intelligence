@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { createApiFootballClient } from "@/lib/data-platform/providers/api-football/client";
 import { createRateLimiter } from "@/lib/data-platform/providers/api-football/rate-limiter";
-import { LIVE_TRANSPORT_MAX_ATTEMPTS } from "@/lib/data-platform/providers/api-football/live-query";
 import type { ApiFootballEvent, ApiFootballFixtureItem } from "@/lib/data-platform/providers/api-football/types";
 import {
   classifyProviderEventClass,
@@ -186,7 +185,7 @@ describe("Vision live status helpers", () => {
   it("20 postponed/cancelled/abandoned/suspended are not scheduled", () => {
     expect(classifyLiveStatus("PST")).toBe("postponed");
     expect(classifyLiveStatus("CANC")).toBe("cancelled");
-    expect(classifyLiveStatus("ABD")).toBe("cancelled");
+    expect(classifyLiveStatus("ABD")).toBe("abandoned");
     expect(classifyLiveStatus("SUSP")).toBe("suspended");
     expect(shouldKeepLiveTracking("PST")).toBe(false);
     expect(shouldKeepLiveTracking("CANC")).toBe(false);
@@ -253,11 +252,11 @@ describe("Vision live transport service", () => {
       getFixturesByIds: vi.fn(async () => ({
         response: [vendorFixture({ goals: { home: 0, away: 0 }, events: [] })],
       })),
-      getEvents: vi.fn(),
+      getLiveEvents: vi.fn(),
     };
     const transport = createVisionLiveTransport({ client });
     await transport.snapshotTrackedFixtures([1510455]);
-    expect(client.getEvents).not.toHaveBeenCalled();
+    expect(client.getLiveEvents).not.toHaveBeenCalled();
   });
 
   it("calls dedicated events at most once for score-without-goal, then respects cooldown", async () => {
@@ -266,7 +265,7 @@ describe("Vision live transport service", () => {
       getFixturesByIds: vi.fn(async () => ({
         response: [vendorFixture({ goals: { home: 1, away: 0 }, events: [] })],
       })),
-      getEvents: vi.fn(async () => ({
+      getLiveEvents: vi.fn(async () => ({
         response: [vendorEvent()],
       })),
     };
@@ -277,15 +276,13 @@ describe("Vision live transport service", () => {
       fallbackCooldownMs: 60_000,
     });
     const first = await transport.snapshotTrackedFixtures([1510455]);
-    expect(client.getEvents).toHaveBeenCalledTimes(1);
+    expect(client.getLiveEvents).toHaveBeenCalledTimes(1);
     expect(first.fixtures[0]?.eventsSource).toBe("DEDICATED_EVENTS_FALLBACK");
     expect(first.fixtures[0]?.events[0]?.eventClass).toBe("GOAL");
 
     await transport.snapshotTrackedFixtures([1510455]);
-    expect(client.getEvents).toHaveBeenCalledTimes(1);
-    expect(client.getEvents).toHaveBeenCalledWith("1510455", {
-      maxAttempts: LIVE_TRANSPORT_MAX_ATTEMPTS,
-    });
+    expect(client.getLiveEvents).toHaveBeenCalledTimes(1);
+    expect(client.getLiveEvents).toHaveBeenCalledWith("1510455");
   });
 
   it("heartbeat uses getLiveFixtures only and drops terminal fixtures from the store", async () => {
@@ -310,13 +307,13 @@ describe("Vision live transport service", () => {
     const client: VisionLiveClient = {
       getLiveFixtures: vi.fn(async () => ({ response: [live, finished] })),
       getFixturesByIds: vi.fn(),
-      getEvents: vi.fn(),
+      getLiveEvents: vi.fn(),
     };
     const store = createProcessLiveStore();
     const transport = createVisionLiveTransport({ client, store });
     const snapshot = await transport.heartbeatLiveLeagues([293, 292]);
     expect(client.getLiveFixtures).toHaveBeenCalledWith([293, 292]);
-    expect(client.getEvents).not.toHaveBeenCalled();
+    expect(client.getLiveEvents).not.toHaveBeenCalled();
     expect(snapshot.fixtures.map((row) => row.fixtureId)).toEqual([11, 22]);
     expect(transport.getFixture(11)?.statusShort).toBe("1H");
     expect(transport.getFixture(22)).toBeNull();
@@ -328,7 +325,7 @@ describe("Vision live transport service", () => {
       client: {
         getLiveFixtures: vi.fn(),
         getFixturesByIds: vi.fn(),
-        getEvents: vi.fn(),
+        getLiveEvents: vi.fn(),
       },
     });
     expect(transport.heartbeatLiveLeagues.length).toBe(1);

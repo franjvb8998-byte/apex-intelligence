@@ -14,6 +14,8 @@ import {
   getMatchCenterData,
   listMatchCenterFixtures,
   loadMatchCenterFromApiFootball,
+  mapApexEventTypeToVisionType,
+  matchCenterStatusFromApex,
 } from "@/lib/match-center";
 
 describe("Match Center ← Data Platform", () => {
@@ -118,6 +120,9 @@ describe("Match Center ← Data Platform", () => {
     expect(center.match.leagueName).toBe("Premier League");
     expect(center.live.vision.homeTeam.name).toBe("Arsenal");
     expect(center.live.source).not.toBe("mock");
+    expect(center.live.fixtureId).toBe(Number(RECORDED_API_FOOTBALL_FIXTURE_ID));
+    expect(center.live.catalogueLive).toBe(false);
+    expect(center.live.providerLive).toBeNull();
     expect(center.post.source).not.toBe("mock");
     expect(center.preview.source).not.toBe("mock");
   });
@@ -233,5 +238,27 @@ describe("Match Center ← Data Platform", () => {
     await expect(
       listMatchCenterFixtures({ provider, env: {} }),
     ).rejects.toSatisfy(isApiFootballQuotaError);
+  });
+});
+
+describe("Match Center status + unknown events", () => {
+  it("does not collapse PST/CANC/SUSP into scheduled; Apex cancelled stays cancelled", () => {
+    expect(matchCenterStatusFromApex("postponed")).toBe("postponed");
+    expect(matchCenterStatusFromApex("cancelled")).toBe("cancelled");
+    expect(matchCenterStatusFromApex("suspended")).toBe("suspended");
+    expect(matchCenterStatusFromApex("unknown")).toBe("unknown");
+    expect(matchCenterStatusFromApex("scheduled")).toBe("scheduled");
+    expect(matchCenterStatusFromApex("live")).toBe("live");
+    expect(matchCenterStatusFromApex("finished")).toBe("finished");
+  });
+
+  it("unknown Apex events become Vision other, never pase", () => {
+    expect(mapApexEventTypeToVisionType("other")).toBe("other");
+    expect(mapApexEventTypeToVisionType("kickoff")).toBe("other");
+    expect(mapApexEventTypeToVisionType("period_start")).toBe("other");
+    expect(mapApexEventTypeToVisionType("full_time")).toBe("other");
+    expect(mapApexEventTypeToVisionType("goal")).toBe("disparo");
+    expect(mapApexEventTypeToVisionType("substitution")).toBe("cambio");
+    expect(mapApexEventTypeToVisionType("other")).not.toBe("pase");
   });
 });

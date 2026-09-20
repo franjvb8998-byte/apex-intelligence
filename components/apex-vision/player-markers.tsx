@@ -6,21 +6,29 @@ import type { VisionPlayer } from "@/lib/apex-vision/types";
 
 type PlayerMarkersProps = {
   players: VisionPlayer[];
+  schematic?: boolean;
 };
 
-export function PlayerMarkers({ players }: PlayerMarkersProps) {
+export function PlayerMarkers({ players, schematic = false }: PlayerMarkersProps) {
   return (
     <>
       {players.map((player) => {
         const isHome = player.side === "home";
+        const label = schematic
+          ? `Schematic formation ${player.side} ${player.number} ${player.name}`
+          : `${player.side} ${player.number} ${player.name}`;
         return (
           <motion.div
             key={player.id}
             className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
             initial={false}
             animate={{ left: `${player.position.x}%`, top: `${player.position.y}%` }}
-            transition={{ type: "spring", stiffness: 90, damping: 18, mass: 0.7 }}
-            title={`${player.name} (#${player.number})`}
+            transition={
+              schematic
+                ? { duration: 0 }
+                : { type: "spring", stiffness: 90, damping: 18, mass: 0.7 }
+            }
+            title={label}
           >
             <div
               className={cx(
@@ -29,7 +37,7 @@ export function PlayerMarkers({ players }: PlayerMarkersProps) {
                   ? "border-[var(--apex-accent-border)] bg-[var(--apex-accent)] text-[var(--apex-fg-inverse)]"
                   : "border-sky-400/50 bg-sky-500/90 text-white",
               )}
-              aria-label={`${player.side} ${player.number} ${player.name}`}
+              aria-label={label}
             >
               {player.number}
             </div>

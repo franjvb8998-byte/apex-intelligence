@@ -15,9 +15,6 @@
 
 import type { ApiFootballClient } from "@/lib/data-platform/providers/api-football/client";
 import {
-  LIVE_TRANSPORT_MAX_ATTEMPTS,
-} from "@/lib/data-platform/providers/api-football/live-query";
-import {
   createDedicatedEventsFallbackGuard,
   evaluateDedicatedEventsFallback,
   type DedicatedEventsFallbackGuard,
@@ -35,7 +32,7 @@ export const DEFAULT_MAX_FALLBACK_CALLS_PER_REFRESH = 1;
 
 export type VisionLiveClient = Pick<
   ApiFootballClient,
-  "getLiveFixtures" | "getFixturesByIds" | "getEvents"
+  "getLiveFixtures" | "getFixturesByIds" | "getLiveEvents"
 >;
 
 export type VisionLiveTransportOptions = {
@@ -101,9 +98,8 @@ export function createVisionLiveTransport(
         next.push(fixture);
         continue;
       }
-      const payload = await options.client.getEvents(
+      const payload = await options.client.getLiveEvents(
         String(fixture.fixtureId),
-        { maxAttempts: LIVE_TRANSPORT_MAX_ATTEMPTS },
       );
       used += 1;
       fallbackGuard.mark(fixture.fixtureId, nowMs);

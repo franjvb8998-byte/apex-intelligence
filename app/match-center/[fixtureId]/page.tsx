@@ -30,6 +30,7 @@ export default async function MatchCenterFixturePage({
         externalMatchId: fixtureId ?? rawFixtureId,
         requireProvider: true,
         includeFixtureList: false,
+        includeLiveRefresh: true,
       }),
     ),
   ]);

@@ -17,6 +17,7 @@ export {
   withApiHandler,
   type ApiHandlerContext,
   type ApiHandlerResult,
+  type WithApiHandlerOptions,
 } from "@/lib/bff/handler";
 export {
   getFixtures,

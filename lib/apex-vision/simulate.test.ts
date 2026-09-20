@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   createInitialVisionState,
@@ -29,5 +31,15 @@ describe("APEX Vision mock simulation", () => {
       1,
       5,
     );
+  });
+
+  it("keeps an explicit synthetic PASS type for mock ticks only", () => {
+    const source = readFileSync(
+      path.join(process.cwd(), "lib/apex-vision/simulate.ts"),
+      "utf8",
+    );
+    expect(source).toContain('"pase"');
+    expect(source).toContain('label: "Pase"');
+    expect(source).toContain("EVENT_TYPES");
   });
 });

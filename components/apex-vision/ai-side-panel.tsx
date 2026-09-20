@@ -14,6 +14,7 @@ import type { VisionLiveState, VisionRiskLevel } from "@/lib/apex-vision/types";
 
 type AiSidePanelProps = {
   state: VisionLiveState;
+  marketsOrigin?: "PREMATCH" | "LIVE";
 };
 
 const riskTone: Record<VisionRiskLevel, "success" | "warning" | "danger"> = {
@@ -22,7 +23,10 @@ const riskTone: Record<VisionRiskLevel, "success" | "warning" | "danger"> = {
   high: "danger",
 };
 
-export function AiSidePanel({ state }: AiSidePanelProps) {
+export function AiSidePanel({
+  state,
+  marketsOrigin = "LIVE",
+}: AiSidePanelProps) {
   const t = useTranslations("vision");
   const common = useTranslations("common");
   const { markets, confidence, risk, riskLabel: riskDetail, aiInsight } = state;
@@ -31,20 +35,26 @@ export function AiSidePanel({ state }: AiSidePanelProps) {
     medium: t("riskMedium"),
     high: t("riskHigh"),
   } as const;
+  const prematch = marketsOrigin === "PREMATCH";
 
   return (
     <aside className="space-y-4 lg:sticky lg:top-6">
       <Card>
         <CardHeader
           title={t("aiPanel")}
-          description={t("aiPanelDescription")}
-          action={<Badge tone="accent">Vision</Badge>}
+          description={prematch ? t("aiPanelPrematchDescription") : t("aiPanelDescription")}
+          action={
+            <Badge tone={prematch ? "info" : "accent"}>
+              {prematch ? t("prematchBadge") : "Vision"}
+            </Badge>
+          }
         />
 
         <div className="space-y-5">
           <div>
             <p className="mb-3 text-xs uppercase tracking-[var(--apex-tracking-wider)] text-[var(--apex-fg-subtle)]">
               {t("win1x2")}
+              {prematch ? ` · ${t("prematchBadge")}` : ""}
             </p>
             <ProbabilityBars
               aria-label={t("winProbability")}
@@ -68,13 +78,13 @@ export function AiSidePanel({ state }: AiSidePanelProps) {
             <MarketChip
               interactive={false}
               selected={markets.over25 >= 0.5}
-              label={common("over25")}
+              label={`${common("over25")}${prematch ? ` · ${t("prematchBadge")}` : ""}`}
               value={`${Math.round(markets.over25 * 100)}%`}
             />
             <MarketChip
               interactive={false}
               selected={markets.btts >= 0.5}
-              label="BTTS"
+              label={`BTTS${prematch ? ` · ${t("prematchBadge")}` : ""}`}
               value={`${Math.round(markets.btts * 100)}%`}
             />
           </div>
