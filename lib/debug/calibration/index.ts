@@ -658,3 +658,12 @@ export {
   verifyScoredHashes,
 } from "@/lib/debug/calibration/prospective/scoring/scoring-hash";
 export { persistScoredArtifact, scoredDirectory } from "@/lib/debug/calibration/prospective/scoring/scoring-persist";
+export {
+  CAPTURE_BRIDGE_LIVE_PROVIDER_ENABLED,
+  CAPTURE_BRIDGE_PHASE,
+  CaptureBridgeRejectedError,
+  ZERO_BRIDGE_SPENT_CALLS,
+} from "@/lib/debug/calibration/prospective/live-capture-bridge/capture-bridge-types";
+export { CAPTURE_BRIDGE_REQUEST_FAMILIES, createSyntheticCaptureBridgeTransport } from "@/lib/debug/calibration/prospective/live-capture-bridge/capture-bridge-transport";
+export { planCaptureBridgeBudget } from "@/lib/debug/calibration/prospective/live-capture-bridge/capture-bridge-budget";
+export { executeCaptureBridge } from "@/lib/debug/calibration/prospective/live-capture-bridge/capture-bridge-runner";
