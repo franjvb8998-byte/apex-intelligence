@@ -574,3 +574,36 @@ export { planFirstLiveDiscovery, FIRST_LIVE_PHASE } from "@/lib/debug/calibratio
 export { countPrimarySampleN, reportingCheckpoints } from "@/lib/debug/calibration/prospective/protocol/protocol-sample";
 export { isEligiblePriorEvidence, selectPriorEvidenceFixtures } from "@/lib/debug/calibration/prospective/protocol/protocol-evidence";
 export { toUtcIso } from "@/lib/debug/calibration/prospective/protocol/protocol-utc";
+export {
+  DISCOVERY_CALL_BUDGET,
+  assertDiscoveryBudget,
+  emptyDiscoveryAccounting,
+  noteFixtureDiscoveryCall,
+} from "@/lib/debug/calibration/prospective/live/discovery-budget";
+export {
+  DISCOVERY_ALLOWED_PATH,
+  DISCOVERY_DATA_DIR,
+  DISCOVERY_FIXTURE_QUERY,
+  DISCOVERY_FORBIDDEN_PATHS,
+  DISCOVERY_PROVIDER,
+  DiscoveryBudgetError,
+  DiscoveryIntegrityError,
+  SEASON_VERIFICATION_METHOD,
+} from "@/lib/debug/calibration/prospective/live/discovery-types";
+export {
+  assertSafeProjectedObject,
+  projectSafeFixture,
+  projectSafeFixtures,
+  verifySeasonFromProjected,
+} from "@/lib/debug/calibration/prospective/live/discovery-projection";
+export {
+  captureOpportunitiesFrom,
+  classifyProjectedFixtures,
+} from "@/lib/debug/calibration/prospective/live/discovery-classify";
+export {
+  assertAllowedDiscoveryRequest,
+  assertOddsUnavailable,
+  createLiveDiscoveryTransport,
+} from "@/lib/debug/calibration/prospective/live/discovery-transport";
+export { persistDiscoveryArtifact } from "@/lib/debug/calibration/prospective/live/discovery-persist";
+export { discoverLiveFixtures } from "@/lib/debug/calibration/prospective/live/discovery-runner";
