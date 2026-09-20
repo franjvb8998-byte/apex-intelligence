@@ -621,3 +621,21 @@ export {
   assertLiveCaptureBatchIntegrity,
   assertFrozenFingerprintOverride,
 } from "@/lib/debug/calibration/prospective/live-capture/live-capture-integrity";
+export {
+  LIVE_EXECUTION_DEFAULT_MODE,
+  LIVE_EXECUTION_MODE_DRY_RUN,
+  LIVE_EXECUTION_MODE_PERSIST_PENDING,
+  LIVE_EXECUTION_PHASE,
+  ZERO_PROVIDER_CALLS,
+  LiveExecutionRejectedError,
+} from "@/lib/debug/calibration/prospective/live-execution/live-execution-types";
+export { projectTargetFixture, projectPriorUniverse } from "@/lib/debug/calibration/prospective/live-execution/live-execution-projection";
+export { buildPreMatchCatalogueEvidence } from "@/lib/debug/calibration/prospective/live-execution/live-execution-evidence";
+export { projectOptionalOdds } from "@/lib/debug/calibration/prospective/live-execution/live-execution-odds";
+export { createSyntheticLiveExecutionTransport } from "@/lib/debug/calibration/prospective/live-execution/live-execution-transport";
+export {
+  countPersistedProspectiveN,
+  emptyProviderCallAccounting,
+} from "@/lib/debug/calibration/prospective/live-execution/live-execution-accounting";
+export { executeLiveCaptureAdapter } from "@/lib/debug/calibration/prospective/live-execution/live-execution-adapter";
+export { recheckFrozenCaptureWindow } from "@/lib/debug/calibration/prospective/live-execution/live-execution-window";
