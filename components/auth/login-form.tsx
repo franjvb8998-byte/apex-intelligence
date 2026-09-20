@@ -7,7 +7,8 @@ import { FormEvent, useState } from "react";
 import { AuthCard } from "@/components/ui/auth-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getAuthErrorKey } from "@/lib/supabase/auth-errors";
+import { sanitizeNextPath } from "@/lib/auth/password-recovery";
+import { getAuthFailureKey } from "@/lib/supabase/auth-errors";
 import { createClient } from "@/lib/supabase/client";
 import { isValidEmail, validatePassword } from "@/lib/validation";
 
@@ -21,7 +22,7 @@ export function LoginForm() {
   const t = useTranslations("auth");
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") ?? "/scanner";
+  const redirectTo = sanitizeNextPath(searchParams.get("redirect"), "/scanner");
   const passwordUpdated = searchParams.get("password_updated") === "1";
 
   const [email, setEmail] = useState("");
@@ -54,17 +55,22 @@ export function LoginForm() {
 
     setIsSubmitting(true);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-    setIsSubmitting(false);
-
-    if (error) {
-      setErrors({ form: t(`errors.${getAuthErrorKey(error.message)}`) });
+      if (error) {
+        setErrors({ form: t(`errors.${getAuthFailureKey(error)}`) });
+        return;
+      }
+    } catch (error) {
+      setErrors({ form: t(`errors.${getAuthFailureKey(error)}`) });
       return;
+    } finally {
+      setIsSubmitting(false);
     }
 
     router.push(redirectTo);
@@ -87,7 +93,15 @@ export function LoginForm() {
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
+      <form method="post" onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
+        <noscript>
+          <p
+            className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+            role="alert"
+          >
+            {t("errors.jsRequired")}
+          </p>
+        </noscript>
         <Input
           label={t("login.email")}
           name="email"

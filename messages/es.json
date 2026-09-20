@@ -196,6 +196,9 @@
       "rateLimit": "Espera un minuto antes de solicitar otro enlace.",
       "redirectMismatch": "La URL de recuperación no está permitida. Añade http://localhost:3000/reset-password en Redirect URLs de Supabase.",
       "passwordRequirements": "La contraseña no cumple los requisitos de seguridad.",
+      "network": "No se puede conectar con el servicio de autenticación. Revisa tu conexión e inténtalo de nuevo.",
+      "configuration": "No se puede iniciar sesión porque la autenticación no está configurada.",
+      "jsRequired": "Se necesita JavaScript para continuar.",
       "generic": "Ha ocurrido un error. Inténtalo de nuevo."
     },
     "footer": "© {year} APEX Intelligence. Todos los derechos reservados."

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { sanitizeAuthQueryParams } from "@/lib/auth/credential-query";
 import {
   AUTH_CALLBACK_PATH,
   AUTH_CONFIRM_PATH,
@@ -20,6 +21,14 @@ function isPublicAuthRoute(pathname: string) {
 
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (isPublicAuthRoute(pathname)) {
+    const cleaned = request.nextUrl.clone();
+    if (sanitizeAuthQueryParams(cleaned.searchParams)) {
+      return NextResponse.redirect(cleaned, 303);
+    }
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");

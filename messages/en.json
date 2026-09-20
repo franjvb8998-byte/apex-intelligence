@@ -196,6 +196,9 @@
       "rateLimit": "Wait a minute before requesting another link.",
       "redirectMismatch": "The recovery URL is not allowed. Add http://localhost:3000/reset-password to Supabase Redirect URLs.",
       "passwordRequirements": "The password does not meet the security requirements.",
+      "network": "Cannot reach the authentication service. Check your connection and try again.",
+      "configuration": "Sign-in is unavailable because authentication is not configured.",
+      "jsRequired": "JavaScript is required to continue.",
       "generic": "Something went wrong. Please try again."
     },
     "footer": "© {year} APEX Intelligence. All rights reserved."

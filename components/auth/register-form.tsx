@@ -113,7 +113,15 @@ export function RegisterForm() {
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
+      <form method="post" onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
+        <noscript>
+          <p
+            className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+            role="alert"
+          >
+            {t("errors.jsRequired")}
+          </p>
+        </noscript>
         <Input
           label={t("register.name")}
           name="name"

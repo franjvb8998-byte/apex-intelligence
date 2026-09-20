@@ -7,6 +7,8 @@ export type AuthErrorKey =
   | "rateLimit"
   | "redirectMismatch"
   | "passwordRequirements"
+  | "network"
+  | "configuration"
   | "generic";
 
 export function getAuthErrorKey(error: string): AuthErrorKey {
@@ -50,6 +52,46 @@ export function getAuthErrorKey(error: string): AuthErrorKey {
   }
   if (normalized.includes("password")) {
     return "passwordRequirements";
+  }
+  return "generic";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object";
+}
+
+export function getAuthFailureKey(error: unknown): AuthErrorKey {
+  if (typeof error === "string") {
+    return getAuthErrorKey(error);
+  }
+  if (!isRecord(error)) {
+    return "generic";
+  }
+
+  const name = typeof error.name === "string" ? error.name : "";
+  const message = typeof error.message === "string" ? error.message : "";
+  const code = typeof error.code === "string" ? error.code.toLowerCase() : "";
+  const combined = `${name} ${code} ${message}`.toLowerCase();
+
+  if (
+    code.includes("invalid_login") ||
+    code.includes("invalid_credentials") ||
+    combined.includes("invalid login credentials")
+  ) {
+    return "invalidCredentials";
+  }
+  if (
+    combined.includes("failed to fetch") ||
+    combined.includes("networkerror") ||
+    combined.includes("load failed")
+  ) {
+    return "network";
+  }
+  if (combined.includes("missing environment variable: next_public_supabase")) {
+    return "configuration";
+  }
+  if (message) {
+    return getAuthErrorKey(message);
   }
   return "generic";
 }
