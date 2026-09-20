@@ -15,9 +15,9 @@ import { UnavailableDataCard } from "@/components/app-shell/states";
 import { LineupsCard, hasPublishedLineup } from "@/components/match-center/lineups-card";
 import { ProviderLiveTimeline } from "@/components/match-center/provider-live-timeline";
 import { simulateVisionTick } from "@/lib/apex-vision";
+import { startMatchCenterLivePoll } from "@/lib/apex-vision/live/browser-poll";
 import {
   heuristicFromScore,
-  matchCenterLiveApiHref,
   matchCenterLivePollIntervalMs,
   shouldStartMatchCenterLivePoll,
   type MatchCenterLiveView,
@@ -71,61 +71,33 @@ export function LivePhase({ data }: LivePhaseProps) {
     return () => window.clearInterval(id);
   }, [isMock]);
 
+  const fixtureId = data.fixtureId;
+  const pollShouldStart = shouldStartMatchCenterLivePoll({
+    isMock,
+    fixtureId,
+    catalogueLive: data.catalogueLive,
+    providerLive: data.providerLive,
+  });
+  const pollIntervalMs = matchCenterLivePollIntervalMs(data.providerLive);
+  const pollFreshness = data.providerLive?.freshness ?? null;
+
   useEffect(() => {
-    if (isMock || data.fixtureId == null) return;
-    const fixtureId = data.fixtureId;
-    let cancelled = false;
-    let polling = shouldStartMatchCenterLivePoll({
-      isMock,
+    if (isMock || fixtureId == null) return;
+    const session = startMatchCenterLivePoll({
       fixtureId,
-      catalogueLive: data.catalogueLive,
-      providerLive: data.providerLive,
-    });
-    if (!polling) return;
-
-    const intervalMs = matchCenterLivePollIntervalMs(data.providerLive);
-    let inFlight = false;
-    const timer = window.setInterval(() => {
-      void pull();
-    }, intervalMs);
-
-    async function pull() {
-      if (inFlight || cancelled || !polling) return;
-      inFlight = true;
-      try {
-        const href = matchCenterLiveApiHref(fixtureId);
+      intervalMs: pollIntervalMs,
+      shouldStart: pollShouldStart,
+      freshness: pollFreshness,
+      async fetchLive(href) {
         const response = await fetch(href);
-        if (!response.ok || cancelled) return;
+        if (!response.ok) return null;
         const body = (await response.json()) as { data?: MatchCenterLiveView };
-        if (!body.data || cancelled) return;
-        setProviderLive(body.data);
-        if (!body.data.refresh.shouldPoll) {
-          polling = false;
-          window.clearInterval(timer);
-        }
-      } catch {
-        // Failed APEX pulls wait for the next interval. No rapid retry.
-      } finally {
-        inFlight = false;
-      }
-    }
-
-    if (!data.providerLive || data.providerLive.freshness !== "LIVE") {
-      void pull();
-    }
-
-    const onVisibility = () => {
-      if (polling && document.visibilityState === "visible") void pull();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-
-    return () => {
-      cancelled = true;
-      polling = false;
-      if (timer != null) window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [isMock, data.fixtureId, data.catalogueLive, data.providerLive]);
+        return body.data ?? null;
+      },
+      onView: setProviderLive,
+    });
+    return () => session.stop();
+  }, [isMock, fixtureId, pollShouldStart, pollIntervalMs, pollFreshness]);
 
   const live = providerLive;
   const scoreHome = live?.homeGoals ?? state.score.home;

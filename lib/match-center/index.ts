@@ -53,6 +53,13 @@ export {
   buildMatchCenterLiveLiteFromVision,
 } from "@/lib/match-center/live-lite";
 
+export {
+  matchCenterHeaderDescriptionKey,
+  matchCenterHeaderPhaseKey,
+  type MatchCenterHeaderDescriptionKey,
+  type MatchCenterHeaderPhaseKey,
+} from "@/lib/match-center/header-copy";
+
 export { apiFootballPlayerRenderKey } from "@/lib/match-center/player-render-key";
 
 export {

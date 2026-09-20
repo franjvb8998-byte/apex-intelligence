@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { MatchProductLinks } from "@/components/app-shell/match-product-links";
 import { AiMatchAnalysisPanel } from "@/components/match-center/ai-match-analysis-panel";
@@ -35,14 +35,20 @@ export function MatchCenterView({
   const [phase, setPhase] = useState<MatchCenterPhase>(
     initialPhase ?? data.defaultPhase,
   );
-
-  useEffect(() => {
+  const phaseIdentity = `${data.match.matchId}:${initialPhase ?? data.defaultPhase}`;
+  const [seenPhaseIdentity, setSeenPhaseIdentity] = useState(phaseIdentity);
+  if (phaseIdentity !== seenPhaseIdentity) {
+    setSeenPhaseIdentity(phaseIdentity);
     setPhase(initialPhase ?? data.defaultPhase);
-  }, [data.match.matchId, data.defaultPhase, initialPhase]);
+  }
 
   return (
     <div className="w-full space-y-6">
-      <MatchCenterHeader match={data.match} phase={phase} />
+      <MatchCenterHeader
+        match={data.match}
+        phase={phase}
+        liveLite={data.liveLite === true}
+      />
       <MatchProductLinks
         matchId={data.match.matchId}
         externalId={data.match.externalId}

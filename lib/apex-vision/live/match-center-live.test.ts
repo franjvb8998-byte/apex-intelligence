@@ -672,18 +672,25 @@ describe("Phase 2A.2 honesty + isolation", () => {
       path.join(process.cwd(), "components/match-center/live-phase.tsx"),
       "utf8",
     );
+    const pollSrc = readFileSync(
+      path.join(process.cwd(), "lib/apex-vision/live/browser-poll.ts"),
+      "utf8",
+    );
     const timeline = readFileSync(
       path.join(process.cwd(), "components/match-center/provider-live-timeline.tsx"),
       "utf8",
     );
-    expect(livePhase).toContain("matchCenterLiveApiHref");
+    expect(livePhase).toContain("startMatchCenterLivePoll");
     expect(livePhase).toContain("schematic={!isMock}");
     expect(livePhase).not.toContain("api-sports.io");
     expect(livePhase).toContain("simulateVisionTick");
     expect(livePhase).toContain("if (!isMock) return");
-    expect(livePhase).toContain("inFlight");
-    expect(livePhase).toContain("window.clearInterval(timer)");
     expect(livePhase).not.toContain("API_FOOTBALL_KEY");
+    expect(livePhase).not.toContain("x-apisports-key");
+    expect(livePhase).not.toContain("v3.football.api-sports.io");
+    expect(pollSrc).toContain("matchCenterLiveApiHref");
+    expect(pollSrc).toContain("pagehide");
+    expect(pollSrc).not.toContain("v3.football.api-sports.io");
     expect(livePhase).not.toContain("x-apisports-key");
     expect(livePhase).not.toContain("v3.football.api-sports.io");
     expect(timeline).not.toContain("pase");

@@ -6,6 +6,10 @@ import {
   Card,
   TeamLogo,
 } from "@/components/design-system";
+import {
+  matchCenterHeaderDescriptionKey,
+  matchCenterHeaderPhaseKey,
+} from "@/lib/match-center/header-copy";
 import type { MatchCenterMeta, MatchCenterPhase } from "@/lib/match-center/types";
 
 function formatKickoff(iso: string, locale: string): string {
@@ -41,6 +45,8 @@ type MatchCenterHeaderProps = {
   match: MatchCenterMeta;
   phase: MatchCenterPhase;
   sourceLabel?: string;
+  /** Live Lite omits PE/odds; header copy must not claim they are loaded. */
+  liveLite?: boolean;
 };
 
 /**
@@ -51,6 +57,7 @@ export function MatchCenterHeader({
   match,
   phase,
   sourceLabel,
+  liveLite = false,
 }: MatchCenterHeaderProps) {
   const t = useTranslations("matchCenter");
   const dashboard = useTranslations("dashboard");
@@ -65,11 +72,8 @@ export function MatchCenterHeader({
     suspended: t("statusSuspended"),
     unknown: t("statusUnknown"),
   } as const;
-  const phaseEyebrow: Record<MatchCenterPhase, string> = {
-    preview: t("headerPreview"),
-    live: t("headerLive"),
-    post: t("headerPost"),
-  };
+  const phaseEyebrow = t(matchCenterHeaderPhaseKey(liveLite, phase));
+  const descriptionKey = matchCenterHeaderDescriptionKey(liveLite, phase);
   return (
     <header className="space-y-6">
       <div className="space-y-3">
@@ -127,7 +131,7 @@ export function MatchCenterHeader({
             {match.awayTeam.name}
           </h1>
           <p className="mt-2 text-sm text-[var(--apex-fg-muted)]">
-            {t("headerDescription", { phase: phaseEyebrow[phase] })}
+            {t(descriptionKey, { phase: phaseEyebrow })}
           </p>
         </div>
       </div>

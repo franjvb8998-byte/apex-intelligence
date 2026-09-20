@@ -63,6 +63,13 @@ export {
 export { parseTrackedFixtureId } from "@/lib/apex-vision/live/parse-id";
 
 export {
+  startMatchCenterLivePoll,
+  type MatchCenterLivePollHost,
+  type MatchCenterLivePollSession,
+  type StartMatchCenterLivePollInput,
+} from "@/lib/apex-vision/live/browser-poll";
+
+export {
   LIVE_REFRESH_INTERVAL_MS,
   HT_REFRESH_INTERVAL_MS,
   LIVE_FRESHNESS_WINDOW_MS,
