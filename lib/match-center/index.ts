@@ -49,6 +49,18 @@ export {
 } from "@/lib/match-center/load";
 
 export {
+  buildMatchCenterLiveLiteFromBundle,
+  buildMatchCenterLiveLiteFromVision,
+} from "@/lib/match-center/live-lite";
+
+export { apiFootballPlayerRenderKey } from "@/lib/match-center/player-render-key";
+
+export {
+  isMatchCenterPostEvaluated,
+  unevaluatedMatchCenterPost,
+} from "@/lib/match-center/post-evaluation";
+
+export {
   firstSearchParam,
   fixtureIdFromMatch,
   matchAnalysisHref,

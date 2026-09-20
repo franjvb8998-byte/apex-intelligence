@@ -12,14 +12,14 @@ type PlayerMarkersProps = {
 export function PlayerMarkers({ players, schematic = false }: PlayerMarkersProps) {
   return (
     <>
-      {players.map((player) => {
+      {players.map((player, index) => {
         const isHome = player.side === "home";
         const label = schematic
           ? `Schematic formation ${player.side} ${player.number} ${player.name}`
           : `${player.side} ${player.number} ${player.name}`;
         return (
           <motion.div
-            key={player.id}
+            key={`${player.side}:${index}:${player.id}`}
             className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
             initial={false}
             animate={{ left: `${player.position.x}%`, top: `${player.position.y}%` }}

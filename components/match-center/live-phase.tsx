@@ -231,10 +231,17 @@ export function LivePhase({ data }: LivePhaseProps) {
         </div>
 
         <div className="xl:col-span-2">
-          <AiSidePanel
-            state={state}
-            marketsOrigin={isMock ? "LIVE" : "PREMATCH"}
-          />
+          {data.loadMode === "live-lite" ? (
+            <UnavailableDataCard
+              title={t("liveLitePrematchUnavailable")}
+              description={t("liveLitePrematchUnavailableDescription")}
+            />
+          ) : (
+            <AiSidePanel
+              state={state}
+              marketsOrigin={isMock ? "LIVE" : "PREMATCH"}
+            />
+          )}
         </div>
       </div>
     </div>

@@ -19,6 +19,8 @@ import {
   matchCenterLiveApiHref,
   matchCenterLivePollIntervalMs,
   parseTrackedFixtureId,
+  getVisionLiveCoordinator,
+  peekVisionLiveFixture,
   resetVisionLiveCoordinatorForTests,
   setVisionLiveCoordinatorForTests,
   shouldKeepLiveTracking,
@@ -26,6 +28,7 @@ import {
   toMatchCenterLiveView,
   type LiveFixtureState,
   type VisionLiveClient,
+  type VisionLiveCoordinator,
 } from "@/lib/apex-vision/live";
 import { classifyProviderEventClass, normalizeLiveEvent } from "@/lib/apex-vision/live/normalize";
 import { DEFAULT_MAX_FALLBACK_CALLS_PER_REFRESH } from "@/lib/apex-vision/live/service";
@@ -106,6 +109,37 @@ function mockClient(
 }
 
 describe("Vision live coordinator + Match Center view", () => {
+  it("getVisionLiveCoordinator exposes zero-call peekFixture", () => {
+    resetVisionLiveCoordinatorForTests();
+    const coordinator = getVisionLiveCoordinator();
+    expect(typeof coordinator.peekFixture).toBe("function");
+    expect(coordinator.peekFixture(1507073)).toBeNull();
+    expect(peekVisionLiveFixture(1507073)).toBeNull();
+  });
+
+  it("upgrades a refreshFixture-only singleton before peek", () => {
+    setVisionLiveCoordinatorForTests({
+      refreshFixture: vi.fn(),
+    } as unknown as VisionLiveCoordinator);
+    expect(typeof getVisionLiveCoordinator().peekFixture).toBe("function");
+    expect(peekVisionLiveFixture(1507073)).toBeNull();
+  });
+
+  it("peekFixture reads store without provider calls", async () => {
+    const client = mockClient();
+    const coordinator = createVisionLiveCoordinator({
+      transport: createVisionLiveTransport({ client }),
+      now: () => new Date("2026-09-20T07:14:00.000Z"),
+    });
+    expect(coordinator.peekFixture(1510455)).toBeNull();
+    expect(client.getFixturesByIds).not.toHaveBeenCalled();
+    await coordinator.refreshFixture(1510455);
+    expect(coordinator.peekFixture(1510455)?.statusShort).toBe("1H");
+    expect(client.getFixturesByIds).toHaveBeenCalledTimes(1);
+    coordinator.peekFixture(1510455);
+    expect(client.getFixturesByIds).toHaveBeenCalledTimes(1);
+  });
+
   it("1 concurrent refresh requests deduplicate provider work", async () => {
     const client = mockClient();
     const transport = createVisionLiveTransport({ client });
@@ -120,6 +154,34 @@ describe("Vision live coordinator + Match Center view", () => {
     expect(client.getFixturesByIds).toHaveBeenCalledTimes(1);
     expect(a.homeGoals).toBe(1);
     expect(b.homeGoals).toBe(1);
+    expect(a.refresh.httpOrigin).toBe("PROVIDER_REFRESH");
+  });
+
+  it("httpOrigin is coordinator-layer inference, not wire-level HTTP", async () => {
+    const client = mockClient();
+    const now = () => new Date("2026-09-20T07:14:00.000Z");
+    const cached = new Set<number>();
+    const coordinator = createVisionLiveCoordinator({
+      transport: createVisionLiveTransport({ client, now }),
+      now,
+      hasLiveHttpCache: (id) => cached.has(id),
+    });
+    const origin = await coordinator.refreshFixture(1510455);
+    expect(origin.refresh.httpOrigin).toBe("PROVIDER_REFRESH");
+    cached.add(1510455);
+    const store = await coordinator.refreshFixture(1510455);
+    expect(store.refresh.httpOrigin).toBe("VISION_STORE_CACHE");
+    expect(client.getFixturesByIds).toHaveBeenCalledTimes(1);
+
+    const later = () => new Date("2026-09-20T07:16:00.000Z");
+    const afterTtl = createVisionLiveCoordinator({
+      transport: createVisionLiveTransport({ client, now: later }),
+      now: later,
+      hasLiveHttpCache: (id) => cached.has(id),
+    });
+    const liveCache = await afterTtl.refreshFixture(1510455);
+    expect(liveCache.refresh.refreshSource).toBe("PROVIDER");
+    expect(liveCache.refresh.httpOrigin).toBe("LIVE_CACHE_REUSE");
   });
 
   it("40 many viewers do not multiply provider calls within the window", async () => {

@@ -20,6 +20,7 @@ import {
   withApiFootballClientCache,
 } from "@/lib/data-platform/providers/api-football/client";
 import { createFixtureApiFootballClient } from "@/lib/data-platform/providers/api-football/fixture-client";
+import { liveFixturesCacheKey } from "@/lib/data-platform/providers/api-football/live-query";
 import { singleFlightApiFootball } from "@/lib/data-platform/providers/api-football/single-flight";
 import { createProcessLiveStore } from "@/lib/apex-vision/live/store";
 import {
@@ -32,6 +33,7 @@ import {
   unavailableLiveView,
   type MatchCenterLiveView,
 } from "@/lib/apex-vision/live/view";
+import type { LiveFixtureState } from "@/lib/apex-vision/live/types";
 
 const COORD_SLOT = Symbol.for("apex.vision.live.coordinator");
 const CACHE_SLOT = Symbol.for("apex.vision.live.httpCache");
@@ -43,12 +45,28 @@ type CoordGlobal = typeof globalThis & {
 
 export type VisionLiveCoordinator = {
   refreshFixture(fixtureId: number): Promise<MatchCenterLiveView>;
+  /** Process-local store read. Never talks to the provider. */
+  peekFixture(fixtureId: number): LiveFixtureState | null;
 };
+
+function hasZeroCallPeek(
+  value: VisionLiveCoordinator | undefined,
+): value is VisionLiveCoordinator {
+  return (
+    typeof value?.refreshFixture === "function" &&
+    typeof value.peekFixture === "function"
+  );
+}
 
 export type VisionLiveCoordinatorOptions = {
   transport: VisionLiveTransport;
   now?: () => Date;
   refreshTtlMs?: number;
+  /**
+   * True when `af:live:fixtures:{id}` is already in the process live HTTP cache
+   * before snapshot. Metadata only — not proof of a subsequent origin skip.
+   */
+  hasLiveHttpCache?: (fixtureId: number) => boolean;
 };
 
 function isFresh(
@@ -68,6 +86,9 @@ export function createVisionLiveCoordinator(
   const refreshTtlMs = options.refreshTtlMs ?? LIVE_REFRESH_INTERVAL_MS;
 
   return {
+    peekFixture(fixtureId) {
+      return options.transport.getFixture(fixtureId);
+    },
     async refreshFixture(fixtureId) {
       const key = `vision-live:refresh:${fixtureId}`;
       return singleFlightApiFootball(key, async () => {
@@ -82,15 +103,20 @@ export function createVisionLiveCoordinator(
             refreshPerformed: false,
             cacheHit: true,
             lastProviderRefreshAt: existing.fetchedAtUtc,
+            httpOrigin: "VISION_STORE_CACHE",
           });
         }
 
+        const liveHttpCached = options.hasLiveHttpCache?.(fixtureId) === true;
         const snapshot = await options.transport.snapshotTrackedFixtures([
           fixtureId,
         ]);
         const state =
           snapshot.fixtures.find((row) => row.fixtureId === fixtureId) ??
           options.transport.getFixture(fixtureId);
+        const httpOrigin = liveHttpCached
+          ? "LIVE_CACHE_REUSE"
+          : "PROVIDER_REFRESH";
         if (!state) {
           const empty = unavailableLiveView(fixtureId, nowUtc);
           return {
@@ -101,6 +127,7 @@ export function createVisionLiveCoordinator(
               refreshSource: "PROVIDER",
               refreshPerformed: true,
               cacheHit: false,
+              httpOrigin,
             },
           };
         }
@@ -111,6 +138,7 @@ export function createVisionLiveCoordinator(
           refreshPerformed: true,
           cacheHit: false,
           lastProviderRefreshAt: nowUtc,
+          httpOrigin,
         });
       });
     },
@@ -131,23 +159,44 @@ function sharedLiveHttpCache() {
 /**
  * Process-local production coordinator.
  * Documented limitation: not a multi-instance lock.
+ *
+ * `Symbol.for("apex.vision.live.coordinator")` survives Turbopack HMR.
+ * A 2A.2 singleton only had `refreshFixture`. Replace that shape so Match
+ * Center never calls a missing `peekFixture`.
  */
 export function getVisionLiveCoordinator(): VisionLiveCoordinator {
   const g = globalThis as CoordGlobal;
-  if (!g[COORD_SLOT]) {
-    const resolved =
-      tryCreateApiFootballClientFromEnv() ?? createFixtureApiFootballClient();
-    const client = withApiFootballClientCache(resolved, sharedLiveHttpCache(), {
-      logger: () => undefined,
-    });
-    g[COORD_SLOT] = createVisionLiveCoordinator({
-      transport: createVisionLiveTransport({
-        client,
-        store: createProcessLiveStore(),
-      }),
-    });
+  const existing = g[COORD_SLOT];
+  if (hasZeroCallPeek(existing)) {
+    return existing;
   }
-  return g[COORD_SLOT];
+  const resolved =
+    tryCreateApiFootballClientFromEnv() ?? createFixtureApiFootballClient();
+  const cache = sharedLiveHttpCache();
+  const client = withApiFootballClientCache(resolved, cache, {
+    logger: () => undefined,
+  });
+  const coordinator = createVisionLiveCoordinator({
+    transport: createVisionLiveTransport({
+      client,
+      store: createProcessLiveStore(),
+    }),
+    hasLiveHttpCache: (fixtureId) =>
+      cache.get(liveFixturesCacheKey([fixtureId])) !== undefined,
+  });
+  g[COORD_SLOT] = coordinator;
+  return coordinator;
+}
+
+/**
+ * Zero-provider-call Vision store read used by Match Center Live Lite routing.
+ * Goes through {@link getVisionLiveCoordinator} so a stale singleton is upgraded
+ * before the read. Empty store returns null.
+ */
+export function peekVisionLiveFixture(
+  fixtureId: number,
+): LiveFixtureState | null {
+  return getVisionLiveCoordinator().peekFixture(fixtureId);
 }
 
 export function resetVisionLiveCoordinatorForTests(): void {

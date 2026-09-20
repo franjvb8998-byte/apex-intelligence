@@ -49,6 +49,7 @@ import {
   type MatchCenterEnrichment,
 } from "@/lib/match-center/enrich";
 import { buildIntelligenceReport } from "@/lib/intelligence-report";
+import { unevaluatedMatchCenterPost } from "@/lib/match-center/post-evaluation";
 import { buildPreviewFromHybrid } from "@/lib/match-center/from-probability";
 import { scoreMatchSelection, apexScoreFromScoring } from "@/lib/scoring-engine/from-match";
 import { selectionTwinFromPreview } from "@/lib/team-intelligence/builders";
@@ -393,6 +394,14 @@ function buildPostFromBundle(
 ): MatchCenterPostData {
   const home = bundle.match.score.home ?? 0;
   const away = bundle.match.score.away ?? 0;
+  if (bundle.match.status !== "finished") {
+    return unevaluatedMatchCenterPost({
+      at: bundle.match.updatedAt,
+      score: { home, away },
+      summary:
+        "Post-match evaluation waits for a finished match (FT, AET, or PEN). Live and prematch scores are not a final result.",
+    });
+  }
   const actualOutcome = outcomeFromScore(home, away);
   const predictedOutcome = preview.analysis.predictedOutcome;
   const oneXTwo = preview.analysis.oneXTwo;
@@ -487,6 +496,7 @@ function buildPostFromBundle(
       },
     ],
     source: "data-platform",
+    evaluationAvailable: true,
   };
 }
 

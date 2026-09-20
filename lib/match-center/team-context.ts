@@ -11,6 +11,7 @@ import type {
   MatchCenterLineup,
   MatchCenterRecentMatch,
 } from "@/lib/match-center/types";
+import { apiFootballPlayerRenderKey } from "@/lib/match-center/player-render-key";
 
 export function isSuspensionAbsence(
   type?: string | null,
@@ -113,13 +114,23 @@ export function lineupFromVendor(
 ): MatchCenterLineup | null {
   if (!lineup) return null;
   const startXI = (lineup.startXI ?? []).map((row, index) => ({
-    id: `apex:api-football:player:${row.player.id}:${index}`,
+    id: apiFootballPlayerRenderKey({
+      teamId: lineup.team.id,
+      slot: "xi",
+      index,
+      playerId: row.player.id,
+    }),
     name: row.player.name,
     number: row.player.number ?? null,
     position: row.player.pos ?? null,
   }));
   const substitutes = (lineup.substitutes ?? []).map((row, index) => ({
-    id: `apex:api-football:player:${row.player.id}:sub:${index}`,
+    id: apiFootballPlayerRenderKey({
+      teamId: lineup.team.id,
+      slot: "sub",
+      index,
+      playerId: row.player.id,
+    }),
     name: row.player.name,
     number: row.player.number ?? null,
     position: row.player.pos ?? null,

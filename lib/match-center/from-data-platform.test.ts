@@ -65,6 +65,7 @@ describe("Match Center ← Data Platform", () => {
     expect(data.live.source).toBe("data-platform");
     expect(data.live.vision.source).toBe("data-platform");
     expect(data.post.source).toBe("data-platform");
+    expect(data.post.evaluationAvailable).toBe(true);
   });
 
   it("builds MatchCenterData from API-Football recorded match (legacy path)", async () => {
@@ -124,6 +125,7 @@ describe("Match Center ← Data Platform", () => {
     expect(center.live.catalogueLive).toBe(false);
     expect(center.live.providerLive).toBeNull();
     expect(center.post.source).not.toBe("mock");
+    expect(center.post.evaluationAvailable).toBe(true);
     expect(center.preview.source).not.toBe("mock");
   });
 

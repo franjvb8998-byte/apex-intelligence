@@ -24,6 +24,7 @@ import type {
   BffTeamStatistics,
 } from "@/lib/bff/types";
 import { adaptApiFootballTeamStatistics } from "@/lib/data-platform/providers/api-football/adapters";
+import { apiFootballPlayerRenderKey } from "@/lib/match-center/player-render-key";
 
 export function fixtureFromBundle(bundle: ApexMatchBundle): BffFixtureSummary {
   const externalId = bundle.match.externalRefs[0]?.externalId ?? null;
@@ -145,14 +146,24 @@ export function lineupsFromApiFootball(
     teamId: `apex:api-football:team:${lineup.team.id}`,
     teamName: lineup.team.name,
     formation: lineup.formation ?? null,
-    startXI: (lineup.startXI ?? []).map((row) => ({
-      id: `apex:api-football:player:${row.player.id}`,
+    startXI: (lineup.startXI ?? []).map((row, index) => ({
+      id: apiFootballPlayerRenderKey({
+        teamId: lineup.team.id,
+        slot: "xi",
+        index,
+        playerId: row.player.id,
+      }),
       name: row.player.name,
       number: row.player.number ?? null,
       position: row.player.pos ?? null,
     })),
-    substitutes: (lineup.substitutes ?? []).map((row) => ({
-      id: `apex:api-football:player:${row.player.id}`,
+    substitutes: (lineup.substitutes ?? []).map((row, index) => ({
+      id: apiFootballPlayerRenderKey({
+        teamId: lineup.team.id,
+        slot: "sub",
+        index,
+        playerId: row.player.id,
+      }),
       name: row.player.name,
       number: row.player.number ?? null,
       position: row.player.pos ?? null,

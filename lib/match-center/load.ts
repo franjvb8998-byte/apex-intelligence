@@ -12,9 +12,17 @@ import {
   enrichMatchCenterContext,
 } from "@/lib/match-center/enrich";
 import { parseTrackedFixtureId } from "@/lib/apex-vision/live/parse-id";
-import { getVisionLiveCoordinator } from "@/lib/apex-vision/live/coordinator";
+import {
+  getVisionLiveCoordinator,
+  peekVisionLiveFixture,
+  shouldKeepLiveTracking,
+} from "@/lib/apex-vision/live";
 import { vendorFixtureId } from "@/lib/match-center/fixture-id";
 import { createMatchCenterFromApexBundle } from "@/lib/match-center/from-data-platform";
+import {
+  buildMatchCenterLiveLiteFromBundle,
+  buildMatchCenterLiveLiteFromVision,
+} from "@/lib/match-center/live-lite";
 import type { MatchCenterData } from "@/lib/match-center/types";
 import {
   createProductDataProvider,
@@ -37,6 +45,7 @@ export type LoadMatchCenterOptions = {
   /**
    * Attach Vision live coordinator state on first paint.
    * Default false so catalogue/budget tests do not spend a live snapshot.
+   * When true, in-play fixtures use Live Lite (no enrichment fan-out).
    */
   includeLiveRefresh?: boolean;
 };
@@ -47,29 +56,113 @@ export function resolveMatchCenterProvider(
   return createProductDataProvider(env);
 }
 
-function repositoriesFor(options: LoadMatchCenterOptions) {
+function repositoriesFor(
+  options: LoadMatchCenterOptions,
+  enrichMatch = true,
+) {
   const env = options.env ?? process.env;
   return createRepositories({
     provider: options.provider,
     env,
-    enrichMatch: true,
+    enrichMatch,
   });
 }
 
 /**
  * Load Match Center from the DAL. Does not use the mock catalogue.
+ *
+ * Live Lite: when `includeLiveRefresh` and the fixture is already known live
+ * (Vision store) or identity `getById` reports live, skip enrichment/odds.
+ * Does not add a live=all discovery call. Unknown non-live fixtures keep the
+ * rich prematch path and do not invoke Vision live transport.
+ *
+ * Identity `GET /fixtures?id=` is an intentional cold-start gate: Vision
+ * `ids=` already carries Live Lite identity, but routing through Vision first
+ * would make every prematch Match Center page hit live transport. Store miss
+ * therefore pays identity + Vision ids snapshot (plus at most one dedicated
+ * events fallback if frozen policy fires).
  */
 export async function getMatchCenterData(
   options: LoadMatchCenterOptions = {},
 ): Promise<MatchCenterData> {
-  const repos = repositoriesFor(options);
   const requested = vendorFixtureId(options.externalMatchId);
-  // Dashboard / Copilot already listed today's catalogue in this request.
+  const liveId = parseTrackedFixtureId(requested);
   const skipCatalogue = options.includeFixtureList === false && Boolean(requested);
+
+  if (options.includeLiveRefresh && liveId != null) {
+    const peeked = peekVisionLiveFixture(liveId);
+    if (peeked && shouldKeepLiveTracking(peeked.statusShort)) {
+      return loadLiveLite({
+        liveId,
+        skipCatalogue,
+        identity: null,
+        fixtures: [],
+      });
+    }
+
+    const identityRepos = repositoriesFor(options, false);
+    const fixtures = skipCatalogue
+      ? []
+      : await identityRepos.fixtures.listCatalogue();
+    const matchId = resolveSelectedFixtureId(fixtures, requested ?? undefined);
+    const identity = await identityRepos.fixtures.getById(matchId);
+    if (identity.match.status === "live") {
+      return loadLiveLite({
+        liveId,
+        skipCatalogue,
+        identity,
+        fixtures,
+      });
+    }
+
+    return loadRichMatchCenter({
+      options,
+      skipCatalogue,
+      fixtures,
+      matchId,
+    });
+  }
+
+  const repos = repositoriesFor(options, true);
   const fixtures = skipCatalogue ? [] : await repos.fixtures.listCatalogue();
   const matchId = resolveSelectedFixtureId(fixtures, requested ?? undefined);
+  return loadRichMatchCenter({
+    options,
+    skipCatalogue,
+    fixtures,
+    matchId,
+  });
+}
 
-  const bundle = await repos.fixtures.getById(matchId);
+async function loadLiveLite(input: {
+  liveId: number;
+  skipCatalogue: boolean;
+  identity: ApexMatchBundle | null;
+  fixtures: ApexMatchBundle[];
+}): Promise<MatchCenterData> {
+  const coordinator = getVisionLiveCoordinator();
+  const view = await coordinator.refreshFixture(input.liveId);
+  const state = peekVisionLiveFixture(input.liveId);
+  const data = input.identity
+    ? buildMatchCenterLiveLiteFromBundle(input.identity, view)
+    : buildMatchCenterLiveLiteFromVision(view, state);
+  data.live.providerLive = view;
+  data.fixtures = input.skipCatalogue
+    ? []
+    : input.identity
+      ? withSelectedFixture(input.fixtures, input.identity)
+      : [];
+  return data;
+}
+
+async function loadRichMatchCenter(input: {
+  options: LoadMatchCenterOptions;
+  skipCatalogue: boolean;
+  fixtures: ApexMatchBundle[];
+  matchId: string;
+}): Promise<MatchCenterData> {
+  const repos = repositoriesFor(input.options, true);
+  const bundle = await repos.fixtures.getById(input.matchId);
   let enrichment;
   try {
     enrichment = await enrichMatchCenterContext(repos, bundle);
@@ -80,9 +173,12 @@ export async function getMatchCenterData(
     enrichment,
     probabilityDiagnosticContext: "match_center",
   });
-  data.fixtures = skipCatalogue ? [] : withSelectedFixture(fixtures, bundle);
-  if (options.includeLiveRefresh && data.match.status === "live") {
-    const liveId = data.live.fixtureId ?? parseTrackedFixtureId(matchId);
+  data.fixtures = input.skipCatalogue
+    ? []
+    : withSelectedFixture(input.fixtures, bundle);
+  data.live.loadMode = "rich";
+  if (input.options.includeLiveRefresh && data.match.status === "live") {
+    const liveId = data.live.fixtureId ?? parseTrackedFixtureId(input.matchId);
     if (liveId != null) {
       data.live.providerLive =
         await getVisionLiveCoordinator().refreshFixture(liveId);

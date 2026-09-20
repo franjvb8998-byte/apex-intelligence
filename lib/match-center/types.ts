@@ -208,6 +208,11 @@ export type MatchCenterPreviewData = {
   };
   dashboard: MatchCenterPreviewDashboard;
   source: "mock" | "intelligence-core" | "data-platform";
+  /**
+   * False when Live Lite omitted PE / odds. UI must not treat zeros as a model.
+   * Default true for the rich prematch path.
+   */
+  probabilitiesAvailable?: boolean;
 };
 
 /** In-play (Live) payload — APEX Vision state, ready for realtime swap. */
@@ -224,6 +229,8 @@ export type MatchCenterLiveData = {
   catalogueLive: boolean;
   /** Provider-backed live view. Null until the coordinator attaches it. */
   providerLive: MatchCenterLiveView | null;
+  /** Live Lite skips enrichment; rich is the prematch/non-live path. */
+  loadMode?: "live-lite" | "rich";
 };
 
 export type MatchCenterMarketVerdict = {
@@ -274,6 +281,12 @@ export type MatchCenterPostData = {
   notes: MatchCenterLearningNote[];
   recommendations: MatchCenterRecommendation[];
   source: "mock" | "learning-engine" | "data-platform";
+  /**
+   * False until the fixture is finished (FT / AET / PEN).
+   * UI must not treat filler Draw / 0% / 0.000 fields as an evaluation.
+   * Default true for mock and finished rich-path payloads.
+   */
+  evaluationAvailable?: boolean;
 };
 
 /**
@@ -292,4 +305,6 @@ export type MatchCenterData = {
   /** Today's (or fallback) fixtures for the selector. */
   fixtures: DashboardMatchSummary[];
   source: "mock" | "platform";
+  /** True when SSR used the Vision Live Lite budget path. */
+  liveLite?: boolean;
 };

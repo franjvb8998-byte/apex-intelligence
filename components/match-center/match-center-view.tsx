@@ -9,11 +9,13 @@ import { PhaseTabs } from "@/components/match-center/phase-tabs";
 import { PreviewPhase } from "@/components/match-center/preview-phase";
 import { LivePhase } from "@/components/match-center/live-phase";
 import { PostPhase } from "@/components/match-center/post-phase";
+import { UnavailableDataCard } from "@/components/app-shell/states";
 import { Card, CardHeader } from "@/components/design-system";
 import type {
   MatchCenterData,
   MatchCenterPhase,
 } from "@/lib/match-center/types";
+import { isMatchCenterPostEvaluated } from "@/lib/match-center/post-evaluation";
 
 type MatchCenterViewProps = {
   data: MatchCenterData;
@@ -50,24 +52,43 @@ export function MatchCenterView({
       />
       <PhaseTabs active={phase} onChange={setPhase} />
 
-      {phase === "preview" && (
-        <PreviewPhase data={data.preview} match={data.match} />
-      )}
+      {phase === "preview" &&
+        (data.liveLite || data.preview.probabilitiesAvailable === false ? (
+          <UnavailableDataCard
+            title={t("liveLitePrematchUnavailable")}
+            description={t("liveLitePrematchUnavailableDescription")}
+          />
+        ) : (
+          <PreviewPhase data={data.preview} match={data.match} />
+        ))}
       {phase === "live" && <LivePhase data={data.live} />}
-      {phase === "post" && (
-        <PostPhase
-          data={data.post}
-          homeShort={data.match.homeTeam.shortName}
-          awayShort={data.match.awayTeam.shortName}
-        />
-      )}
+      {phase === "post" &&
+        (isMatchCenterPostEvaluated(data.post) ? (
+          <PostPhase
+            data={data.post}
+            homeShort={data.match.homeTeam.shortName}
+            awayShort={data.match.awayTeam.shortName}
+          />
+        ) : (
+          <UnavailableDataCard
+            title={t("postEvaluationUnavailable")}
+            description={t("postEvaluationUnavailableDescription")}
+          />
+        ))}
 
       <Card padding="lg">
         <CardHeader
           title={t("aiMatchAnalysis")}
           description={t("aiMatchAnalysisDescription")}
         />
-        <AiMatchAnalysisPanel analysis={data.aiAnalysis} />
+        {data.liveLite ? (
+          <UnavailableDataCard
+            title={t("liveLiteAnalysisUnavailable")}
+            description={t("liveLiteAnalysisUnavailableDescription")}
+          />
+        ) : (
+          <AiMatchAnalysisPanel analysis={data.aiAnalysis} />
+        )}
       </Card>
     </div>
   );

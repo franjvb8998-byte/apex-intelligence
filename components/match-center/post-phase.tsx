@@ -13,6 +13,8 @@ import {
 } from "@/components/design-system";
 import { ExplanationPanel } from "@/components/design-system";
 import type { MatchCenterPostData } from "@/lib/match-center/types";
+import { isMatchCenterPostEvaluated } from "@/lib/match-center/post-evaluation";
+import { UnavailableDataCard } from "@/components/app-shell/states";
 
 type PostPhaseProps = {
   data: MatchCenterPostData;
@@ -26,6 +28,16 @@ type PostPhaseProps = {
 export function PostPhase({ data, homeShort, awayShort }: PostPhaseProps) {
   const t = useTranslations("matchCenter");
   const common = useTranslations("common");
+  if (!isMatchCenterPostEvaluated(data)) {
+    return (
+      <div className="space-y-6" role="tabpanel" aria-labelledby="match-center-tab-post">
+        <UnavailableDataCard
+          title={t("postEvaluationUnavailable")}
+          description={t("postEvaluationUnavailableDescription")}
+        />
+      </div>
+    );
+  }
   const outcomeLabel = {
     home: t("outcomeHome"),
     draw: t("outcomeDraw"),

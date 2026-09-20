@@ -166,15 +166,22 @@ function mapPlayers(
       ...(lineup.substitutes ?? []),
     ];
     for (const row of rows) {
-      const id = String(row.player.id);
+      const providerId = row.player.id;
+      const keyTail =
+        providerId == null
+          ? `slot:${lineup.team.id}:${players.length}`
+          : String(providerId);
       players.push({
-        id: apexIdFor(PROVIDER, "player", id),
+        id: apexIdFor(PROVIDER, "player", keyTail),
         teamId,
         name: row.player.name,
         shirtNumber: row.player.number ?? null,
         position: mapPosition(row.player.pos),
         nationality: null,
-        externalRefs: [{ provider: PROVIDER, externalId: id }],
+        externalRefs:
+          providerId == null
+            ? []
+            : [{ provider: PROVIDER, externalId: String(providerId) }],
       });
     }
   }

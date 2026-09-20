@@ -53,6 +53,7 @@ export {
 export {
   createVisionLiveCoordinator,
   getVisionLiveCoordinator,
+  peekVisionLiveFixture,
   resetVisionLiveCoordinatorForTests,
   setVisionLiveCoordinatorForTests,
   type VisionLiveCoordinator,
@@ -76,6 +77,8 @@ export {
   cardToneFromDetail,
   type LiveFreshness,
   type LiveRefreshSource,
+  type LiveHttpOrigin,
+  liveHttpOriginFromRefreshSource,
   type MatchCenterLiveView,
   type MatchCenterLiveViewEvent,
 } from "@/lib/apex-vision/live/view";

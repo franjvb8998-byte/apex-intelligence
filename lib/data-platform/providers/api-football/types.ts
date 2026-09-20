@@ -102,7 +102,7 @@ export type ApiFootballEvent = {
 
 export type ApiFootballLineupPlayer = {
   player: {
-    id: number;
+    id: number | null;
     name: string;
     number?: number | null;
     pos?: string | null;

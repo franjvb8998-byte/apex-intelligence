@@ -20,6 +20,30 @@ export type LiveFreshness = "LIVE" | "STALE" | "UNAVAILABLE";
 
 export type LiveRefreshSource = "CACHE" | "PROVIDER" | "STORE" | "NONE";
 
+/**
+ * Coordinator-layer refresh classification. Not a wire sniffer.
+ * Does not prove that an external HTTP request occurred or was skipped.
+ *
+ * VISION_STORE_CACHE — store was fresh; snapshot was not invoked.
+ * LIVE_CACHE_REUSE — live HTTP cache key was already populated before snapshot.
+ * PROVIDER_REFRESH — snapshot ran because the store was not fresh; origin vs
+ *   live-cache fill is not observed at the socket.
+ * NONE — no refresh path.
+ */
+export type LiveHttpOrigin =
+  | "VISION_STORE_CACHE"
+  | "LIVE_CACHE_REUSE"
+  | "PROVIDER_REFRESH"
+  | "NONE";
+
+export function liveHttpOriginFromRefreshSource(
+  source: LiveRefreshSource,
+): LiveHttpOrigin {
+  if (source === "CACHE" || source === "STORE") return "VISION_STORE_CACHE";
+  if (source === "PROVIDER") return "PROVIDER_REFRESH";
+  return "NONE";
+}
+
 /** Economy refresh target. */
 export const LIVE_REFRESH_INTERVAL_MS = 60_000;
 /** HT may refresh slower. */
@@ -115,6 +139,7 @@ export type MatchCenterLiveView = {
     refreshSource: LiveRefreshSource;
     refreshPerformed: boolean;
     cacheHit: boolean;
+    httpOrigin: LiveHttpOrigin;
   };
 };
 
@@ -208,6 +233,7 @@ export function unavailableLiveView(
       refreshSource: "NONE",
       refreshPerformed: false,
       cacheHit: false,
+      httpOrigin: "NONE",
     },
   };
 }
@@ -219,6 +245,7 @@ export function toMatchCenterLiveView(input: {
   refreshPerformed: boolean;
   cacheHit: boolean;
   lastProviderRefreshAt: string | null;
+  httpOrigin?: LiveHttpOrigin;
 }): MatchCenterLiveView {
   const { state } = input;
   const kind = classifyLiveStatus(state.statusShort);
@@ -266,6 +293,8 @@ export function toMatchCenterLiveView(input: {
       refreshSource: input.refreshSource,
       refreshPerformed: input.refreshPerformed,
       cacheHit: input.cacheHit,
+      httpOrigin:
+        input.httpOrigin ?? liveHttpOriginFromRefreshSource(input.refreshSource),
     },
   };
 }
