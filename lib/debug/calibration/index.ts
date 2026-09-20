@@ -639,3 +639,22 @@ export {
 } from "@/lib/debug/calibration/prospective/live-execution/live-execution-accounting";
 export { executeLiveCaptureAdapter } from "@/lib/debug/calibration/prospective/live-execution/live-execution-adapter";
 export { recheckFrozenCaptureWindow } from "@/lib/debug/calibration/prospective/live-execution/live-execution-window";
+export {
+  AET_PEN_GOAL_POLICY,
+  ALLOWED_FINAL_STATUSES,
+  PROSPECTIVE_SCORING_PHASE,
+  PROSPECTIVE_SCORING_VERSION,
+  ZERO_SCORING_PROVIDER_CALLS,
+  ScoringRejectedError,
+} from "@/lib/debug/calibration/prospective/scoring/scoring-types";
+export { deriveObservedClass } from "@/lib/debug/calibration/prospective/scoring/scoring-outcome";
+export { scoreCandidateObservation, LOG_LOSS_EPS as PROSPECTIVE_SCORING_LOG_LOSS_EPS } from "@/lib/debug/calibration/prospective/scoring/scoring-metrics";
+export { createSyntheticOutcomeSource } from "@/lib/debug/calibration/prospective/scoring/scoring-transport";
+export { countCapturedProspectiveN, countScoredProspectiveN } from "@/lib/debug/calibration/prospective/scoring/scoring-accounting";
+export { scoreProspectiveBatch } from "@/lib/debug/calibration/prospective/scoring/scoring-runner";
+export {
+  hashCandidateScores,
+  hashOutcome,
+  verifyScoredHashes,
+} from "@/lib/debug/calibration/prospective/scoring/scoring-hash";
+export { persistScoredArtifact, scoredDirectory } from "@/lib/debug/calibration/prospective/scoring/scoring-persist";
