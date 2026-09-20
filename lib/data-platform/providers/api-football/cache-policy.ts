@@ -5,7 +5,12 @@
 import { noteApiFootballCacheEvent } from "@/lib/debug/scanner-profile";
 
 export const API_FOOTBALL_CACHE_TTL_MS = {
-  /** Fixtures lists by date / league (live catalogue). */
+  /**
+   * APEX Vision live transport only (`af:live:*`).
+   * Isolated from the ~10-minute prematch fixture catalogue TTL.
+   */
+  live: 60 * 1000,
+  /** Fixtures lists by date / league (prematch catalogue). */
   fixtures: 10 * 60 * 1000,
   /** Match details (fixture, events, lineups, odds, injuries) while not terminal. */
   match: 10 * 60 * 1000,
@@ -41,6 +46,7 @@ export type ApiFootballCacheLogger = (event: ApiFootballCacheLogEvent) => void;
 
 export function ttlForCacheKey(key: string, overrideTtlMs?: number): number {
   if (overrideTtlMs != null) return overrideTtlMs;
+  if (key.startsWith("af:live:")) return API_FOOTBALL_CACHE_TTL_MS.live;
   if (key.startsWith("af:standings:")) return API_FOOTBALL_CACHE_TTL_MS.standings;
   if (key.startsWith("af:league:")) return API_FOOTBALL_CACHE_TTL_MS.league;
   if (key.startsWith("af:team:") || key.startsWith("af:team-stats:") || key.startsWith("af:player:")) {
@@ -87,6 +93,7 @@ export function ttlForCachedPayload(
   payload: unknown,
   fallbackMs: number,
 ): number {
+  if (key.startsWith("af:live:")) return fallbackMs;
   if (key.startsWith("af:fixtures:")) return fallbackMs;
   if (!key.startsWith("af:fixture:")) return fallbackMs;
   const short = fixtureStatusShort(payload);

@@ -61,6 +61,15 @@ describe("API-Football cache policy", () => {
     expect(ttlForCacheKey("af:standings:39:2023")).toBe(
       API_FOOTBALL_CACHE_TTL_MS.standings,
     );
+    expect(ttlForCacheKey("af:live:leagues:292-293")).toBe(
+      API_FOOTBALL_CACHE_TTL_MS.live,
+    );
+    expect(ttlForCacheKey("af:live:fixtures:1-2")).toBe(
+      API_FOOTBALL_CACHE_TTL_MS.live,
+    );
+    expect(API_FOOTBALL_CACHE_TTL_MS.live).not.toBe(
+      API_FOOTBALL_CACHE_TTL_MS.fixtures,
+    );
   });
 
   it("lengthens TTL only for a terminal single-fixture payload", () => {

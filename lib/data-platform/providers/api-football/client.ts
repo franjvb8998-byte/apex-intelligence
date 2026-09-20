@@ -39,6 +39,13 @@ import {
 } from "@/lib/data-platform/providers/api-football/quota-circuit";
 import { singleFlightApiFootball } from "@/lib/data-platform/providers/api-football/single-flight";
 import { withRetry } from "@/lib/data-platform/providers/api-football/retry";
+import {
+  buildFixtureIdsQuery,
+  buildLiveLeaguesQuery,
+  liveFixturesCacheKey,
+  liveLeaguesCacheKey,
+  LIVE_TRANSPORT_MAX_ATTEMPTS,
+} from "@/lib/data-platform/providers/api-football/live-query";
 import type {
   ApiFootballEventsResponse,
   ApiFootballFixturesResponse,
@@ -79,6 +86,20 @@ export type ApiFootballClient = {
   getFixture(id: string): Promise<ApiFootballFixturesResponse>;
   /** Today's (or any date) matches */
   getFixturesByDate(date: string): Promise<ApiFootballFixturesResponse>;
+  /**
+   * Multi-league live heartbeat. Query is `live=<sorted ids joined by ->`.
+   * Viewer count is not a parameter and must never be sent to the provider.
+   */
+  getLiveFixtures(
+    leagueIds: Array<string | number>,
+  ): Promise<ApiFootballFixturesResponse>;
+  /**
+   * Batched fixture snapshot. Query is `ids=<sorted ids joined by ->`.
+   * Rejects empty, invalid, duplicate-only, or > MAX_FIXTURES_PER_BATCH lists.
+   */
+  getFixturesByIds(
+    fixtureIds: Array<string | number>,
+  ): Promise<ApiFootballFixturesResponse>;
   getFixturesByLeague(
     league: string | number,
     season: string | number,
@@ -103,7 +124,10 @@ export type ApiFootballClient = {
     season: string | number,
   ): Promise<ApiFootballStandingsResponse>;
   getLineups(fixture: string): Promise<ApiFootballLineupsResponse>;
-  getEvents(fixture: string): Promise<ApiFootballEventsResponse>;
+  getEvents(
+    fixture: string,
+    request?: { maxAttempts?: number },
+  ): Promise<ApiFootballEventsResponse>;
   getFixtureStatistics(
     fixture: string,
   ): Promise<ApiFootballFixtureStatisticsResponse>;
@@ -169,6 +193,7 @@ export function createApiFootballClient(
   async function get<T>(
     path: string,
     query?: Record<string, string | number | boolean | undefined | null>,
+    request?: { maxAttempts?: number },
   ): Promise<T> {
     const run = async () => {
       throwIfApiFootballDailyQuotaExhausted();
@@ -201,7 +226,10 @@ export function createApiFootballClient(
     };
 
     if (!retryEnabled) return run();
-    return withRetry(run, { maxAttempts, baseDelayMs });
+    return withRetry(run, {
+      maxAttempts: request?.maxAttempts ?? maxAttempts,
+      baseDelayMs,
+    });
   }
 
   const client: ApiFootballClient = {
@@ -210,6 +238,22 @@ export function createApiFootballClient(
     },
     getFixturesByDate(date) {
       return get<ApiFootballFixturesResponse>("/fixtures", { date });
+    },
+    async getLiveFixtures(leagueIds) {
+      const live = buildLiveLeaguesQuery(leagueIds);
+      return get<ApiFootballFixturesResponse>(
+        "/fixtures",
+        { live },
+        { maxAttempts: LIVE_TRANSPORT_MAX_ATTEMPTS },
+      );
+    },
+    async getFixturesByIds(fixtureIds) {
+      const ids = buildFixtureIdsQuery(fixtureIds);
+      return get<ApiFootballFixturesResponse>(
+        "/fixtures",
+        { ids },
+        { maxAttempts: LIVE_TRANSPORT_MAX_ATTEMPTS },
+      );
     },
     getFixturesByLeague(league, season) {
       return get<ApiFootballFixturesResponse>("/fixtures", {
@@ -251,8 +295,12 @@ export function createApiFootballClient(
     getLineups(fixture) {
       return get<ApiFootballLineupsResponse>("/fixtures/lineups", { fixture });
     },
-    getEvents(fixture) {
-      return get<ApiFootballEventsResponse>("/fixtures/events", { fixture });
+    getEvents(fixture, request) {
+      return get<ApiFootballEventsResponse>(
+        "/fixtures/events",
+        { fixture },
+        request,
+      );
     },
     getFixtureStatistics(fixture) {
       return get<ApiFootballFixtureStatisticsResponse>(
@@ -372,6 +420,14 @@ export function withApiFootballClientCache(
       cached(`af:fixture:${id}`, () => client.getFixture(id)),
     getFixturesByDate: (date) =>
       cached(`af:fixtures:date:${date}`, () => client.getFixturesByDate(date)),
+    getLiveFixtures: (leagueIds) =>
+      cached(liveLeaguesCacheKey(leagueIds), () =>
+        client.getLiveFixtures(leagueIds),
+      ),
+    getFixturesByIds: (fixtureIds) =>
+      cached(liveFixturesCacheKey(fixtureIds), () =>
+        client.getFixturesByIds(fixtureIds),
+      ),
     getFixturesByLeague: (league, season) =>
       cached(`af:fixtures:league:${league}:${season}`, () =>
         client.getFixturesByLeague(league, season),
@@ -396,8 +452,8 @@ export function withApiFootballClientCache(
       ),
     getLineups: (fixture) =>
       cached(`af:lineups:${fixture}`, () => client.getLineups(fixture)),
-    getEvents: (fixture) =>
-      cached(`af:events:${fixture}`, () => client.getEvents(fixture)),
+    getEvents: (fixture, request) =>
+      cached(`af:events:${fixture}`, () => client.getEvents(fixture, request)),
     getFixtureStatistics: (fixture) =>
       cached(`af:fixture-stats:${fixture}`, () =>
         client.getFixtureStatistics(fixture),

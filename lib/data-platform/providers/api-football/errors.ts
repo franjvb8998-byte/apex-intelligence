@@ -13,7 +13,9 @@ export type ApiFootballErrorCode =
   | HttpErrorCode
   | "missing_api_key"
   | "empty_response"
-  | "vendor_error";
+  | "vendor_error"
+  | "invalid_ids"
+  | "batch_limit_exceeded";
 
 export class ApiFootballError extends DataPlatformHttpError {
   readonly apiFootballCode: ApiFootballErrorCode;
@@ -30,7 +32,9 @@ export class ApiFootballError extends DataPlatformHttpError {
         ? "unauthorized"
         : input.code === "empty_response"
           ? "not_found"
-          : input.code === "vendor_error"
+          : input.code === "vendor_error" ||
+              input.code === "invalid_ids" ||
+              input.code === "batch_limit_exceeded"
             ? "provider"
             : input.code;
 

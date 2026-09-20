@@ -89,6 +89,8 @@ export type ApiFootballFixtureItem = {
 };
 
 export type ApiFootballEvent = {
+  /** Vendor does not always expose a stable event id. Preserve when present. */
+  id?: number | null;
   time: { elapsed: number | null; extra?: number | null };
   team: { id: number | null; name?: string | null; logo?: string | null };
   player: { id: number | null; name?: string | null };

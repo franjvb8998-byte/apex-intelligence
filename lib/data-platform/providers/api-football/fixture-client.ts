@@ -15,6 +15,10 @@ import {
   RECORDED_API_FOOTBALL_FIXTURE_ID,
 } from "@/lib/data-platform/providers/api-football/fixtures";
 import type { ApiFootballClient } from "@/lib/data-platform/providers/api-football/client";
+import {
+  buildFixtureIdsQuery,
+  buildLiveLeaguesQuery,
+} from "@/lib/data-platform/providers/api-football/live-query";
 import type {
   ApiFootballEventsResponse,
   ApiFootballLineupsResponse,
@@ -36,6 +40,14 @@ export function createFixtureApiFootballClient(): ApiFootballClient {
     },
     async getFixturesByDate(date) {
       return createRecordedApiFootballTodaysMatchesResponse(date);
+    },
+    async getLiveFixtures(leagueIds) {
+      buildLiveLeaguesQuery(leagueIds);
+      return emptyList<ApiFootballFixturesResponse>("fixtures");
+    },
+    async getFixturesByIds(fixtureIds) {
+      buildFixtureIdsQuery(fixtureIds);
+      return emptyList<ApiFootballFixturesResponse>("fixtures");
     },
     async getFixturesByLeague(league, _season) {
       if (String(league) !== "39") {

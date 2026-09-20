@@ -54,6 +54,18 @@ export {
 } from "@/lib/data-platform/providers/api-football/cache-policy";
 
 export {
+  MAX_FIXTURES_PER_BATCH,
+  LIVE_CACHE_PREFIX,
+  PREMATCH_FIXTURES_CACHE_PREFIX,
+  LIVE_TRANSPORT_MAX_ATTEMPTS,
+  normalizePositiveIntegerIds,
+  buildLiveLeaguesQuery,
+  buildFixtureIdsQuery,
+  liveLeaguesCacheKey,
+  liveFixturesCacheKey,
+} from "@/lib/data-platform/providers/api-football/live-query";
+
+export {
   isApiFootballQuotaError,
   loadUnlessQuota,
   ignoreNonQuotaErrors,
