@@ -607,3 +607,17 @@ export {
 } from "@/lib/debug/calibration/prospective/live/discovery-transport";
 export { persistDiscoveryArtifact } from "@/lib/debug/calibration/prospective/live/discovery-persist";
 export { discoverLiveFixtures } from "@/lib/debug/calibration/prospective/live/discovery-runner";
+export {
+  ACCEPTED_PROSPECTIVE_SEASON,
+  LIVE_CAPTURE_PHASE,
+  LiveCaptureRejectedError,
+} from "@/lib/debug/calibration/prospective/live-capture/live-capture-types";
+export { LIVE_CAPTURE_DEFAULT_DRY_RUN, LIVE_CAPTURE_OPERATIONAL_FACTS, liveCaptureWindow } from "@/lib/debug/calibration/prospective/live-capture/live-capture-config";
+export { assessLiveCaptureReadiness, assertAllFixturesEligible } from "@/lib/debug/calibration/prospective/live-capture/live-capture-eligibility";
+export { siblingMaySupplyEvidence, toProspectiveFixtureInput } from "@/lib/debug/calibration/prospective/live-capture/live-capture-evidence";
+export { orchestrateLiveCapture } from "@/lib/debug/calibration/prospective/live-capture/live-capture-orchestrator";
+export { reportLiveCaptureReadiness } from "@/lib/debug/calibration/prospective/live-capture/live-capture-report";
+export {
+  assertLiveCaptureBatchIntegrity,
+  assertFrozenFingerprintOverride,
+} from "@/lib/debug/calibration/prospective/live-capture/live-capture-integrity";
