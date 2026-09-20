@@ -667,3 +667,15 @@ export {
 export { CAPTURE_BRIDGE_REQUEST_FAMILIES, createSyntheticCaptureBridgeTransport } from "@/lib/debug/calibration/prospective/live-capture-bridge/capture-bridge-transport";
 export { planCaptureBridgeBudget } from "@/lib/debug/calibration/prospective/live-capture-bridge/capture-bridge-budget";
 export { executeCaptureBridge } from "@/lib/debug/calibration/prospective/live-capture-bridge/capture-bridge-runner";
+export {
+  EVALUATION_DEFAULT_MODE,
+  EVALUATION_MODES,
+  EvaluationRejectedError,
+  PROSPECTIVE_EVALUATION_PHASE,
+  PROSPECTIVE_EVALUATION_VERSION,
+  ZERO_EVALUATION_PROVIDER_CALLS,
+} from "@/lib/debug/calibration/prospective/evaluation/evaluation-types";
+export { evaluateProspectiveScores } from "@/lib/debug/calibration/prospective/evaluation/evaluation-runner";
+export { evaluationCheckpointState } from "@/lib/debug/calibration/prospective/evaluation/evaluation-checkpoint";
+export { EVALUATION_ECE_BIN_COUNT } from "@/lib/debug/calibration/prospective/evaluation/evaluation-ece";
+export { inspectScoredArtifact } from "@/lib/debug/calibration/prospective/evaluation/evaluation-integrity";
