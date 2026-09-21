@@ -27,8 +27,15 @@ import {
   type LoadMatchCenterOptions,
 } from "@/lib/match-center/load";
 import { createRepositories } from "@/lib/repositories";
+import { attachPrematchDecisionTicket } from "@/lib/prematch-decision/attach";
+import type { InjectedClock } from "@/lib/prematch-decision/actionability";
+import type { PrematchDecisionTicketStore } from "@/lib/prematch-decision/store";
 
-export type LoadMatchAnalysisOptions = LoadMatchCenterOptions;
+export type LoadMatchAnalysisOptions = LoadMatchCenterOptions & {
+  nowUtc?: InjectedClock;
+  asOf?: InjectedClock;
+  ticketStore?: PrematchDecisionTicketStore;
+};
 
 /**
  * Load Match Analysis for a selected fixture. Does not use getMockMatchAnalysis.
@@ -101,7 +108,7 @@ export async function getMatchAnalysisData(
           ),
           season: bundle.league?.season ?? null,
         });
-  return {
+  const payload = {
     ...stamped,
     decision: scored.decision,
     scoring: scored.scoring,
@@ -116,6 +123,18 @@ export async function getMatchAnalysisData(
       referee: center.match.referee,
     },
   };
+
+  return await attachPrematchDecisionTicket(payload, {
+    leagueId: bundle.league?.id ?? null,
+    season: bundle.league?.season ?? null,
+    odds: extras.odds,
+    injuries: extras.injuries,
+    homeForm: extras.homeForm,
+    awayForm: extras.awayForm,
+    nowUtc: options.nowUtc,
+    asOf: options.asOf,
+    store: options.ticketStore,
+  });
 }
 
 function leaguePositionFromStanding(

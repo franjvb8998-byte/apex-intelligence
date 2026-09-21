@@ -28,6 +28,8 @@ import {
   createProductDataProvider,
   createRepositories,
 } from "@/lib/repositories";
+import { lookupFrozenPrematchDecision } from "@/lib/prematch-decision/attach";
+import type { PrematchDecisionTicketStore } from "@/lib/prematch-decision/store";
 
 export type LoadMatchCenterOptions = {
   /** External fixture id (API-Football fixture id or Apex id). */
@@ -48,6 +50,7 @@ export type LoadMatchCenterOptions = {
    * When true, in-play fixtures use Live Lite (no enrichment fan-out).
    */
   includeLiveRefresh?: boolean;
+  ticketStore?: PrematchDecisionTicketStore;
 };
 
 export function resolveMatchCenterProvider(
@@ -173,6 +176,21 @@ async function loadRichMatchCenter(input: {
     enrichment,
     probabilityDiagnosticContext: "match_center",
   });
+  const fixtureId =
+    vendorFixtureId(data.match.externalId) ??
+    vendorFixtureId(data.match.matchId);
+  if (fixtureId) {
+    const frozen = await lookupFrozenPrematchDecision(
+      fixtureId,
+      input.options.ticketStore,
+    );
+    if (frozen) {
+      data.preview.analysis = {
+        ...data.preview.analysis,
+        frozenPrematchDecision: frozen,
+      };
+    }
+  }
   data.fixtures = input.skipCatalogue
     ? []
     : withSelectedFixture(input.fixtures, bundle);

@@ -830,6 +830,7 @@
     "noValueBet": "Sin value bet por encima del umbral de edge.",
     "noLongerPrematchOpportunity": "Este partido ya no es una oportunidad prepartido activa.",
     "noFrozenPrematchDecision": "No existe una decisión prepartido congelada para este partido.",
+    "frozenPrematchDecisionExists": "Existe una decisión prepartido congelada para este partido.",
     "noClearEdge": "Sin edge claro",
     "valueLine": "Value: {market} · {selection} · edge {edge} pp",
     "oddsShort": "cuota {odds}",
@@ -933,6 +934,7 @@
     "evHint": "P × cuota − 1",
     "noLongerPrematchOpportunity": "Este partido ya no es una oportunidad prepartido activa.",
     "noFrozenPrematchDecision": "No existe una decisión prepartido congelada para este partido.",
+    "frozenPrematchDecisionExists": "Existe una decisión prepartido congelada para este partido.",
     "premium": {
       "heroEyebrow": "Resumen",
       "vs": "VS",

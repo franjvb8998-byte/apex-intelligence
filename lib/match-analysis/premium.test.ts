@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { RECORDED_API_FOOTBALL_FIXTURE_ID } from "@/lib/data-platform";
 import { getMatchAnalysisData } from "@/lib/match-analysis/load";
 import { buildPremiumAnalysis } from "@/lib/match-analysis/premium";
+import { resetPrematchDecisionTicketStoreForTests } from "@/lib/prematch-decision/store";
 
 describe("Match Analysis Premium v3 mapper", () => {
+  beforeEach(() => {
+    resetPrematchDecisionTicketStoreForTests();
+  });
   it("presents published engines without inventing opening odds or unpublished axes", async () => {
     const data = await getMatchAnalysisData({
       env: {},
@@ -28,8 +32,9 @@ describe("Match Analysis Premium v3 mapper", () => {
     expect(premium.recommendations).toEqual([]);
     expect(premium.actionabilityCopyKey).toBe("noFrozenPrematchDecision");
     expect(premium.actionabilityReason).toBe("STATUS_NOT_PREMATCH");
+    expect(premium.hasFrozenPrematchDecision).toBe(false);
     expect(data).not.toHaveProperty("historicalRecommendation");
-    expect(data).not.toHaveProperty("frozenPrematchDecision");
+    expect(data.frozenPrematchDecision).toBeNull();
 
     expect(premium.evidence.total).toBe(6);
     expect(premium.evidence.aligned).toBeGreaterThanOrEqual(0);
@@ -62,6 +67,9 @@ describe("Match Analysis Premium v3 mapper", () => {
 });
 
 describe("Match Analysis current recommendation gate", () => {
+  beforeEach(() => {
+    resetPrematchDecisionTicketStoreForTests();
+  });
   it("does not show a current Value/Strong/Elite bet on a finished fixture", async () => {
     const data = await getMatchAnalysisData({
       env: {},
@@ -73,6 +81,8 @@ describe("Match Analysis current recommendation gate", () => {
     expect(premium.currentlyActionable).toBe(false);
     expect(premium.recommendations).toEqual([]);
     expect(premium.actionabilityCopyKey).toBe("noFrozenPrematchDecision");
+    expect(premium.hasFrozenPrematchDecision).toBe(false);
+    expect(data.frozenPrematchDecision).toBeNull();
     expect(
       ["Value Bet", "Strong Bet", "Elite"].includes(premium.tier) &&
         premium.currentlyActionable,

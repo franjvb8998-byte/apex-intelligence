@@ -830,6 +830,7 @@
     "noValueBet": "No value bet above the edge threshold.",
     "noLongerPrematchOpportunity": "This match is no longer a current prematch opportunity.",
     "noFrozenPrematchDecision": "No frozen prematch decision exists for this fixture.",
+    "frozenPrematchDecisionExists": "A frozen prematch decision exists for this fixture.",
     "noClearEdge": "No clear edge",
     "valueLine": "Value: {market} · {selection} · edge {edge} pp",
     "oddsShort": "odds {odds}",
@@ -933,6 +934,7 @@
     "evHint": "P × odds − 1",
     "noLongerPrematchOpportunity": "This match is no longer a current prematch opportunity.",
     "noFrozenPrematchDecision": "No frozen prematch decision exists for this fixture.",
+    "frozenPrematchDecisionExists": "A frozen prematch decision exists for this fixture.",
     "premium": {
       "heroEyebrow": "Hero Summary",
       "vs": "VS",

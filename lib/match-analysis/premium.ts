@@ -19,6 +19,10 @@ import {
   type PrematchActionabilityReason,
 } from "@/lib/prematch-decision/actionability";
 
+export type PremiumActionabilityCopyKey =
+  | PrematchActionabilityCopyKey
+  | "frozenPrematchDecisionExists";
+
 export type PremiumRecKind =
   | "highestConfidence"
   | "bestValue"
@@ -104,7 +108,8 @@ export type PremiumAnalysis = {
   tier: ScoringTier;
   currentlyActionable: boolean;
   actionabilityReason: PrematchActionabilityReason;
-  actionabilityCopyKey: PrematchActionabilityCopyKey;
+  actionabilityCopyKey: PremiumActionabilityCopyKey;
+  hasFrozenPrematchDecision: boolean;
   score: number;
   confidence: number;
   confidenceBand: "low" | "medium" | "high";
@@ -679,13 +684,20 @@ export function buildPremiumAnalysis(
     asOf: clock?.asOf,
   });
   const currentlyActionable = actionability.isCurrentlyActionable;
+  const frozen = data.frozenPrematchDecision ?? null;
+  const hasFrozenPrematchDecision = frozen != null;
 
   return {
     selectionLabel: scoring.selectionLabel,
     tier: scoring.recommendation.tier,
     currentlyActionable,
     actionabilityReason: actionability.reason,
-    actionabilityCopyKey: prematchActionabilityCopyKey(actionability),
+    actionabilityCopyKey: currentlyActionable
+      ? prematchActionabilityCopyKey(actionability)
+      : hasFrozenPrematchDecision
+        ? "frozenPrematchDecisionExists"
+        : prematchActionabilityCopyKey(actionability),
+    hasFrozenPrematchDecision,
     score: Math.round(scoring.overall),
     confidence: data.decision.confidence.value,
     confidenceBand: data.decision.confidence.band,

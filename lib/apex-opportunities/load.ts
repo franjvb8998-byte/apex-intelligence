@@ -29,6 +29,9 @@ import { fixtureIdFromMatch } from "@/lib/match-center/fixture-id";
 import { createMatchCenterFromApexBundle } from "@/lib/match-center/from-data-platform";
 import type { LoadMatchCenterOptions } from "@/lib/match-center/load";
 import { filterCurrentActionableOpportunities } from "@/lib/prematch-decision/actionability";
+import type { InjectedClock } from "@/lib/prematch-decision/actionability";
+import { captureScannerPrematchTicketFromCenter } from "@/lib/prematch-decision/from-scanner";
+import type { PrematchDecisionTicketStore } from "@/lib/prematch-decision/store";
 import {
   createRepositories,
   ignoreNonQuotaErrors,
@@ -41,6 +44,8 @@ const EVALUATE_CONCURRENCY = 3;
 export type LoadApexOpportunitiesOptions = LoadMatchCenterOptions & {
   /** Sprint 2.5 — removable profile session. Does not change board output. */
   scannerProfile?: ScannerProfileSession;
+  nowUtc?: InjectedClock;
+  ticketStore?: PrematchDecisionTicketStore;
 };
 
 async function attachOdds(
@@ -80,6 +85,10 @@ async function attachOdds(
 async function evaluateBundle(
   repos: ApexRepositories,
   bundle: ApexMatchBundle,
+  capture?: {
+    clock?: InjectedClock;
+    store?: PrematchDecisionTicketStore;
+  },
 ) {
   const withOdds = await measurePhase(
     "attachOdds",
@@ -93,11 +102,21 @@ async function evaluateBundle(
     enrichment: EMPTY_MATCH_CENTER_ENRICHMENT,
     probabilityDiagnosticContext: "scanner",
   });
-  return measurePhaseSync(
+  const row = measurePhaseSync(
     "serialization",
     () => mapOpportunityFromCenter(center),
     { fixtures: 1 },
   );
+  if (row) {
+    await captureScannerPrematchTicketFromCenter({
+      center,
+      leagueId: bundle.league?.id ?? null,
+      season: bundle.league?.season ?? null,
+      clock: capture?.clock,
+      store: capture?.store,
+    });
+  }
+  return row;
 }
 
 type MapPoolResult<R> = {
@@ -168,7 +187,9 @@ function isShareableApexOpportunitiesOptions(
   return (
     options.provider == null &&
     options.env == null &&
-    options.scannerProfile == null
+    options.scannerProfile == null &&
+    options.nowUtc == null &&
+    options.ticketStore == null
   );
 }
 
@@ -213,9 +234,13 @@ async function computeApexOpportunitiesBoard(
   noteScannerFixtureCount(bundles.length);
   noteScannerFixtures("catalogue", bundles.length);
 
+  const capture = {
+    clock: options.nowUtc,
+    store: options.ticketStore,
+  };
   const mapped = await mapPool(bundles, EVALUATE_CONCURRENCY, async (bundle) => {
     try {
-      return await evaluateBundle(repos, bundle);
+      return await evaluateBundle(repos, bundle, capture);
     } catch (error) {
       if (isQuotaError(error)) throw error;
       return null;

@@ -24,6 +24,7 @@ import type {
   MatchCenterH2HMeeting,
   MatchCenterRecentMatch,
 } from "@/lib/match-center/types";
+import type { PrematchDecisionTicket } from "@/lib/prematch-decision/ticket";
 
 export type MatchAnalysisTeam = {
   id: UUID;
@@ -158,4 +159,9 @@ export type MatchAnalysisData = {
     home: TeamIntelligence;
     away: TeamIntelligence;
   };
+  /**
+   * Frozen prematch decision ticket when one was captured before kickoff.
+   * Null when none exists. Never a live or post-match regeneration.
+   */
+  frozenPrematchDecision?: PrematchDecisionTicket | null;
 };
