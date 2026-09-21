@@ -8,6 +8,7 @@ import type {
   OpportunityKickoffWindow,
 } from "@/lib/apex-opportunities/types";
 import { DEFAULT_OPPORTUNITY_FILTERS } from "@/lib/apex-opportunities/types";
+import { isCurrentActionableOpportunity } from "@/lib/prematch-decision/actionability";
 
 export function kickoffWindow(iso: string): OpportunityKickoffWindow {
   const ms = Date.parse(iso);
@@ -40,6 +41,7 @@ export function opportunityPassesFilters(
   row: ApexOpportunity,
   filters: OpportunityFilters,
 ): boolean {
+  if (!isCurrentActionableOpportunity(row)) return false;
   if (row.score < filters.minScore) return false;
   if (row.confidence < filters.minConfidence) return false;
   if (!passesMinEv(row.expectedValue, filters.minEv)) return false;

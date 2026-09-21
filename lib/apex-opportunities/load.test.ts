@@ -33,6 +33,16 @@ async function templateBundle(): Promise<ApexMatchBundle> {
   return createMockDataProvider().getMatch({ matchId: DEMO_MATCH_EXTERNAL_ID });
 }
 
+function vendorShortForApex(status: ApexMatchStatus): string {
+  if (status === "scheduled") return "NS";
+  if (status === "live") return "LIVE";
+  if (status === "finished") return "FT";
+  if (status === "postponed") return "PST";
+  if (status === "cancelled") return "CANC";
+  if (status === "suspended") return "SUSP";
+  return "UNKNOWN";
+}
+
 function catalogueRow(
   template: ApexMatchBundle,
   index: number,
@@ -45,8 +55,9 @@ function catalogueRow(
     match: {
       ...template.match,
       id: `apex:mock:match:${externalId}`,
-      kickoffAt: `2026-08-15T${String(10 + (index % 10)).padStart(2, "0")}:00:00.000Z`,
+      kickoffAt: `2027-08-15T${String(10 + (index % 10)).padStart(2, "0")}:00:00.000Z`,
       status,
+      vendorStatusShort: vendorShortForApex(status),
       externalRefs: [{ provider: "mock", externalId }],
     },
   };
@@ -82,19 +93,15 @@ function oddsProvider(options: {
 }
 
 describe("APEX Opportunities loader", () => {
-  it("evaluates the recorded catalogue through the Decision Engine", async () => {
+  it("does not publish the recorded finished fixture as a current opportunity", async () => {
     const board = await getApexOpportunities({ env: {} });
     expect(board.quotaExhausted).toBe(false);
-    expect(board.analyzed.length).toBeGreaterThanOrEqual(1);
     expect(
       board.analyzed.some((row) => row.fixtureId === RECORDED_API_FOOTBALL_FIXTURE_ID),
+    ).toBe(false);
+    expect(
+      board.analyzed.every((row) => row.vendorStatusShort === "NS"),
     ).toBe(true);
-    const first = board.analyzed[0]!;
-    expect(first.score).toBeGreaterThanOrEqual(0);
-    expect(first.score).toBeLessThanOrEqual(100);
-    expect(first.confidence).toBeGreaterThanOrEqual(0);
-    expect(first.market).toBe("1x2");
-    expect(first.verdict).toBeTruthy();
 
     const quality = filterOpportunities(board.analyzed, DEFAULT_OPPORTUNITY_FILTERS);
     expect(Array.isArray(quality)).toBe(true);
@@ -289,7 +296,7 @@ function cloneCatalogueItem(
     fixture: {
       ...base.fixture,
       id: 7000 + index,
-      date: `2026-08-15T${String(12 + (index % 10)).padStart(2, "0")}:00:00+00:00`,
+      date: `2027-08-15T${String(12 + (index % 10)).padStart(2, "0")}:00:00+00:00`,
       status: {
         long: String(short),
         short,
@@ -350,7 +357,7 @@ function extrasCatalogueProvider(options: {
 }
 
 describe("APEX Opportunities terminal odds skip", () => {
-  it("does not request odds for a finished fixture and keeps the row", async () => {
+  it("does not request odds for a finished fixture and does not publish it as current", async () => {
     const template = await templateBundle();
     const rows = [catalogueRow(template, 0, "finished")];
     const calls: string[] = [];
@@ -364,14 +371,10 @@ describe("APEX Opportunities terminal odds skip", () => {
 
     expect(calls).toEqual([]);
     expect(board.quotaExhausted).toBe(false);
-    expect(board.analyzed.map((row) => row.fixtureId)).toEqual(["scan-0"]);
-    expect(
-      board.analyzed[0]?.bookmakerOdds == null ||
-        board.analyzed[0]?.bookmakerOdds === board.analyzed[0]?.fairOdds,
-    ).toBe(true);
+    expect(board.analyzed).toEqual([]);
   }, 30_000);
 
-  it("still requests odds for scheduled and live fixtures", async () => {
+  it("still requests odds for scheduled and live fixtures but only publishes actionable prematch", async () => {
     const template = await templateBundle();
     const rows = [
       catalogueRow(template, 0, "scheduled"),
@@ -388,8 +391,8 @@ describe("APEX Opportunities terminal odds skip", () => {
 
     expect(calls.sort()).toEqual(["scan-0", "scan-1"]);
     expect(board.quotaExhausted).toBe(false);
-    expect(board.analyzed).toHaveLength(2);
-    expect(board.analyzed.every((row) => row.bookmakerOdds != null)).toBe(true);
+    expect(board.analyzed.map((row) => row.fixtureId)).toEqual(["scan-0"]);
+    expect(board.analyzed[0]?.bookmakerOdds).not.toBeNull();
   }, 30_000);
 
   it("does not skip postponed, suspended, or unknown fixtures", async () => {
@@ -442,7 +445,7 @@ describe("APEX Opportunities terminal odds skip", () => {
     expect(calls).not.toContain("scan-4");
     expect(calls).toContain("scan-5");
     expect(mixed.quotaExhausted).toBe(false);
-    expect(mixed.analyzed).toHaveLength(20);
+    expect(mixed.analyzed).toHaveLength(15);
 
     for (const control of complete.analyzed) {
       const kept = mixed.analyzed.find((row) => row.fixtureId === control.fixtureId);

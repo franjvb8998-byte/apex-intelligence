@@ -28,6 +28,7 @@ import { EMPTY_MATCH_CENTER_ENRICHMENT } from "@/lib/match-center/enrich";
 import { fixtureIdFromMatch } from "@/lib/match-center/fixture-id";
 import { createMatchCenterFromApexBundle } from "@/lib/match-center/from-data-platform";
 import type { LoadMatchCenterOptions } from "@/lib/match-center/load";
+import { filterCurrentActionableOpportunities } from "@/lib/prematch-decision/actionability";
 import {
   createRepositories,
   ignoreNonQuotaErrors,
@@ -223,11 +224,13 @@ async function computeApexOpportunitiesBoard(
 
   if (mapped.quotaExhausted) noteScannerQuotaExhausted();
 
+  const analyzed = filterCurrentActionableOpportunities(
+    mapped.items.filter((row): row is NonNullable<typeof row> => row != null),
+  );
+
   return {
     generatedAt: new Date().toISOString(),
-    analyzed: mapped.items.filter(
-      (row): row is NonNullable<typeof row> => row != null,
-    ),
+    analyzed,
     quotaExhausted: mapped.quotaExhausted,
   };
 }

@@ -444,7 +444,8 @@ export function mapApiFootballFixtureItemToApexBundle(
   const leagueId = apexIdFor(PROVIDER, "league", String(item.league.id));
   const ingestedAt = envelope.fetchedAt;
   const updatedAt = nowIso();
-  const status = mapApiFootballStatus(item.fixture.status.short);
+  const vendorStatusShort = item.fixture.status.short;
+  const status = mapApiFootballStatus(vendorStatusShort);
   const kickoffAt = new Date(item.fixture.date).toISOString();
 
   const players = mapPlayers(item.lineups, leagueId);
@@ -459,6 +460,7 @@ export function mapApiFootballFixtureItemToApexBundle(
       awayTeamId,
       kickoffAt,
       status,
+      vendorStatusShort,
       score: {
         home: item.goals.home,
         away: item.goals.away,

@@ -4,6 +4,7 @@
 
 import type { ApexOpportunity } from "@/lib/apex-opportunities/types";
 import { isStrongOrElite, scannerRecommendation } from "@/lib/opportunity-scanner/recommend";
+import { filterCurrentActionableOpportunities } from "@/lib/prematch-decision/actionability";
 
 export type ScannerRankingKind =
   | "top10"
@@ -27,15 +28,16 @@ export type ScannerDeskStats = {
 };
 
 export function scannerDeskStats(rows: ApexOpportunity[]): ScannerDeskStats {
-  const strong = rows.filter(isStrongOrElite).length;
-  const value = rows.filter(
+  const actionable = filterCurrentActionableOpportunities(rows);
+  const strong = actionable.filter(isStrongOrElite).length;
+  const value = actionable.filter(
     (row) => scannerRecommendation(row) === "Value Bet",
   ).length;
   const conf =
-    rows.length === 0
+    actionable.length === 0
       ? null
-      : rows.reduce((sum, row) => sum + row.confidence, 0) / rows.length;
-  const evs = rows
+      : actionable.reduce((sum, row) => sum + row.confidence, 0) / actionable.length;
+  const evs = actionable
     .map((row) => row.expectedValue)
     .filter((value): value is number => value != null && Number.isFinite(value));
   const averageEv =
@@ -43,7 +45,7 @@ export function scannerDeskStats(rows: ApexOpportunity[]): ScannerDeskStats {
       ? null
       : evs.reduce((sum, value) => sum + value, 0) / evs.length;
   return {
-    today: rows.length,
+    today: actionable.length,
     strong,
     value,
     averageConfidence: conf,
@@ -59,16 +61,17 @@ function byScore(a: ApexOpportunity, b: ApexOpportunity): number {
 export function buildScannerRankings(
   analyzed: ApexOpportunity[],
 ): ScannerRankingBoard[] {
-  const live = analyzed.filter((row) => row.verdict !== "avoid" || (row.expectedValue ?? 0) > 0);
+  const actionable = filterCurrentActionableOpportunities(analyzed);
+  const live = actionable.filter((row) => row.verdict !== "avoid" || (row.expectedValue ?? 0) > 0);
 
   return [
     {
       kind: "top10",
-      items: [...analyzed].sort(byScore).slice(0, LIMIT),
+      items: [...actionable].sort(byScore).slice(0, LIMIT),
     },
     {
       kind: "value",
-      items: analyzed
+      items: actionable
         .filter((row) => scannerRecommendation(row) === "Value Bet" || (row.expectedValue ?? 0) > 0)
         .sort(
           (a, b) =>
@@ -79,7 +82,7 @@ export function buildScannerRankings(
     },
     {
       kind: "confidence",
-      items: analyzed
+      items: actionable
         .filter((row) => row.confidence >= 65)
         .sort((a, b) => b.confidence - a.confidence || byScore(a, b))
         .slice(0, LIMIT),

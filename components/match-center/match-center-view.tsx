@@ -93,7 +93,7 @@ export function MatchCenterView({
             description={t("liveLiteAnalysisUnavailableDescription")}
           />
         ) : (
-          <AiMatchAnalysisPanel analysis={data.aiAnalysis} />
+          <AiMatchAnalysisPanel analysis={data.aiAnalysis} match={data.match} />
         )}
       </Card>
     </div>

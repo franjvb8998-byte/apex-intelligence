@@ -106,7 +106,21 @@ function Section({
 }
 
 function RecommendationCenter({ premium }: { premium: PremiumAnalysis }) {
+  const t = useTranslations("matchAnalysis");
   const p = useTranslations("matchAnalysis.premium");
+  if (!premium.currentlyActionable) {
+    return (
+      <Section
+        index="02"
+        title={p("recCenter")}
+        hint={p("recCenterHint")}
+      >
+        <p className="text-sm leading-relaxed text-[var(--apex-fg-muted)]">
+          {t(premium.actionabilityCopyKey)}
+        </p>
+      </Section>
+    );
+  }
   const featured = REC_KIND_ORDER.filter((kind) => kind !== "avoid").flatMap(
     (kind) => premium.recommendations.filter((row) => row.kind === kind),
   );

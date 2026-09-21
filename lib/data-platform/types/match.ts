@@ -47,6 +47,12 @@ export type ApexMatch = {
   awayTeamId: ApexId;
   kickoffAt: string;
   status: ApexMatchStatus;
+  /**
+   * Vendor lifecycle short (API-Football `status.short`) when known.
+   * Required to distinguish NS from TBD. Product actionability uses this
+   * field; it does not change Vision live classification.
+   */
+  vendorStatusShort?: string | null;
   score: ApexScore;
   venue: ApexVenue | null;
   referee?: string | null;

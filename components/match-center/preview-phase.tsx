@@ -178,7 +178,7 @@ export function PreviewPhase({ data, match }: PreviewPhaseProps) {
         </div>
 
         <div className="space-y-6 lg:col-span-2">
-          <RecommendationCard dashboard={dashboard} />
+          <RecommendationCard dashboard={dashboard} match={match} />
 
           <Card className="flex flex-col items-center gap-4">
             <CardHeader

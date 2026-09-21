@@ -48,6 +48,7 @@ function cloneItem(index: number, short: ApiFootballStatusShort): ApiFootballFix
     fixture: {
       ...base.fixture,
       id: 8000 + index,
+      date: short === "NS" ? "2027-08-15T15:00:00+00:00" : base.fixture.date,
       status: { long: String(short), short, elapsed: short === "NS" ? null : 90 },
     },
   };
@@ -127,7 +128,7 @@ describe("Sprint 5A.8 call-budget characterization", () => {
     const board = await getApexOpportunities({
       provider: countingProvider({ items: mixed20, calls: coldCalls }),
     });
-    expect(board.analyzed).toHaveLength(20);
+    expect(board.analyzed).toHaveLength(15);
     expect(coldCalls.filter((name) => name === "getFixturesByDate")).toHaveLength(1);
     expect(coldCalls.filter((name) => name === "getFixtureOdds")).toHaveLength(15);
     expect(

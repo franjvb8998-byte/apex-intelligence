@@ -38,6 +38,7 @@ export type PreviewBuildContext = {
   leagueName: string;
   kickoffAt: string;
   status: MatchAnalysisData["status"];
+  vendorStatusShort?: string | null;
   homeTeam: MatchCenterTeam;
   awayTeam: MatchCenterTeam;
   eloInput: TeamEloInput;
@@ -91,6 +92,7 @@ export function mapHybridToMatchAnalysis(
     leagueName: context.leagueName,
     kickoffAt: context.kickoffAt,
     status: context.status,
+    vendorStatusShort: context.vendorStatusShort ?? null,
     homeTeam: context.homeTeam,
     awayTeam: context.awayTeam,
     oneXTwo: result.oneXTwo,

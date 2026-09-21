@@ -55,6 +55,8 @@ async function fixtureBundle(ids: {
     match: {
       ...bundle.match,
       id: "apex:api-football:match:1639552",
+      kickoffAt: "2027-08-15T18:00:00.000Z",
+      vendorStatusShort: "NS",
       externalRefs: [{ provider: "api-football", externalId: "1639552" }],
     },
   };

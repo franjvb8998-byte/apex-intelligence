@@ -24,15 +24,12 @@ describe("Match Analysis Premium v3 mapper", () => {
     expect(premium.bookmakerOdds).toBe(data.decision.value.impliedOdds);
     expect(premium.summary.length).toBeGreaterThan(40);
 
-    expect(premium.recommendations.some((row) => row.kind === "highestConfidence")).toBe(
-      true,
-    );
-    expect(
-      premium.recommendations.filter((row) => row.kind === "bestValue").length,
-    ).toBeGreaterThanOrEqual(premium.expectedValue != null && premium.expectedValue > 0 ? 1 : 0);
-    expect(premium.recommendations.every((row) => row.explanation.length > 12)).toBe(
-      true,
-    );
+    expect(premium.currentlyActionable).toBe(false);
+    expect(premium.recommendations).toEqual([]);
+    expect(premium.actionabilityCopyKey).toBe("noFrozenPrematchDecision");
+    expect(premium.actionabilityReason).toBe("STATUS_NOT_PREMATCH");
+    expect(data).not.toHaveProperty("historicalRecommendation");
+    expect(data).not.toHaveProperty("frozenPrematchDecision");
 
     expect(premium.evidence.total).toBe(6);
     expect(premium.evidence.aligned).toBeGreaterThanOrEqual(0);
@@ -61,5 +58,24 @@ describe("Match Analysis Premium v3 mapper", () => {
         );
       }
     }
+  });
+});
+
+describe("Match Analysis current recommendation gate", () => {
+  it("does not show a current Value/Strong/Elite bet on a finished fixture", async () => {
+    const data = await getMatchAnalysisData({
+      env: {},
+      externalMatchId: RECORDED_API_FOOTBALL_FIXTURE_ID,
+    });
+    const premium = buildPremiumAnalysis(data);
+    expect(data.vendorStatusShort).toBe("FT");
+    expect(data.status).toBe("finished");
+    expect(premium.currentlyActionable).toBe(false);
+    expect(premium.recommendations).toEqual([]);
+    expect(premium.actionabilityCopyKey).toBe("noFrozenPrematchDecision");
+    expect(
+      ["Value Bet", "Strong Bet", "Elite"].includes(premium.tier) &&
+        premium.currentlyActionable,
+    ).toBe(false);
   });
 });

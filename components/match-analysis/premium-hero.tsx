@@ -20,6 +20,8 @@ type PremiumHeroProps = {
   premium: PremiumAnalysis;
 };
 
+const CURRENT_BETTING_TIERS = new Set(["Value Bet", "Strong Bet", "Elite"]);
+
 const riskTone: Record<ApexRiskBand, ApexTone> = {
   low: "accent",
   medium: "warning",
@@ -114,12 +116,25 @@ export function PremiumHero({ data, premium }: PremiumHeroProps) {
           <span className="font-mono text-2xl font-bold tracking-[0.35em] text-[var(--apex-fg-subtle)] sm:text-3xl">
             {p("vs")}
           </span>
-          <Badge tone={SCORING_BADGE_TONE[premium.tier]} size="md">
-            {premium.tier}
-          </Badge>
-          <p className="max-w-[16rem] text-center text-sm text-[var(--apex-fg-muted)]">
-            {premium.selectionLabel}
-          </p>
+          {premium.currentlyActionable ? (
+            <>
+              <Badge tone={SCORING_BADGE_TONE[premium.tier]} size="md">
+                {premium.tier}
+              </Badge>
+              <p className="max-w-[16rem] text-center text-sm text-[var(--apex-fg-muted)]">
+                {premium.selectionLabel}
+              </p>
+            </>
+          ) : (
+            <>
+              <Badge tone="neutral" size="md">
+                {p("notCurrentOpportunity")}
+              </Badge>
+              <p className="max-w-[22rem] text-center text-sm text-[var(--apex-fg-muted)]">
+                {t(premium.actionabilityCopyKey)}
+              </p>
+            </>
+          )}
         </div>
         <TeamBlock
           name={data.awayTeam.name}
@@ -166,9 +181,21 @@ export function PremiumHero({ data, premium }: PremiumHeroProps) {
           />
           <RatingStat
             label={p("opportunity")}
-            value={premium.tier}
-            hint={premium.selectionLabel}
-            tone={SCORING_BADGE_TONE[premium.tier]}
+            value={
+              premium.currentlyActionable && CURRENT_BETTING_TIERS.has(premium.tier)
+                ? premium.tier
+                : p("notCurrentOpportunity")
+            }
+            hint={
+              premium.currentlyActionable
+                ? premium.selectionLabel
+                : t(premium.actionabilityCopyKey)
+            }
+            tone={
+              premium.currentlyActionable
+                ? SCORING_BADGE_TONE[premium.tier]
+                : "neutral"
+            }
           />
         </div>
       </div>

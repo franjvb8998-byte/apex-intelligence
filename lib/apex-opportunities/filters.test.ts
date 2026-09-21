@@ -35,7 +35,7 @@ describe("APEX Opportunities filters", () => {
     stars: 2,
     predicted: "away",
     selectionLabel: "Chelsea",
-    kickoffAt: "2026-08-27T20:00:00.000Z",
+    kickoffAt: "2027-08-27T20:00:00.000Z",
     leagueName: "La Liga",
     bookmakerOdds: 3.4,
   });

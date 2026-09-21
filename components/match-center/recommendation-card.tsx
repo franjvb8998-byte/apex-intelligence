@@ -2,7 +2,11 @@
 
 import { useTranslations } from "next-intl";
 import { Badge, Card, CardHeader } from "@/components/design-system";
-import type { MatchCenterPreviewDashboard } from "@/lib/match-center/types";
+import type {
+  MatchCenterMeta,
+  MatchCenterPreviewDashboard,
+} from "@/lib/match-center/types";
+import { presentMatchCenterBettingSurfaces } from "@/lib/prematch-decision/actionability";
 
 const actionTone = {
   bet: "accent" as const,
@@ -14,10 +18,25 @@ const actionTone = {
 
 type RecommendationCardProps = {
   dashboard: MatchCenterPreviewDashboard;
+  match: MatchCenterMeta;
 };
 
-export function RecommendationCard({ dashboard }: RecommendationCardProps) {
+export function RecommendationCard({ dashboard, match }: RecommendationCardProps) {
   const t = useTranslations("matchCenter");
+  const presented = presentMatchCenterBettingSurfaces(match, dashboard);
+  if (!presented.currentlyActionable) {
+    return (
+      <Card>
+        <CardHeader
+          title={t("recommendationTitle")}
+          description={t("actionWatch")}
+        />
+        <p className="text-base font-semibold text-[var(--apex-fg)]">
+          {t(presented.copyKey)}
+        </p>
+      </Card>
+    );
+  }
   const { recommendation, valueBet } = dashboard;
   const actionLabel = {
     bet: t("actionBet"),

@@ -96,6 +96,8 @@ export type MatchAnalysisData = {
   leagueName: string;
   kickoffAt: string;
   status: "scheduled" | "live" | "finished";
+  /** Vendor `status.short` when known. Distinguishes NS from TBD. */
+  vendorStatusShort?: string | null;
   homeTeam: MatchAnalysisTeam;
   awayTeam: MatchAnalysisTeam;
   oneXTwo: OutcomeProbability;

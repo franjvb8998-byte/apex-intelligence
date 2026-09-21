@@ -60,6 +60,7 @@ export function mapOpportunityFromCenter(
   return mapOpportunityFromDecision({
     fixtureId,
     kickoffAt: data.match.kickoffAt,
+    vendorStatusShort: data.match.vendorStatusShort ?? null,
     leagueName: data.match.leagueName,
     home: {
       name: data.match.homeTeam.name,
@@ -84,6 +85,7 @@ export function mapOpportunityFromCenter(
 export function mapOpportunityFromDecision(input: {
   fixtureId: string;
   kickoffAt: string;
+  vendorStatusShort?: string | null;
   leagueName: string;
   home: ApexOpportunity["home"];
   away: ApexOpportunity["away"];
@@ -99,6 +101,7 @@ export function mapOpportunityFromDecision(input: {
   const row: ApexOpportunity = {
     fixtureId: input.fixtureId,
     kickoffAt: input.kickoffAt,
+    vendorStatusShort: input.vendorStatusShort ?? null,
     leagueName: input.leagueName,
     country: countryFromLeague(input.leagueName, input.country),
     market: "1x2",

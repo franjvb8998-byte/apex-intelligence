@@ -10,6 +10,8 @@ import {
 import { ExplanationPanel as DsExplanationPanel } from "@/components/design-system";
 import { ExplainablePredictionPanel } from "@/components/explainable-ai";
 import type { MatchAnalysis } from "@/lib/match-analysis/analysis-types";
+import type { MatchCenterMeta } from "@/lib/match-center/types";
+import { presentMatchCenterBettingSurfaces } from "@/lib/prematch-decision/actionability";
 
 const riskTone = {
   low: "accent" as const,
@@ -19,17 +21,21 @@ const riskTone = {
 
 type AiMatchAnalysisPanelProps = {
   analysis: MatchAnalysis;
+  match: MatchCenterMeta;
 };
 
 /**
  * AI Match Analysis panel — Design System only.
  * Displays Sprint 8 MatchAnalysis + Sprint 10 Explainable AI (rules, no OpenAI).
  */
-export function AiMatchAnalysisPanel({ analysis }: AiMatchAnalysisPanelProps) {
+export function AiMatchAnalysisPanel({ analysis, match }: AiMatchAnalysisPanelProps) {
   const t = useTranslations("matchCenter");
   const common = useTranslations("common");
   const { prediction, confidence, riskLevel, expectedGoals, recommendation } =
     analysis;
+  const presented = presentMatchCenterBettingSurfaces(match, {
+    valueBet: analysis.valueBet,
+  });
   const actionLabel = {
     bet: t("actionBet"),
     pass: t("actionPass"),
@@ -131,53 +137,75 @@ export function AiMatchAnalysisPanel({ analysis }: AiMatchAnalysisPanelProps) {
           <Card>
             <CardHeader
               title={t("recommendation")}
-              description={actionLabel[recommendation.action]}
-              action={<Badge tone="accent">{recommendation.priority}</Badge>}
+              description={
+                presented.showCurrentRecommendation
+                  ? actionLabel[recommendation.action]
+                  : t("actionWatch")
+              }
+              action={
+                presented.showCurrentRecommendation ? (
+                  <Badge tone="accent">{recommendation.priority}</Badge>
+                ) : null
+              }
             />
-            <p className="text-sm font-medium text-[var(--apex-fg)]">
-              {recommendation.title}
-            </p>
-            <p className="mt-2 text-xs text-[var(--apex-fg-muted)]">
-              {recommendation.rationale}
-            </p>
+            {presented.showCurrentRecommendation ? (
+              <>
+                <p className="text-sm font-medium text-[var(--apex-fg)]">
+                  {recommendation.title}
+                </p>
+                <p className="mt-2 text-xs text-[var(--apex-fg-muted)]">
+                  {recommendation.rationale}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm font-medium text-[var(--apex-fg)]">
+                {t(presented.copyKey)}
+              </p>
+            )}
           </Card>
 
           <Card>
             <CardHeader
-              title="Value Bet"
+              title={
+                presented.currentlyActionable ? "Value Bet" : t("recommendationTitle")
+              }
               description={
-                analysis.valueBet
-                  ? `${analysis.valueBet.market} · ${analysis.valueBet.selection}`
-                  : t("noClearEdge")
+                presented.valueBet
+                  ? `${presented.valueBet.market} · ${presented.valueBet.selection}`
+                  : presented.currentlyActionable
+                    ? t("noClearEdge")
+                    : t(presented.copyKey)
               }
             />
-            {analysis.valueBet ? (
+            {presented.valueBet ? (
               <div className="space-y-2 text-sm text-[var(--apex-fg-muted)]">
                 <p>
                   {t("modelPct", {
-                    pct: (analysis.valueBet.modelProbability * 100).toFixed(0),
+                    pct: (presented.valueBet.modelProbability * 100).toFixed(0),
                   })}
-                  {analysis.valueBet.impliedProbability != null && (
+                  {presented.valueBet.impliedProbability != null && (
                     <>
                       {" "}
                       · {t("implied")}{" "}
-                      {(analysis.valueBet.impliedProbability * 100).toFixed(0)}%
+                      {(presented.valueBet.impliedProbability * 100).toFixed(0)}%
                     </>
                   )}
                 </p>
                 <p>
                   Edge{" "}
                   <span className="text-[var(--apex-accent)]">
-                    {(analysis.valueBet.edge * 100).toFixed(1)} pp
+                    {(presented.valueBet.edge * 100).toFixed(1)} pp
                   </span>
                 </p>
-                {analysis.valueBet.explanation && (
-                  <p className="text-xs">{analysis.valueBet.explanation}</p>
+                {presented.valueBet.explanation && (
+                  <p className="text-xs">{presented.valueBet.explanation}</p>
                 )}
               </div>
             ) : (
               <p className="text-sm text-[var(--apex-fg-muted)]">
-                {t("noValueBet")}
+                {presented.currentlyActionable
+                  ? t("noValueBet")
+                  : t(presented.copyKey)}
               </p>
             )}
           </Card>

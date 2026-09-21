@@ -137,6 +137,20 @@ export function mapFixtureToApexBundle(
       awayTeamId,
       kickoffAt: fixture.match.kickoffAt,
       status: fixture.match.status,
+      vendorStatusShort:
+        fixture.match.status === "scheduled"
+          ? "NS"
+          : fixture.match.status === "live"
+            ? "LIVE"
+            : fixture.match.status === "finished"
+              ? "FT"
+              : fixture.match.status === "postponed"
+                ? "PST"
+                : fixture.match.status === "cancelled"
+                  ? "CANC"
+                  : fixture.match.status === "suspended"
+                    ? "SUSP"
+                    : "UNKNOWN",
       score: {
         home: fixture.match.score.home,
         away: fixture.match.score.away,

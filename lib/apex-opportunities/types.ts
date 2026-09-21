@@ -29,6 +29,8 @@ export type ApexOpportunityTeam = {
 export type ApexOpportunity = {
   fixtureId: string;
   kickoffAt: string;
+  /** Vendor `status.short`. Missing/unknown fails closed for actionability. */
+  vendorStatusShort?: string | null;
   leagueName: string;
   country: string | null;
   market: OpportunityMarket;

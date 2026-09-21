@@ -11,6 +11,7 @@ import type {
   OpportunityRiskFilter,
 } from "@/lib/apex-opportunities/types";
 import type { ScoringTier } from "@/lib/scoring-engine/types";
+import { isCurrentActionableOpportunity } from "@/lib/prematch-decision/actionability";
 
 export type DiscoveryPriorityLabel =
   | "Elite Opportunity"
@@ -145,6 +146,7 @@ export function discoveryPassesFilters(
   filters: DiscoveryFilters,
   watchlistIds: string[] = [],
 ): boolean {
+  if (!isCurrentActionableOpportunity(row)) return false;
   if (row.score < filters.minScore) return false;
   if (filters.league !== "all" && row.leagueName !== filters.league) return false;
   if (filters.market !== "all" && row.market !== filters.market) return false;

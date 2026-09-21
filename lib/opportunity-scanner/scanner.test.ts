@@ -8,6 +8,7 @@ import {
 import { applyScannerMode } from "@/lib/opportunity-scanner/modes";
 import { scannerRecommendation, isStrongOrElite } from "@/lib/opportunity-scanner/recommend";
 import { buildScannerRankings } from "@/lib/opportunity-scanner/ranking";
+import { filterCurrentActionableOpportunities } from "@/lib/prematch-decision/actionability";
 import { countryFromLeague } from "@/lib/opportunity-scanner/country";
 import { parseComboSlip, serializeComboSlip } from "@/lib/smart-combos/slip-storage";
 import {
@@ -323,5 +324,57 @@ describe("Opportunity Scanner briefing and desk UX", () => {
         risk: "low",
       }).titleKey,
     ).toBe("filteredByRisk");
+  });
+});
+
+describe("Opportunity Scanner actionability gate", () => {
+  it("cannot publish a non-actionable row as a current opportunity", () => {
+    const current = opportunityFixture({
+      fixtureId: "ns-future",
+      vendorStatusShort: "NS",
+    });
+    const finished = opportunityFixture({
+      fixtureId: "ft",
+      vendorStatusShort: "FT",
+      kickoffAt: "2026-09-21T10:00:00.000Z",
+      recommendation: "Value Bet",
+      verdictLabel: "Value Bet",
+    });
+    const live = opportunityFixture({
+      fixtureId: "live",
+      vendorStatusShort: "1H",
+      kickoffAt: "2026-09-21T10:00:00.000Z",
+      recommendation: "Elite",
+      verdictLabel: "Elite",
+    });
+    const staleNs = opportunityFixture({
+      fixtureId: "stale",
+      vendorStatusShort: "NS",
+      kickoffAt: "2026-09-21T11:00:00.000Z",
+      recommendation: "Strong Bet",
+      verdictLabel: "Strong Bet",
+    });
+
+    const published = filterCurrentActionableOpportunities([
+      current,
+      finished,
+      live,
+      staleNs,
+    ]);
+    expect(published.map((row) => row.fixtureId)).toEqual(["ns-future"]);
+
+    const ranked = buildScannerRankings([current, finished, live, staleNs]);
+    const ids = ranked.flatMap((board) => board.items.map((row) => row.fixtureId));
+    expect(ids).toContain("ns-future");
+    expect(ids).not.toContain("ft");
+    expect(ids).not.toContain("live");
+    expect(ids).not.toContain("stale");
+
+    const filtered = filterScanner(
+      [current, finished, live, staleNs],
+      DEFAULT_SCANNER_FILTERS,
+      "ranked",
+    );
+    expect(filtered.map((row) => row.fixtureId)).toEqual(["ns-future"]);
   });
 });

@@ -45,6 +45,8 @@ export type MatchCenterMeta = {
   externalId?: string | null;
   leagueName: string;
   kickoffAt: string;
+  /** Vendor `status.short` when known. Distinguishes NS from TBD. */
+  vendorStatusShort?: string | null;
   /** Canonical match status. PST/CANC/ABD/SUSP are not scheduled. */
   status:
     | "scheduled"

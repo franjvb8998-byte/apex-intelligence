@@ -11,6 +11,14 @@ import type { PublishedScore } from "@/lib/team-intelligence/types";
 import type { TeamIntelligence } from "@/lib/team-intelligence/models";
 import type { MatchAnalysisData } from "@/lib/match-analysis/types";
 
+import {
+  evaluatePrematchActionability,
+  prematchActionabilityCopyKey,
+  type InjectedClock,
+  type PrematchActionabilityCopyKey,
+  type PrematchActionabilityReason,
+} from "@/lib/prematch-decision/actionability";
+
 export type PremiumRecKind =
   | "highestConfidence"
   | "bestValue"
@@ -94,6 +102,9 @@ export type PremiumEvidenceSignal = {
 export type PremiumAnalysis = {
   selectionLabel: string;
   tier: ScoringTier;
+  currentlyActionable: boolean;
+  actionabilityReason: PrematchActionabilityReason;
+  actionabilityCopyKey: PrematchActionabilityCopyKey;
   score: number;
   confidence: number;
   confidenceBand: "low" | "medium" | "high";
@@ -633,7 +644,10 @@ function buildEvidence(data: MatchAnalysisData): PremiumAnalysis["evidence"] {
   return { signals, aligned, total: signals.length };
 }
 
-export function buildPremiumAnalysis(data: MatchAnalysisData): PremiumAnalysis {
+export function buildPremiumAnalysis(
+  data: MatchAnalysisData,
+  clock?: { nowUtc?: InjectedClock; asOf?: InjectedClock },
+): PremiumAnalysis {
   const scoring =
     data.scoring ??
     ({
@@ -658,10 +672,20 @@ export function buildPremiumAnalysis(data: MatchAnalysisData): PremiumAnalysis {
       },
     });
   const briefing = buildApexBrainBriefing(data.decision, scoring);
+  const actionability = evaluatePrematchActionability({
+    vendorStatusShort: data.vendorStatusShort,
+    kickoffUtc: data.kickoffAt,
+    nowUtc: clock?.nowUtc,
+    asOf: clock?.asOf,
+  });
+  const currentlyActionable = actionability.isCurrentlyActionable;
 
   return {
     selectionLabel: scoring.selectionLabel,
     tier: scoring.recommendation.tier,
+    currentlyActionable,
+    actionabilityReason: actionability.reason,
+    actionabilityCopyKey: prematchActionabilityCopyKey(actionability),
     score: Math.round(scoring.overall),
     confidence: data.decision.confidence.value,
     confidenceBand: data.decision.confidence.band,
@@ -672,7 +696,7 @@ export function buildPremiumAnalysis(data: MatchAnalysisData): PremiumAnalysis {
     fairOdds: data.decision.value.fairOdds,
     bookmakerOdds: data.decision.value.impliedOdds,
     bookmaker: data.report.market.bookmaker,
-    recommendations: buildRecommendations(data),
+    recommendations: currentlyActionable ? buildRecommendations(data) : [],
     contributions: buildContributions(data),
     comparison: buildComparison(data),
     context: buildContext(data),

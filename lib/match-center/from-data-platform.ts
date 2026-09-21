@@ -600,6 +600,7 @@ export function createMatchCenterFromApexBundle(
     leagueName: bundle.league?.name ?? "Football",
     kickoffAt: bundle.match.kickoffAt,
     status,
+    vendorStatusShort: bundle.match.vendorStatusShort ?? null,
     homeTeam,
     awayTeam,
     venue: bundle.match.venue
@@ -667,6 +668,7 @@ export function createMatchCenterFromApexBundle(
     kickoffAt: match.kickoffAt,
     status:
       status === "finished" ? "finished" : status === "live" ? "live" : "scheduled",
+    vendorStatusShort: match.vendorStatusShort ?? null,
     homeTeam,
     awayTeam,
     eloInput,

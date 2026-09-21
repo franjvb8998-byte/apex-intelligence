@@ -24,7 +24,7 @@ describe("APEX Opportunities discovery ranking", () => {
     kellyPct: 4.2,
     riskScore: 40,
     riskBand: "medium",
-    kickoffAt: "2026-08-27T19:00:00.000Z",
+    kickoffAt: "2027-08-27T19:00:00.000Z",
     leagueName: "La Liga",
   });
   const avoid = opportunityFixture({
@@ -40,7 +40,7 @@ describe("APEX Opportunities discovery ranking", () => {
     positiveEdge: true,
     riskScore: 70,
     riskBand: "high",
-    kickoffAt: "2026-08-27T12:00:00.000Z",
+    kickoffAt: "2027-08-27T12:00:00.000Z",
   });
 
   it("maps engine verdicts to visual priority and recommendation badges", () => {

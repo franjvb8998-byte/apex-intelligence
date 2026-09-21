@@ -77,8 +77,10 @@ describe("scanner profile", () => {
           scannerProfile: beginScannerProfile(),
         });
       });
-      expect(board.analyzed.length).toBeGreaterThanOrEqual(1);
       expect(board.quotaExhausted).toBe(false);
+      expect(
+        board.analyzed.every((row) => row.vendorStatusShort === "NS"),
+      ).toBe(true);
       printed = log.mock.calls.map((call) => String(call[0] ?? "")).join("\n");
     } finally {
       log.mockRestore();

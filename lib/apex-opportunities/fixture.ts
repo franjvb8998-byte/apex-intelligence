@@ -5,7 +5,8 @@ export function opportunityFixture(
 ): ApexOpportunity {
   return {
     fixtureId: "1035089",
-    kickoffAt: "2026-08-27T15:00:00.000Z",
+    kickoffAt: "2027-08-27T15:00:00.000Z",
+    vendorStatusShort: "NS",
     leagueName: "Premier League",
     country: "England",
     market: "1x2",

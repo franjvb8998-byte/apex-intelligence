@@ -6,6 +6,7 @@ import type { ApexOpportunity } from "@/lib/apex-opportunities/types";
 import type { ApexRiskBand } from "@/lib/decision-engine/types";
 import { applyScannerMode, type ScannerMode } from "@/lib/opportunity-scanner/modes";
 import { scannerRecommendation } from "@/lib/opportunity-scanner/recommend";
+import { filterCurrentActionableOpportunities } from "@/lib/prematch-decision/actionability";
 
 export type ScannerFilters = {
   league: string;
@@ -81,7 +82,8 @@ export function filterScanner(
   favoriteLeagues: string[] = [],
   favoriteTeams: string[] = [],
 ): ApexOpportunity[] {
-  const gated = rows.filter((row) =>
+  const actionable = filterCurrentActionableOpportunities(rows);
+  const gated = actionable.filter((row) =>
     scannerPassesFilters(row, filters, favoriteLeagues, favoriteTeams),
   );
   return applyScannerMode(gated, mode);
