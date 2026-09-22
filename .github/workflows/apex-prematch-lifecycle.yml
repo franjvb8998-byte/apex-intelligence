@@ -12,9 +12,6 @@ name: APEX Prematch Lifecycle
 
 on:
   workflow_dispatch:
-  schedule:
-    # 15-minute cadence offset from :00/:15/:30/:45 (GitHub docs: higher load near hour start).
-    - cron: "7,22,37,52 * * * *"
 
 concurrency:
   group: apex-prematch-lifecycle
