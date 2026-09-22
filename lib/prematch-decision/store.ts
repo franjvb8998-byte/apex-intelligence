@@ -17,9 +17,22 @@ export type PrematchTicketInsertResult = {
   unavailable: boolean;
 };
 
+export type DurableTicketProof =
+  | {
+      confirmed: true;
+      source: "durable_insert" | "durable_read";
+      ticket: PrematchDecisionTicket;
+    }
+  | {
+      confirmed: false;
+      reason: "DURABLE_STORE_UNAVAILABLE" | "MISSING";
+      ticket: null;
+    };
+
 export type PrematchDecisionTicketStore = {
   getByTicketId(ticketId: string): Promise<PrematchDecisionTicket | null>;
   getByFixtureId(fixtureId: string): Promise<PrematchDecisionTicket | null>;
+  confirmDurableByTicketId(ticketId: string): Promise<DurableTicketProof>;
   insertIfAbsent(ticket: PrematchDecisionTicket): Promise<PrematchTicketInsertResult>;
   clear(): void;
 };
@@ -62,6 +75,14 @@ export class InMemoryPrematchDecisionTicketStore
     const ticketId = prematchDecisionTicketId(fixtureId);
     if (!ticketId) return null;
     return this.getByTicketId(ticketId);
+  }
+
+  async confirmDurableByTicketId(ticketId: string): Promise<DurableTicketProof> {
+    const ticket = this.rows.get(ticketId) ?? null;
+    if (!ticket) {
+      return { confirmed: false, reason: "MISSING", ticket: null };
+    }
+    return { confirmed: true, source: "durable_read", ticket };
   }
 
   hydrate(ticket: PrematchDecisionTicket): PrematchDecisionTicket {
@@ -119,10 +140,41 @@ export class LayeredPrematchDecisionTicketStore
     return this.getByTicketId(ticketId);
   }
 
+  async confirmDurableByTicketId(ticketId: string): Promise<DurableTicketProof> {
+    try {
+      const remote = await this.durable.getByTicketId(ticketId);
+      if (!remote.ok) {
+        return { confirmed: false, reason: "DURABLE_STORE_UNAVAILABLE", ticket: null };
+      }
+      if (!remote.ticket) {
+        return { confirmed: false, reason: "MISSING", ticket: null };
+      }
+      return {
+        confirmed: true,
+        source: "durable_read",
+        ticket: this.memory.hydrate(remote.ticket),
+      };
+    } catch {
+      return { confirmed: false, reason: "DURABLE_STORE_UNAVAILABLE", ticket: null };
+    }
+  }
+
   async insertIfAbsent(
     ticket: PrematchDecisionTicket,
   ): Promise<PrematchTicketInsertResult> {
-    const written = await this.durable.insertIfAbsent(ticket);
+    let written: Awaited<
+      ReturnType<PrematchDecisionTicketDurableBackend["insertIfAbsent"]>
+    >;
+    try {
+      written = await this.durable.insertIfAbsent(ticket);
+    } catch {
+      return {
+        ticket: null,
+        created: false,
+        durable: false,
+        unavailable: true,
+      };
+    }
     if (!written.ok) {
       return {
         ticket: null,
@@ -220,6 +272,17 @@ export function setPrematchDecisionDurableBackendFactory(
 
 export function getPrematchDecisionTicketStore(): PrematchDecisionTicketStore {
   return ensureProcessStore();
+}
+
+export async function confirmDurableByFixtureId(
+  store: PrematchDecisionTicketStore,
+  fixtureId: string,
+): Promise<DurableTicketProof> {
+  const ticketId = prematchDecisionTicketId(fixtureId);
+  if (!ticketId) {
+    return { confirmed: false, reason: "MISSING", ticket: null };
+  }
+  return store.confirmDurableByTicketId(ticketId);
 }
 
 export function resetPrematchDecisionTicketStoreForTests(): void {

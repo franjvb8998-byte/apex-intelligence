@@ -105,13 +105,15 @@ export const DISCOVERY_RECOMMENDATION_OPTIONS: DiscoveryRecommendationLabel[] = 
   "SKIP",
 ];
 
-export function discoveryPriority(row: ApexOpportunity): DiscoveryPriority {
+export function discoveryPriority(row: ApexOpportunity): DiscoveryPriority | null {
+  if (!row.recommendation) return null;
   return DISCOVERY_PRIORITY[row.recommendation];
 }
 
 export function discoveryRecommendation(
   row: ApexOpportunity,
-): DiscoveryRecommendationLabel {
+): DiscoveryRecommendationLabel | null {
+  if (!row.recommendation) return null;
   return DISCOVERY_FROM_TIER[row.recommendation];
 }
 
@@ -147,7 +149,7 @@ export function discoveryPassesFilters(
   watchlistIds: string[] = [],
 ): boolean {
   if (!isCurrentActionableOpportunity(row)) return false;
-  if (row.score < filters.minScore) return false;
+  if (row.score == null || row.score < filters.minScore) return false;
   if (filters.league !== "all" && row.leagueName !== filters.league) return false;
   if (filters.market !== "all" && row.market !== filters.market) return false;
   if (filters.risk !== "all" && row.riskBand !== filters.risk) return false;
@@ -181,20 +183,22 @@ export function sortDiscovery(
       const kelly = nullableDesc(a.kellyPct, b.kellyPct);
       if (kelly !== 0) return kelly;
     } else if (sort === "risk") {
-      const risk = a.riskScore - b.riskScore;
+      const risk = nullableAsc(a.riskScore, b.riskScore);
       if (risk !== 0) return risk;
     } else if (sort === "kickoff") {
       const kick = nullableAsc(Date.parse(a.kickoffAt), Date.parse(b.kickoffAt));
       if (kick !== 0) return kick;
     } else {
-      const score = b.score - a.score;
+      const score = nullableDesc(a.score, b.score);
       if (score !== 0) return score;
     }
 
-    if (b.score !== a.score) return b.score - a.score;
+    const scoreTie = nullableDesc(a.score, b.score);
+    if (scoreTie !== 0) return scoreTie;
     const ev = nullableDesc(a.expectedValue, b.expectedValue);
     if (ev !== 0) return ev;
-    if (b.confidence !== a.confidence) return b.confidence - a.confidence;
+    const confidence = nullableDesc(a.confidence, b.confidence);
+    if (confidence !== 0) return confidence;
     return a.fixtureId.localeCompare(b.fixtureId);
   });
 }
@@ -218,7 +222,7 @@ export function discoveryDashboardStats(
   return {
     today: analyzed.length,
     elite: analyzed.filter((row) => row.recommendation === "Elite").length,
-    averageConfidence: mean(analyzed.map((row) => row.confidence)),
+    averageConfidence: mean(finite(analyzed.map((row) => row.confidence))),
     averageEv: mean(finite(analyzed.map((row) => row.expectedValue))),
     highestKelly: kellys.length === 0 ? null : Math.max(...kellys),
   };

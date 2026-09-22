@@ -55,7 +55,9 @@ export function DiscoveryCard({
 }: DiscoveryCardProps) {
   const reduceMotion = useReducedMotion();
   const priority = discoveryPriority(row);
-  const riskLabel = row.riskBand.charAt(0).toUpperCase() + row.riskBand.slice(1);
+  const riskLabel = row.riskBand
+    ? row.riskBand.charAt(0).toUpperCase() + row.riskBand.slice(1)
+    : "—";
 
   return (
     <motion.article
@@ -68,7 +70,7 @@ export function DiscoveryCard({
       }}
       className={cx(
         "rounded-[var(--apex-radius-2xl)] border p-4 shadow-[var(--apex-shadow-sm)] sm:p-5",
-        VERDICT_CARD_CLASS[row.verdict],
+        row.verdict ? VERDICT_CARD_CLASS[row.verdict] : "border-[var(--apex-border)]",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -98,10 +100,12 @@ export function DiscoveryCard({
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-2 font-mono text-[11px] text-[var(--apex-accent)]">
-            <Stars filled={priority.stars} />
-            <span className="tracking-[0.08em]">{priority.label}</span>
-          </span>
+          {priority ? (
+            <span className="inline-flex items-center gap-2 font-mono text-[11px] text-[var(--apex-accent)]">
+              <Stars filled={priority.stars} />
+              <span className="tracking-[0.08em]">{priority.label}</span>
+            </span>
+          ) : null}
           <RecommendationBadge row={row} />
         </div>
       </div>
@@ -110,7 +114,10 @@ export function DiscoveryCard({
         <OpportunityScoreViz row={row} />
         <div className="min-w-0 space-y-4">
           <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-            <Metric label="Confidence" value={String(Math.round(row.confidence))} />
+            <Metric
+              label="Confidence"
+              value={row.confidence == null ? "—" : String(Math.round(row.confidence))}
+            />
             <Metric label="Expected Value" value={formatSignedPct(row.expectedValue)} />
             <Metric
               label="Kelly Stake"

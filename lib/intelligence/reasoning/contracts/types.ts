@@ -72,12 +72,12 @@ export type Explanation = {
 export type Recommendation = {
   id: ReasoningId;
   title: string;
-  action: "bet" | "pass" | "watch" | "reduce_stake" | "other";
+  action?: "bet" | "pass" | "watch" | "reduce_stake" | "other";
   market?: ReasoningMarketKey;
   selection?: ReasoningSide;
-  priority: "low" | "medium" | "high";
+  priority?: "low" | "medium" | "high";
   rationale: string;
-  confidence: ConfidenceScore;
+  confidence?: ConfidenceScore;
 };
 
 /** Structured risk view for a match / recommendation set. */
@@ -97,10 +97,10 @@ export type ValueOpportunity = {
   id: ReasoningId;
   market: ReasoningMarketKey;
   selection: ReasoningSide;
-  modelProbability: number;
+  modelProbability: number | null;
   impliedProbability: number | null;
   decimalOdds: number | null;
-  edge: number;
+  edge: number | null;
   kellyFraction?: number | null;
   explanation?: string;
 };

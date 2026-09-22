@@ -3,7 +3,7 @@
  * Rows are Decision Engine outputs on today's real fixtures. Never mock.
  */
 
-import type { ApexScoring, ScoringTier } from "@/lib/scoring-engine/types";
+import type { ScoringTier } from "@/lib/scoring-engine/types";
 import type {
   ApexConfidenceBand,
   ApexDecisionReason,
@@ -36,30 +36,33 @@ export type ApexOpportunity = {
   market: OpportunityMarket;
   home: ApexOpportunityTeam;
   away: ApexOpportunityTeam;
-  predicted: MatchOutcome;
+  predicted: MatchOutcome | null;
   selectionLabel: string;
-  score: number;
-  stars: number;
-  confidence: number;
-  confidenceBand: ApexConfidenceBand;
-  riskBand: ApexRiskBand;
-  riskScore: number;
+  score: number | null;
+  stars: number | null;
+  confidence: number | null;
+  confidenceBand: ApexConfidenceBand | null;
+  riskBand: ApexRiskBand | null;
+  riskScore: number | null;
   fairOdds: number | null;
   bookmakerOdds: number | null;
   valuePct: number | null;
   expectedValue: number | null;
   marketEdge: number | null;
   kellyPct: number | null;
-  stakePct: number;
-  stakeLabel: string;
+  stakePct: number | null;
+  stakeLabel: string | null;
   /** Scoring Engine v2 recommendation. Stake still comes from Decision Engine. */
-  recommendation: ScoringTier;
-  verdict: ApexDecisionVerdictKind;
-  verdictLabel: string;
+  recommendation: ScoringTier | null;
+  verdict: ApexDecisionVerdictKind | null;
+  verdictLabel: string | null;
   explanation: string;
   reasonsFor: ApexDecisionReason[];
   reasonsAgainst: ApexDecisionReason[];
-  positiveEdge: boolean;
+  positiveEdge: boolean | null;
+  /** Set only after durable ticket confirmation. Required to publish. */
+  durableTicketConfirmed?: boolean;
+  frozenTicketId?: string | null;
 };
 
 export type OpportunityFilters = {

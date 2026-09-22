@@ -65,6 +65,9 @@ export function weakestLeg(legs: ComboLeg[]): ComboLeg | null {
     const pa = a.apexProbability ?? 0;
     const pb = b.apexProbability ?? 0;
     if (pa !== pb) return pa - pb;
-    return a.score - b.score;
+    return (
+      (a.score ?? Number.POSITIVE_INFINITY) -
+      (b.score ?? Number.POSITIVE_INFINITY)
+    );
   })[0]!;
 }

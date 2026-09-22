@@ -44,13 +44,13 @@ describe("APEX Opportunities discovery ranking", () => {
   });
 
   it("maps engine verdicts to visual priority and recommendation badges", () => {
-    expect(discoveryPriority(elite)).toEqual({
+    expect(discoveryPriority(elite)!).toEqual({
       stars: 5,
       label: "Elite Opportunity",
       shortLabel: "Elite",
     });
-    expect(discoveryPriority(strong).label).toBe("Strong");
-    expect(discoveryPriority(avoid).label).toBe("Avoid");
+    expect(discoveryPriority(strong)?.label).toBe("Strong");
+    expect(discoveryPriority(avoid)?.label).toBe("Avoid");
     expect(discoveryRecommendation(elite)).toBe("STRONG BET");
     expect(discoveryRecommendation(strong)).toBe("BET");
     expect(discoveryRecommendation(avoid)).toBe("SKIP");

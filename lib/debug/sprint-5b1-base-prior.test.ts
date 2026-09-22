@@ -282,7 +282,11 @@ describe("Sprint 5B.1 — product surfaces share the resolver", () => {
         return row;
       },
     };
-    const board = await getApexOpportunities({ provider, env: {} });
+    const board = await getApexOpportunities({
+      provider,
+      env: {},
+      nowUtc: "2027-08-15T17:00:00.000Z",
+    });
     expect(board.analyzed.length).toBeGreaterThan(0);
     const item = board.analyzed.find((entry) => entry.fixtureId === "1639552");
     expect(item).toBeDefined();

@@ -28,7 +28,11 @@ export function opportunityBlurb(row: ApexOpportunity): string {
   }
 
   if (row.bookmakerOdds == null) {
-    return `APEX Score ${Math.round(row.score)} with ${Math.round(row.confidence)} confidence; no current bookmaker odds are published.`;
+    const score =
+      row.score == null ? "unavailable" : String(Math.round(row.score));
+    const confidence =
+      row.confidence == null ? "unavailable" : String(Math.round(row.confidence));
+    return `APEX Score ${score} with ${confidence} confidence; no current bookmaker odds are published.`;
   }
 
   if (hasEv && ev === 0) {
@@ -37,6 +41,6 @@ export function opportunityBlurb(row: ApexOpportunity): string {
 
   return (
     firstSentence(row.explanation) ??
-    `Engine verdict ${row.verdictLabel} at score ${Math.round(row.score)}.`
+    `Engine verdict ${row.verdictLabel ?? "unavailable"} at score ${row.score == null ? "unavailable" : Math.round(row.score)}.`
   );
 }

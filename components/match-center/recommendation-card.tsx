@@ -49,11 +49,15 @@ export function RecommendationCard({ dashboard, match }: RecommendationCardProps
     <Card>
       <CardHeader
         title={t("recommendationTitle")}
-        description={actionLabel[recommendation.action]}
+        description={
+          recommendation.action ? actionLabel[recommendation.action] : undefined
+        }
         action={
-          <Badge tone={actionTone[recommendation.action]}>
-            {recommendation.priority}
-          </Badge>
+          recommendation.action && recommendation.priority ? (
+            <Badge tone={actionTone[recommendation.action]}>
+              {recommendation.priority}
+            </Badge>
+          ) : null
         }
       />
       <p className="text-base font-semibold text-[var(--apex-fg)]">
@@ -66,11 +70,13 @@ export function RecommendationCard({ dashboard, match }: RecommendationCardProps
       </p>
       {valueBet ? (
         <p className="mt-4 text-sm text-[var(--apex-fg-muted)]">
-          {t("valueLine", {
-            market: valueBet.market.toUpperCase(),
-            selection: valueBet.selection,
-            edge: (valueBet.edge * 100).toFixed(1),
-          })}
+          {valueBet.edge == null
+            ? `${valueBet.market.toUpperCase()} · ${valueBet.selection}`
+            : t("valueLine", {
+                market: valueBet.market.toUpperCase(),
+                selection: valueBet.selection,
+                edge: (valueBet.edge * 100).toFixed(1),
+              })}
           {valueBet.decimalOdds != null && (
             <>
               {" "}

@@ -9,7 +9,7 @@ export type ScannerBriefingMatch = {
   fixtureId: string;
   label: string;
   leagueName: string;
-  score: number;
+  score: number | null;
 };
 
 export type ScannerBriefing = {
@@ -49,17 +49,31 @@ export function buildScannerBriefing(
   quotaExhausted = false,
 ): ScannerBriefing {
   const leagues = [...new Set(rows.map((row) => row.leagueName))];
-  const scores = rows.map((row) => row.score);
-  const conf = rows.map((row) => row.confidence);
+  const scores = rows
+    .map((row) => row.score)
+    .filter((value): value is number => value != null && Number.isFinite(value));
+  const conf = rows
+    .map((row) => row.confidence)
+    .filter((value): value is number => value != null && Number.isFinite(value));
   const evs = rows
     .map((row) => row.expectedValue)
     .filter((value): value is number => value != null && Number.isFinite(value));
-  const highest = [...rows].sort((a, b) => b.score - a.score)[0] ?? null;
+  const highest =
+    [...rows]
+      .filter((row) => row.score != null)
+      .sort(
+        (a, b) =>
+          (b.score ?? Number.NEGATIVE_INFINITY) -
+          (a.score ?? Number.NEGATIVE_INFINITY),
+      )[0] ?? null;
 
   let bestLeague: ScannerBriefing["bestLeague"] = null;
   for (const name of leagues) {
     const avg = mean(
-      rows.filter((row) => row.leagueName === name).map((row) => row.score),
+      rows
+        .filter((row) => row.leagueName === name)
+        .map((row) => row.score)
+        .filter((value): value is number => value != null && Number.isFinite(value)),
     );
     if (avg == null) continue;
     if (!bestLeague || avg > bestLeague.averageScore) {

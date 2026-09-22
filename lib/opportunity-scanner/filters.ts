@@ -62,7 +62,7 @@ export function scannerPassesFilters(
   if (filters.country !== "all" && row.country !== filters.country) return false;
   if (filters.market !== "all" && row.market !== filters.market) return false;
   if (filters.risk !== "all" && row.riskBand !== filters.risk) return false;
-  if (row.confidence < filters.minConfidence) return false;
+  if (row.confidence == null || row.confidence < filters.minConfidence) return false;
   if (!passesOdds(row, filters)) return false;
   if (!passesEv(row, filters.minEv)) return false;
   if (filters.favoriteLeaguesOnly && !favoriteLeagues.includes(row.leagueName)) {

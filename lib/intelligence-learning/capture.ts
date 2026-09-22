@@ -28,7 +28,9 @@ export function captureOpportunityRecommendation(
   row: ApexOpportunity,
   scoring?: ApexScoring,
 ): RecommendationRecord | null {
-  return captureRecommendation(recommendationDraftFromOpportunity(row, scoring));
+  const draft = recommendationDraftFromOpportunity(row, scoring);
+  if (!draft) return null;
+  return captureRecommendation(draft);
 }
 
 export function captureMatchRecommendation(input: {

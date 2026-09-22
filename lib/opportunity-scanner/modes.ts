@@ -25,10 +25,17 @@ export const SCANNER_MODES: Array<{ id: ScannerMode }> = [
 ];
 
 function byScoreEv(a: ApexOpportunity, b: ApexOpportunity): number {
-  if (b.score !== a.score) return b.score - a.score;
-  const ev = (b.expectedValue ?? Number.NEGATIVE_INFINITY) - (a.expectedValue ?? Number.NEGATIVE_INFINITY);
+  const score =
+    (b.score ?? Number.NEGATIVE_INFINITY) - (a.score ?? Number.NEGATIVE_INFINITY);
+  if (score !== 0) return score;
+  const ev =
+    (b.expectedValue ?? Number.NEGATIVE_INFINITY) -
+    (a.expectedValue ?? Number.NEGATIVE_INFINITY);
   if (ev !== 0) return ev;
-  return b.confidence - a.confidence;
+  return (
+    (b.confidence ?? Number.NEGATIVE_INFINITY) -
+    (a.confidence ?? Number.NEGATIVE_INFINITY)
+  );
 }
 
 export function applyScannerMode(
@@ -46,12 +53,19 @@ export function applyScannerMode(
       .filter(
         (row) =>
           row.recommendation !== "Avoid" &&
+          row.confidence != null &&
           row.confidence >= 60 &&
           (row.bookmakerOdds == null || row.bookmakerOdds <= 2.2),
       )
       .sort((a, b) => {
-        if (b.confidence !== a.confidence) return b.confidence - a.confidence;
-        return a.riskScore - b.riskScore;
+        const confidence =
+          (b.confidence ?? Number.NEGATIVE_INFINITY) -
+          (a.confidence ?? Number.NEGATIVE_INFINITY);
+        if (confidence !== 0) return confidence;
+        return (
+          (a.riskScore ?? Number.POSITIVE_INFINITY) -
+          (b.riskScore ?? Number.POSITIVE_INFINITY)
+        );
       });
   }
 
@@ -94,8 +108,14 @@ export function applyScannerMode(
           )
             ? 8
             : 0;
-        const scoreA = a.score + (a.expectedValue ?? 0) * 40 - leaguePenalty(a, list);
-        const scoreB = b.score + (b.expectedValue ?? 0) * 40 - leaguePenalty(b, list);
+        const scoreA =
+          (a.score ?? Number.NEGATIVE_INFINITY) +
+          (a.expectedValue ?? 0) * 40 -
+          leaguePenalty(a, list);
+        const scoreB =
+          (b.score ?? Number.NEGATIVE_INFINITY) +
+          (b.expectedValue ?? 0) * 40 -
+          leaguePenalty(b, list);
         return scoreB - scoreA;
       });
   }

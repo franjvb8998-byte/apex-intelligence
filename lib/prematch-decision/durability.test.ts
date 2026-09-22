@@ -379,7 +379,7 @@ describe("PrematchDecisionTicket durability + capture window", () => {
     expect(provider.getMatch).not.toHaveBeenCalled();
   });
 
-  it("U. Scanner board still renders if ticket persistence fails", async () => {
+  it("U. Scanner board does not publish if ticket persistence fails", async () => {
     const template = await createMockDataProvider().getMatch({
       matchId: DEMO_MATCH_EXTERNAL_ID,
     });
@@ -404,6 +404,9 @@ describe("PrematchDecisionTicket durability + capture window", () => {
       async insertIfAbsent() {
         throw new Error("ticket store down");
       },
+      async confirmDurableByTicketId() {
+        throw new Error("ticket store down");
+      },
       clear() {},
     };
     const board = await getApexOpportunities({
@@ -420,7 +423,7 @@ describe("PrematchDecisionTicket durability + capture window", () => {
       ticketStore: throwing,
       nowUtc,
     });
-    expect(board.analyzed.length).toBeGreaterThan(0);
+    expect(board.analyzed).toEqual([]);
   });
 
   it("V. Match Analysis lookup finds frozen ticket after kickoff", async () => {

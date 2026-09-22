@@ -13,7 +13,15 @@ export function recommendationDraftFromOpportunity(
   row: ApexOpportunity,
   scoring?: ApexScoring,
   timestamp = new Date().toISOString(),
-): RecommendationDraft {
+): RecommendationDraft | null {
+  if (
+    row.recommendation == null ||
+    row.score == null ||
+    row.stakePct == null ||
+    row.predicted == null
+  ) {
+    return null;
+  }
   return {
     timestamp,
     source: "scanner",

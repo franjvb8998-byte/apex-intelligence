@@ -39,7 +39,7 @@ export function ComboVerdictCard({ analysis }: { analysis: ComboAnalysis }) {
             <p className="font-mono text-[11px] text-[var(--apex-warning)]">
               {t("weakest", {
                 selection: analysis.weakest.selectionLabel,
-                verdict: analysis.weakest.verdictLabel,
+                verdict: analysis.weakest.verdictLabel ?? "—",
               })}
             </p>
           )}

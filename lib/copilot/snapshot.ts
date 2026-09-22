@@ -6,6 +6,12 @@
 import { edgePp, fairOdds, impliedProbability } from "@/lib/copilot/pricing";
 import type { CopilotMarketLine, CopilotMatchSnapshot } from "@/lib/copilot/types";
 import type { MatchCenterData } from "@/lib/match-center/types";
+import {
+  canPublishFrozenCurrentBet,
+  frozenRecommendation,
+  frozenSelectionOutcome,
+  frozenValueBet,
+} from "@/lib/prematch-decision/frozen-betting";
 
 function teamBlock(
   side: "home" | "away",
@@ -46,7 +52,11 @@ function marketLines(data: MatchCenterData): CopilotMarketLine[] {
 
 export function snapshotFromMatchCenter(data: MatchCenterData): CopilotMatchSnapshot {
   const analysis = data.aiAnalysis;
-  const value = analysis.valueBet;
+  const ticket = data.preview.analysis.frozenPrematchDecision ?? null;
+  const publishable = ticket != null && canPublishFrozenCurrentBet(ticket);
+  const frozenRec = publishable && ticket ? frozenRecommendation(ticket) : null;
+  const frozenValue = publishable && ticket ? frozenValueBet(ticket) : null;
+  const value = publishable ? frozenValue : ticket ? null : analysis.valueBet;
   const homeLineup = data.preview.dashboard.lineups.home;
   const awayLineup = data.preview.dashboard.lineups.away;
   const live =
@@ -69,12 +79,31 @@ export function snapshotFromMatchCenter(data: MatchCenterData): CopilotMatchSnap
     overUnder25: data.preview.hybrid.overUnder25,
     btts: data.preview.hybrid.btts,
     expectedGoals: analysis.expectedGoals,
-    predictedOutcome: analysis.prediction.outcome,
-    predictedLabel: analysis.prediction.label,
-    confidence: {
-      value: analysis.confidence.value,
-      band: analysis.confidence.band,
-    },
+    predictedOutcome: publishable && ticket
+      ? frozenSelectionOutcome(ticket)
+      : ticket
+        ? null
+        : analysis.prediction.outcome,
+    predictedLabel: publishable && ticket
+      ? ticket.scoring?.selectionLabel?.trim() ?? ""
+      : ticket
+        ? ""
+        : analysis.prediction.label,
+    confidence: publishable && ticket
+      ? {
+          value:
+            typeof ticket.scoring?.confidence === "number" &&
+            Number.isFinite(ticket.scoring.confidence)
+              ? ticket.scoring.confidence
+              : null,
+          band: ticket.scoring?.confidenceBand ?? null,
+        }
+      : ticket
+        ? { value: null, band: null }
+        : {
+            value: analysis.confidence.value,
+            band: analysis.confidence.band,
+          },
     modelVersion: analysis.prediction.modelVersion,
     elo: {
       home: data.preview.eloInput.homeElo,
@@ -93,7 +122,12 @@ export function snapshotFromMatchCenter(data: MatchCenterData): CopilotMatchSnap
       label: item.label,
       detail: item.detail,
     })),
-    recommendation: analysis.recommendation,
+    recommendation:
+      publishable && frozenRec
+        ? frozenRec
+        : ticket
+          ? { id: "frozen-unavailable", title: "", rationale: "" }
+          : analysis.recommendation,
     valueBet: value
       ? {
           market: value.market,
@@ -123,8 +157,8 @@ export function snapshotFromMatchCenter(data: MatchCenterData): CopilotMatchSnap
       (homeLineup?.startXI.length ?? 0) > 0 || (awayLineup?.startXI.length ?? 0) > 0,
     ),
     liveState: live,
-    decision: data.preview.analysis.decision,
-    scoring: data.preview.analysis.scoring,
+    decision: publishable ? undefined : ticket ? undefined : data.preview.analysis.decision,
+    scoring: ticket ? undefined : data.preview.analysis.scoring,
   };
 }
 

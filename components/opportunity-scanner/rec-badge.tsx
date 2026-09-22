@@ -18,6 +18,7 @@ const TONE: Record<ScannerRecommendation, ApexTone> = {
 
 export function ScannerRecBadge({ row }: { row: ApexOpportunity }) {
   const label = scannerRecommendation(row);
+  if (!label) return null;
   return (
     <Badge tone={TONE[label]} size="sm" className="font-mono tracking-[0.08em]">
       {label}

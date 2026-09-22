@@ -33,9 +33,11 @@ export async function DecisionBreakdownCard({
       eyebrow={t("engineEyebrow")}
       title={t("decision")}
       badge={
-        <Badge tone={VERDICT_BADGE_TONE[decision.verdictKind]}>
-          {decision.verdictLabel}
-        </Badge>
+        decision.verdictKind ? (
+          <Badge tone={VERDICT_BADGE_TONE[decision.verdictKind]}>
+            {decision.verdictLabel}
+          </Badge>
+        ) : undefined
       }
       kpis={decision.kpis}
       footerHref={decision.href}

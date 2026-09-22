@@ -83,7 +83,7 @@ export function ScannerDailyBriefing({
           value={briefing.highestRatedMatch?.label ?? t("waitingFixtures")}
           hint={
             briefing.highestRatedMatch
-              ? `${briefing.highestRatedMatch.leagueName} · ${Math.round(briefing.highestRatedMatch.score)}`
+              ? `${briefing.highestRatedMatch.leagueName} · ${briefing.highestRatedMatch.score == null ? "—" : Math.round(briefing.highestRatedMatch.score)}`
               : t("highestRatedHintEmpty")
           }
         />

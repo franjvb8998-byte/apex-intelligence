@@ -96,10 +96,10 @@ export function ScannerRow({
           {formatOdds(row.bookmakerOdds)}
         </span>
         <span className="font-mono text-sm tabular-nums text-[var(--apex-accent)]">
-          {Math.round(row.score)}
+          {row.score == null ? "—" : Math.round(row.score)}
         </span>
         <span className="font-mono text-[11px] tabular-nums text-[var(--apex-fg)]">
-          {Math.round(row.confidence)}
+          {row.confidence == null ? "—" : Math.round(row.confidence)}
         </span>
         <span className="font-mono text-[11px] tabular-nums text-[var(--apex-fg)]">
           {formatSignedPct(row.expectedValue)}
@@ -110,11 +110,13 @@ export function ScannerRow({
               ? "danger"
               : row.riskBand === "medium"
                 ? "warning"
-                : "success"
+                : row.riskBand === "low"
+                  ? "success"
+                  : "neutral"
           }
           size="sm"
         >
-          {row.riskBand}
+          {row.riskBand ?? "—"}
         </Badge>
         <div className="flex flex-wrap items-center justify-end gap-1">
           <ScannerRecBadge row={row} />

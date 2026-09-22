@@ -28,7 +28,10 @@ const riskTone: Record<ApexRiskBand, ApexTone> = {
   high: "danger",
 };
 
-const confidenceTone: Record<PremiumAnalysis["confidenceBand"], ApexTone> = {
+const confidenceTone: Record<
+  Exclude<PremiumAnalysis["confidenceBand"], null>,
+  ApexTone
+> = {
   high: "accent",
   medium: "warning",
   low: "danger",
@@ -47,7 +50,7 @@ const riskLabelKey: Record<ApexRiskBand, "riskLow" | "riskMedium" | "riskHigh"> 
 };
 
 const confidenceLabelKey: Record<
-  PremiumAnalysis["confidenceBand"],
+  Exclude<PremiumAnalysis["confidenceBand"], null>,
   "confidenceLow" | "confidenceMedium" | "confidenceHigh"
 > = {
   high: "confidenceHigh",
@@ -118,9 +121,11 @@ export function PremiumHero({ data, premium }: PremiumHeroProps) {
           </span>
           {premium.currentlyActionable ? (
             <>
-              <Badge tone={SCORING_BADGE_TONE[premium.tier]} size="md">
-                {premium.tier}
-              </Badge>
+              {premium.tier ? (
+                <Badge tone={SCORING_BADGE_TONE[premium.tier]} size="md">
+                  {premium.tier}
+                </Badge>
+              ) : null}
               <p className="max-w-[16rem] text-center text-sm text-[var(--apex-fg-muted)]">
                 {premium.selectionLabel}
               </p>
@@ -145,23 +150,41 @@ export function PremiumHero({ data, premium }: PremiumHeroProps) {
       </div>
 
       <div className="mt-10 grid items-center gap-8 lg:grid-cols-[auto_minmax(0,1fr)]">
-        <ScoreGauge
-          value={premium.score}
-          label={p("apexScore")}
-          caption={premium.confidenceCaption}
-        />
+        {premium.score == null ? (
+          <p className="font-mono text-sm text-[var(--apex-fg-subtle)]">{empty}</p>
+        ) : (
+          <ScoreGauge
+            value={premium.score}
+            label={p("apexScore")}
+            caption={premium.confidenceCaption}
+          />
+        )}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <RatingStat
             label={p("confidence")}
             value={formatScore(premium.confidence, empty)}
-            hint={p(confidenceLabelKey[premium.confidenceBand])}
-            tone={confidenceTone[premium.confidenceBand]}
+            hint={
+              premium.confidenceBand
+                ? p(confidenceLabelKey[premium.confidenceBand])
+                : empty
+            }
+            tone={
+              premium.confidenceBand
+                ? confidenceTone[premium.confidenceBand]
+                : "neutral"
+            }
           />
           <RatingStat
             label={p("risk")}
-            value={p(riskLabelKey[premium.riskBand])}
-            hint={`${formatScore(premium.riskScore, empty)} / 100`}
-            tone={riskTone[premium.riskBand]}
+            value={
+              premium.riskBand ? p(riskLabelKey[premium.riskBand]) : empty
+            }
+            hint={
+              premium.riskScore == null
+                ? empty
+                : `${formatScore(premium.riskScore, empty)} / 100`
+            }
+            tone={premium.riskBand ? riskTone[premium.riskBand] : "neutral"}
           />
           <RatingStat
             label={p("expectedValue")}
@@ -182,7 +205,9 @@ export function PremiumHero({ data, premium }: PremiumHeroProps) {
           <RatingStat
             label={p("opportunity")}
             value={
-              premium.currentlyActionable && CURRENT_BETTING_TIERS.has(premium.tier)
+              premium.currentlyActionable &&
+              premium.tier != null &&
+              CURRENT_BETTING_TIERS.has(premium.tier)
                 ? premium.tier
                 : p("notCurrentOpportunity")
             }
@@ -192,7 +217,7 @@ export function PremiumHero({ data, premium }: PremiumHeroProps) {
                 : t(premium.actionabilityCopyKey)
             }
             tone={
-              premium.currentlyActionable
+              premium.currentlyActionable && premium.tier
                 ? SCORING_BADGE_TONE[premium.tier]
                 : "neutral"
             }

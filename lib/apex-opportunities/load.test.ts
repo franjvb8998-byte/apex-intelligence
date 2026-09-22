@@ -55,7 +55,7 @@ function catalogueRow(
     match: {
       ...template.match,
       id: `apex:mock:match:${externalId}`,
-      kickoffAt: `2027-08-15T${String(10 + (index % 10)).padStart(2, "0")}:00:00.000Z`,
+      kickoffAt: "2027-08-15T15:00:00.000Z",
       status,
       vendorStatusShort: vendorShortForApex(status),
       externalRefs: [{ provider: "mock", externalId }],
@@ -94,7 +94,10 @@ function oddsProvider(options: {
 
 describe("APEX Opportunities loader", () => {
   it("does not publish the recorded finished fixture as a current opportunity", async () => {
-    const board = await getApexOpportunities({ env: {} });
+    const board = await getApexOpportunities({
+      env: {},
+      nowUtc: "2027-08-15T14:00:00.000Z",
+    });
     expect(board.quotaExhausted).toBe(false);
     expect(
       board.analyzed.some((row) => row.fixtureId === RECORDED_API_FOOTBALL_FIXTURE_ID),
@@ -115,6 +118,7 @@ describe("APEX Opportunities quota partial results", () => {
       catalogueRow(template, index),
     );
     const complete = await getApexOpportunities({
+      nowUtc: "2027-08-15T14:00:00.000Z",
       provider: oddsProvider({
         rows,
         calls: [],
@@ -132,6 +136,7 @@ describe("APEX Opportunities quota partial results", () => {
     });
     const calls: string[] = [];
     const partial = await getApexOpportunities({
+      nowUtc: "2027-08-15T14:00:00.000Z",
       provider: oddsProvider({
         rows,
         calls,
@@ -179,6 +184,7 @@ describe("APEX Opportunities quota partial results", () => {
     );
     const calls: string[] = [];
     const board = await getApexOpportunities({
+      nowUtc: "2027-08-15T14:00:00.000Z",
       provider: oddsProvider({
         rows,
         calls,
@@ -200,6 +206,7 @@ describe("APEX Opportunities quota partial results", () => {
       catalogueRow(template, index),
     );
     const board = await getApexOpportunities({
+      nowUtc: "2027-08-15T14:00:00.000Z",
       provider: oddsProvider({
         rows,
         calls: [],
@@ -228,6 +235,7 @@ describe("APEX Opportunities quota partial results", () => {
       catalogueRow(template, index),
     );
     const board = await getApexOpportunities({
+      nowUtc: "2027-08-15T14:00:00.000Z",
       provider: oddsProvider({
         rows,
         calls: [],
@@ -296,7 +304,7 @@ function cloneCatalogueItem(
     fixture: {
       ...base.fixture,
       id: 7000 + index,
-      date: `2027-08-15T${String(12 + (index % 10)).padStart(2, "0")}:00:00+00:00`,
+      date: "2027-08-15T15:00:00+00:00",
       status: {
         long: String(short),
         short,
@@ -362,6 +370,7 @@ describe("APEX Opportunities terminal odds skip", () => {
     const rows = [catalogueRow(template, 0, "finished")];
     const calls: string[] = [];
     const board = await getApexOpportunities({
+      nowUtc: "2027-08-15T14:00:00.000Z",
       provider: oddsProvider({
         rows,
         calls,
@@ -382,6 +391,7 @@ describe("APEX Opportunities terminal odds skip", () => {
     ];
     const calls: string[] = [];
     const board = await getApexOpportunities({
+      nowUtc: "2027-08-15T14:00:00.000Z",
       provider: oddsProvider({
         rows,
         calls,
@@ -404,6 +414,7 @@ describe("APEX Opportunities terminal odds skip", () => {
     ];
     const calls: string[] = [];
     await getApexOpportunities({
+      nowUtc: "2027-08-15T14:00:00.000Z",
       provider: oddsProvider({
         rows,
         calls,
@@ -424,6 +435,7 @@ describe("APEX Opportunities terminal odds skip", () => {
     );
     const eligibleRows = rows.filter((row) => row.match.status === "scheduled");
     const complete = await getApexOpportunities({
+      nowUtc: "2027-08-15T14:00:00.000Z",
       provider: oddsProvider({
         rows: eligibleRows,
         calls: [],
@@ -433,6 +445,7 @@ describe("APEX Opportunities terminal odds skip", () => {
 
     const calls: string[] = [];
     const mixed = await getApexOpportunities({
+      nowUtc: "2027-08-15T14:00:00.000Z",
       provider: oddsProvider({
         rows,
         calls,
@@ -462,6 +475,7 @@ describe("APEX Opportunities call-budget characterization", () => {
   ): Promise<{ calls: string[]; odds: string[]; enrich: string[] }> {
     const calls: string[] = [];
     await getApexOpportunities({
+      nowUtc: "2027-08-15T14:00:00.000Z",
       provider: extrasCatalogueProvider({ items, calls }),
     });
     return {
@@ -533,9 +547,11 @@ describe("APEX Opportunities call-budget characterization", () => {
       cloneCatalogueItem(3, "NS"),
     ];
     const board3 = await getApexOpportunities({
+      nowUtc: "2027-08-15T14:00:00.000Z",
       provider: extrasCatalogueProvider({ items: three, calls: [] }),
     });
     const board4 = await getApexOpportunities({
+      nowUtc: "2027-08-15T14:00:00.000Z",
       provider: extrasCatalogueProvider({ items: four, calls: [] }),
     });
     const shared = board3.analyzed.map((row) => row.fixtureId);

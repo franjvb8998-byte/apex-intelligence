@@ -43,9 +43,16 @@ export function journalWriteFromOpportunity(input: {
   decision: ApexDecision;
   scoring?: ApexScoring;
   season?: string | null;
-}): PredictionJournalWrite {
+}): PredictionJournalWrite | null {
   const { row, decision } = input;
   const scoring = input.scoring;
+  if (
+    row.recommendation == null ||
+    row.score == null ||
+    row.riskBand == null
+  ) {
+    return null;
+  }
   return {
     id: predictionIdFromParts({
       fixtureId: row.fixtureId,

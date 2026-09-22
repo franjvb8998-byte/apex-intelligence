@@ -75,7 +75,11 @@ export {
 } from "@/lib/apex-opportunities/hrefs";
 
 export { getApexOpportunities } from "@/lib/apex-opportunities/load";
-export { mapOpportunityFromCenter, mapOpportunityFromDecision } from "@/lib/apex-opportunities/map";
+export {
+  applyFrozenTicketToOpportunity,
+  mapOpportunityFromCenter,
+  mapOpportunityFromDecision,
+} from "@/lib/apex-opportunities/map";
 
 export {
   WATCHLIST_STORAGE_KEY,

@@ -29,6 +29,11 @@ import {
   createRepositories,
 } from "@/lib/repositories";
 import { lookupFrozenPrematchDecision } from "@/lib/prematch-decision/attach";
+import {
+  canPublishFrozenCurrentBet,
+  frozenRecommendation,
+  frozenValueBet,
+} from "@/lib/prematch-decision/frozen-betting";
 import type { PrematchDecisionTicketStore } from "@/lib/prematch-decision/store";
 import type { FinalFixtureEvidenceStore } from "@/lib/final-evidence/store";
 import { loadHistoricalPrematchView } from "@/lib/prematch-evaluation/historical";
@@ -196,10 +201,49 @@ async function loadRichMatchCenter(input: {
       fixtureId,
       input.options.ticketStore,
     );
+    data.match = {
+      ...data.match,
+      durableTicketConfirmed:
+        frozen != null && canPublishFrozenCurrentBet(frozen),
+    };
     if (frozen) {
       data.preview.analysis = {
         ...data.preview.analysis,
         frozenPrematchDecision: frozen,
+      };
+    }
+    if (frozen && canPublishFrozenCurrentBet(frozen)) {
+      const recommendation = frozenRecommendation(frozen);
+      const valueBet = frozenValueBet(frozen);
+      if (recommendation) {
+        data.preview.dashboard = {
+          ...data.preview.dashboard,
+          recommendation,
+          valueBet,
+        };
+        data.aiAnalysis = {
+          ...data.aiAnalysis,
+          recommendation,
+          valueBet,
+        };
+      } else {
+        data.preview.dashboard = {
+          ...data.preview.dashboard,
+          valueBet,
+        };
+        data.aiAnalysis = {
+          ...data.aiAnalysis,
+          valueBet,
+        };
+      }
+    } else {
+      data.preview.dashboard = {
+        ...data.preview.dashboard,
+        valueBet: null,
+      };
+      data.aiAnalysis = {
+        ...data.aiAnalysis,
+        valueBet: null,
       };
     }
     data.preview.analysis = {

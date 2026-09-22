@@ -29,7 +29,7 @@ export function headerStats(
     analyzed: analyzed.length,
     opportunities: filtered.length,
     elitePicks: filtered.filter((row) => row.verdict === "elite_pick").length,
-    averageConfidence: mean(filtered.map((row) => row.confidence)),
+    averageConfidence: mean(finite(filtered.map((row) => row.confidence))),
     averageEv: mean(finite(filtered.map((row) => row.expectedValue))),
   };
 }
@@ -43,7 +43,7 @@ export function summaryStats(
     elitePicks: filtered.filter((row) => row.verdict === "elite_pick").length,
     averageEdge: mean(finite(filtered.map((row) => row.valuePct ?? row.marketEdge))),
     averageKelly: mean(finite(filtered.map((row) => row.kellyPct))),
-    averageConfidence: mean(filtered.map((row) => row.confidence)),
+    averageConfidence: mean(finite(filtered.map((row) => row.confidence))),
   };
 }
 
@@ -56,27 +56,41 @@ export function marketSummary(
       .sort((a, b) => (b.expectedValue ?? 0) - (a.expectedValue ?? 0))[0] ?? null;
 
   const highestScore =
-    [...analyzed].sort((a, b) => b.score - a.score)[0] ?? null;
+    [...analyzed]
+      .filter((row) => row.score != null)
+      .sort((a, b) => (b.score ?? Number.NEGATIVE_INFINITY) - (a.score ?? Number.NEGATIVE_INFINITY))[0] ??
+    null;
 
   const safest =
-    [...analyzed].sort((a, b) => {
-      if (a.riskScore !== b.riskScore) return a.riskScore - b.riskScore;
-      return b.confidence - a.confidence;
-    })[0] ?? null;
+    [...analyzed]
+      .filter((row) => row.riskScore != null)
+      .sort((a, b) => {
+        const risk =
+          (a.riskScore ?? Number.POSITIVE_INFINITY) -
+          (b.riskScore ?? Number.POSITIVE_INFINITY);
+        if (risk !== 0) return risk;
+        return (
+          (b.confidence ?? Number.NEGATIVE_INFINITY) -
+          (a.confidence ?? Number.NEGATIVE_INFINITY)
+        );
+      })[0] ?? null;
 
   const mostAggressive =
-    [...analyzed].sort((a, b) => {
-      if (b.stakePct !== a.stakePct) return b.stakePct - a.stakePct;
-      const kA = a.kellyPct ?? -1;
-      const kB = b.kellyPct ?? -1;
-      return kB - kA;
-    })[0] ?? null;
+    [...analyzed]
+      .filter((row) => row.stakePct != null)
+      .sort((a, b) => {
+        const stake =
+          (b.stakePct ?? Number.NEGATIVE_INFINITY) -
+          (a.stakePct ?? Number.NEGATIVE_INFINITY);
+        if (stake !== 0) return stake;
+        return (b.kellyPct ?? Number.NEGATIVE_INFINITY) - (a.kellyPct ?? Number.NEGATIVE_INFINITY);
+      })[0] ?? null;
 
   return {
     averageInefficiency: mean(
       finite(analyzed.map((row) => row.valuePct)).map((n) => Math.abs(n)),
     ),
-    averageConfidence: mean(analyzed.map((row) => row.confidence)),
+    averageConfidence: mean(finite(analyzed.map((row) => row.confidence))),
     highestEv,
     highestScore,
     safest,

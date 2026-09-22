@@ -84,7 +84,8 @@ describe("Match Analysis current recommendation gate", () => {
     expect(premium.hasFrozenPrematchDecision).toBe(false);
     expect(data.frozenPrematchDecision).toBeNull();
     expect(
-      ["Value Bet", "Strong Bet", "Elite"].includes(premium.tier) &&
+      premium.tier != null &&
+        ["Value Bet", "Strong Bet", "Elite"].includes(premium.tier) &&
         premium.currentlyActionable,
     ).toBe(false);
   });

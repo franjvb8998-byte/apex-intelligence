@@ -49,7 +49,9 @@ type ScannerViewProps = {
 };
 
 function pickTeamName(row: ApexOpportunity): string {
-  return row.predicted === "away" ? row.away.name : row.home.name;
+  if (row.predicted === "away") return row.away.name;
+  if (row.predicted === "home") return row.home.name;
+  return row.selectionLabel;
 }
 
 export function ScannerView({

@@ -15,6 +15,7 @@ import type {
 } from "@/lib/smart-combos/types";
 
 function passesProfile(leg: ComboLeg, profile: ComboRiskProfile): boolean {
+  if (leg.confidence == null || leg.score == null) return false;
   if (profile === "conservative") {
     return (
       leg.confidence >= 55 &&
@@ -30,7 +31,9 @@ function passesProfile(leg: ComboLeg, profile: ComboRiskProfile): boolean {
 }
 
 function rankLeg(leg: ComboLeg, profile: ComboRiskProfile): number {
+  if (leg.score == null) return Number.NEGATIVE_INFINITY;
   if (profile === "conservative") {
+    if (leg.riskScore == null) return Number.NEGATIVE_INFINITY;
     return (leg.apexProbability ?? 0) * 100 + (100 - leg.riskScore) * 0.15;
   }
   if (profile === "balanced") {

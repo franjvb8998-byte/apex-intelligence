@@ -75,6 +75,7 @@ export function formatKelly(value: number | null): string {
   return `${value.toFixed(1)}%`;
 }
 
-export function formatScore(value: number): string {
+export function formatScore(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
   return String(Math.round(value));
 }

@@ -47,6 +47,8 @@ export type MatchCenterMeta = {
   kickoffAt: string;
   /** Vendor `status.short` when known. Distinguishes NS from TBD. */
   vendorStatusShort?: string | null;
+  /** Durable-confirmed ticket only. L1-only must stay false. */
+  durableTicketConfirmed?: boolean;
   /** Canonical match status. PST/CANC/ABD/SUSP are not scheduled. */
   status:
     | "scheduled"

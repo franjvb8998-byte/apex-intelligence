@@ -189,9 +189,11 @@ export function StrategyBuilderCard({
                   {row.home.shortName} vs {row.away.shortName}
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
-                  <Badge tone={VERDICT_BADGE_TONE[row.verdict]}>
-                    {row.verdictLabel}
-                  </Badge>
+                  {row.verdict ? (
+                    <Badge tone={VERDICT_BADGE_TONE[row.verdict]}>
+                      {row.verdictLabel ?? "—"}
+                    </Badge>
+                  ) : null}
                   <span className="font-mono text-[10px] tabular-nums text-[var(--apex-fg-subtle)]">
                     {formatScore(row.score)} · {formatEv(row.expectedValue)}
                   </span>

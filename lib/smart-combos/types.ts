@@ -37,22 +37,22 @@ export type ComboLeg = {
   market: ComboMarket;
   home: ComboTeam;
   away: ComboTeam;
-  predicted: MatchOutcome;
+  predicted: MatchOutcome | null;
   selectionLabel: string;
   /** Published decimal odds. Null when the catalogue has no price. */
   decimalOdds: number | null;
   /** Decision Engine model probability for the selected side. */
   apexProbability: number | null;
   impliedProbability: number | null;
-  score: number;
-  confidence: number;
-  confidenceBand: ApexConfidenceBand;
-  riskBand: ApexRiskBand;
-  riskScore: number;
+  score: number | null;
+  confidence: number | null;
+  confidenceBand: ApexConfidenceBand | null;
+  riskBand: ApexRiskBand | null;
+  riskScore: number | null;
   expectedValue: number | null;
   kellyPct: number | null;
-  verdict: ApexDecisionVerdictKind;
-  verdictLabel: string;
+  verdict: ApexDecisionVerdictKind | null;
+  verdictLabel: string | null;
   explanation: string;
 };
 

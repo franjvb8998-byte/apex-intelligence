@@ -37,9 +37,9 @@ export function persistOpportunityPrediction(input: {
   season?: string | null;
 }): PredictionJournalEntry | null {
   try {
-    return getPredictionJournalService().savePrediction(
-      journalWriteFromOpportunity(input),
-    );
+    const write = journalWriteFromOpportunity(input);
+    if (!write) return null;
+    return getPredictionJournalService().savePrediction(write);
   } catch {
     return null;
   }

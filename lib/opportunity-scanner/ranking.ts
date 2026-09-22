@@ -33,10 +33,13 @@ export function scannerDeskStats(rows: ApexOpportunity[]): ScannerDeskStats {
   const value = actionable.filter(
     (row) => scannerRecommendation(row) === "Value Bet",
   ).length;
+  const confRows = actionable.filter(
+    (row): row is typeof row & { confidence: number } => row.confidence != null,
+  );
   const conf =
-    actionable.length === 0
+    confRows.length === 0
       ? null
-      : actionable.reduce((sum, row) => sum + row.confidence, 0) / actionable.length;
+      : confRows.reduce((sum, row) => sum + row.confidence, 0) / confRows.length;
   const evs = actionable
     .map((row) => row.expectedValue)
     .filter((value): value is number => value != null && Number.isFinite(value));
@@ -54,7 +57,9 @@ export function scannerDeskStats(rows: ApexOpportunity[]): ScannerDeskStats {
 }
 
 function byScore(a: ApexOpportunity, b: ApexOpportunity): number {
-  if (b.score !== a.score) return b.score - a.score;
+  const left = b.score ?? Number.NEGATIVE_INFINITY;
+  const right = a.score ?? Number.NEGATIVE_INFINITY;
+  if (left !== right) return left - right;
   return (b.expectedValue ?? -99) - (a.expectedValue ?? -99);
 }
 
@@ -83,8 +88,8 @@ export function buildScannerRankings(
     {
       kind: "confidence",
       items: actionable
-        .filter((row) => row.confidence >= 65)
-        .sort((a, b) => b.confidence - a.confidence || byScore(a, b))
+        .filter((row) => row.confidence != null && row.confidence >= 65)
+        .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0) || byScore(a, b))
         .slice(0, LIMIT),
     },
     {

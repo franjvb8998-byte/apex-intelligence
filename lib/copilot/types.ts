@@ -75,9 +75,9 @@ export type CopilotMatchSnapshot = {
   overUnder25: { over: number; under: number };
   btts: { yes: number; no: number };
   expectedGoals: { home: number; away: number; total: number };
-  predictedOutcome: MatchOutcome;
+  predictedOutcome: MatchOutcome | null;
   predictedLabel: string;
-  confidence: { value: number; band: "low" | "medium" | "high" };
+  confidence: { value: number | null; band: "low" | "medium" | "high" | null };
   modelVersion: string;
   elo: {
     home: number;
@@ -91,9 +91,9 @@ export type CopilotMatchSnapshot = {
   valueBet: {
     market: string;
     selection: string;
-    modelProbability: number;
+    modelProbability: number | null;
     decimalOdds: number | null;
-    edge: number;
+    edge: number | null;
     kellyFraction: number | null;
     explanation: string | null;
   } | null;
@@ -149,8 +149,8 @@ export type CopilotLiveOpportunity = {
 
 export type CopilotIntelligence = {
   call: CopilotCall;
-  confidenceBand: "low" | "medium" | "high";
-  riskBand: "low" | "medium" | "high";
+  confidenceBand: "low" | "medium" | "high" | null;
+  riskBand: "low" | "medium" | "high" | null;
   evTone: CopilotEvTone;
   paragraph: string;
   reasons: CopilotIntelligencePoint[];
@@ -188,8 +188,8 @@ export type CopilotBriefing = {
   sections: CopilotBriefingSection[];
   stake: CopilotSuggestedStake;
   recommendationAction: Recommendation["action"];
-  confidenceBand: "low" | "medium" | "high";
-  riskLevel: "low" | "medium" | "high";
+  confidenceBand: "low" | "medium" | "high" | null;
+  riskLevel: "low" | "medium" | "high" | null;
   intelligence: CopilotIntelligence;
 };
 

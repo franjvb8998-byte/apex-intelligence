@@ -12,8 +12,8 @@ export type ScannerExplanation = {
   supporting: Array<{ title: string; detail: string }>;
   risks: Array<{ title: string; detail: string }>;
   fairOdds: number | null;
-  stakePct: number;
-  stakeLabel: string;
+  stakePct: number | null;
+  stakeLabel: string | null;
   kellyPct: number | null;
 };
 
@@ -39,8 +39,11 @@ export function explainOpportunity(row: ApexOpportunity): ScannerExplanation {
         }))
       : [
           {
-            title: `Risk ${row.riskBand}`,
-            detail: `Published risk score ${row.riskScore}. This is not a guarantee the pick loses.`,
+            title: row.riskBand ? `Risk ${row.riskBand}` : "Risk unavailable",
+            detail:
+              row.riskScore == null
+                ? "Frozen risk score is unavailable."
+                : `Published risk score ${row.riskScore}. This is not a guarantee the pick loses.`,
           },
         ];
 

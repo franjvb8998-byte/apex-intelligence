@@ -35,14 +35,25 @@ export function WatchlistCard({ analyzed, error = false }: WatchlistCardProps) {
       href: opportunityAnalysisHref(row.fixtureId),
       title: `${row.home.name} vs ${row.away.name}`,
       subtitle: `${row.leagueName} · ${formatKickoff(row.kickoffAt)}`,
-      badge: {
-        label: discoveryRecommendation(row),
-        tone: VERDICT_BADGE_TONE[row.verdict],
-      },
+      badge: discoveryRecommendation(row)
+        ? {
+            label: discoveryRecommendation(row)!,
+            tone: row.verdict
+              ? VERDICT_BADGE_TONE[row.verdict]
+              : ("neutral" as const),
+          }
+        : undefined,
       confidence: row.confidence,
       kpis: [
-        { label: "Score", value: String(Math.round(row.score)), tone: "accent" as const },
-        { label: "Conf", value: String(Math.round(row.confidence)) },
+        {
+          label: "Score",
+          value: row.score == null ? "—" : String(Math.round(row.score)),
+          tone: "accent" as const,
+        },
+        {
+          label: "Conf",
+          value: row.confidence == null ? "—" : String(Math.round(row.confidence)),
+        },
       ],
     })),
     ...orphanIds.slice(0, 3).map((id) => ({

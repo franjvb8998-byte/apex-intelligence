@@ -15,13 +15,19 @@ type BriefingCardProps = {
   briefing: CopilotBriefing;
 };
 
-const riskTone: Record<CopilotBriefing["riskLevel"], ApexTone> = {
+const riskTone: Record<
+  Exclude<CopilotBriefing["riskLevel"], null>,
+  ApexTone
+> = {
   low: "accent",
   medium: "warning",
   high: "danger",
 };
 
-const confidenceTone: Record<CopilotBriefing["confidenceBand"], ApexTone> = {
+const confidenceTone: Record<
+  Exclude<CopilotBriefing["confidenceBand"], null>,
+  ApexTone
+> = {
   high: "accent",
   medium: "warning",
   low: "danger",
@@ -121,13 +127,21 @@ export function BriefingCard({ briefing }: BriefingCardProps) {
           />
           <Stat
             label={t("confidence")}
-            value={t(confidenceBandKey[desk.confidenceBand])}
-            tone={confidenceTone[desk.confidenceBand]}
+            value={
+              desk.confidenceBand
+                ? t(confidenceBandKey[desk.confidenceBand])
+                : "—"
+            }
+            tone={
+              desk.confidenceBand
+                ? confidenceTone[desk.confidenceBand]
+                : "neutral"
+            }
           />
           <Stat
             label={t("risk")}
-            value={t(riskBandKey[desk.riskBand])}
-            tone={riskTone[desk.riskBand]}
+            value={desk.riskBand ? t(riskBandKey[desk.riskBand]) : "—"}
+            tone={desk.riskBand ? riskTone[desk.riskBand] : "neutral"}
           />
           <Stat
             label={t("expectedValue")}

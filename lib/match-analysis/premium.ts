@@ -18,6 +18,10 @@ import {
   type PrematchActionabilityCopyKey,
   type PrematchActionabilityReason,
 } from "@/lib/prematch-decision/actionability";
+import {
+  canPublishFrozenCurrentBet,
+  frozenModelProbability,
+} from "@/lib/prematch-decision/frozen-betting";
 
 export type PremiumActionabilityCopyKey =
   | PrematchActionabilityCopyKey
@@ -105,17 +109,17 @@ export type PremiumEvidenceSignal = {
 
 export type PremiumAnalysis = {
   selectionLabel: string;
-  tier: ScoringTier;
+  tier: ScoringTier | null;
   currentlyActionable: boolean;
   actionabilityReason: PrematchActionabilityReason;
   actionabilityCopyKey: PremiumActionabilityCopyKey;
   hasFrozenPrematchDecision: boolean;
-  score: number;
-  confidence: number;
-  confidenceBand: "low" | "medium" | "high";
+  score: number | null;
+  confidence: number | null;
+  confidenceBand: "low" | "medium" | "high" | null;
   confidenceCaption: string;
-  riskBand: ApexRiskBand;
-  riskScore: number;
+  riskBand: ApexRiskBand | null;
+  riskScore: number | null;
   expectedValue: number | null;
   fairOdds: number | null;
   bookmakerOdds: number | null;
@@ -130,7 +134,7 @@ export type PremiumAnalysis = {
     currentOdds: number | null;
     fairOdds: number | null;
     expectedValue: number | null;
-    modelProbability: number;
+    modelProbability: number | null;
     impliedProbability: number | null;
     move: PremiumMarketMove;
   };
@@ -294,6 +298,29 @@ function toRec(
   };
 }
 
+function buildRecommendationsFromTicket(
+  data: MatchAnalysisData,
+  ticket: NonNullable<MatchAnalysisData["frozenPrematchDecision"]>,
+): PremiumRecommendation[] {
+  const scoring = ticket.scoring;
+  if (!scoring?.selectionLabel) return [];
+  return [
+    {
+      kind: "highestConfidence",
+      market: "1x2",
+      selection: scoring.selectionLabel,
+      confidence: scoring.confidence,
+      riskBand: scoring.riskBand,
+      expectedValue: scoring.expectedValue,
+      odds: scoring.offeredOdds,
+      explanation: `${scoring.selectionLabel} is the frozen prematch ticket selection.`,
+      primary: true,
+    },
+  ];
+}
+
+// Live PE recs stay unpublished; current betting uses the frozen ticket only.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildRecommendations(data: MatchAnalysisData): PremiumRecommendation[] {
   const priced = collectPriced(data);
   const primary =
@@ -662,7 +689,7 @@ export function buildPremiumAnalysis(
       overall: data.decision.score.value,
       coverage: data.decision.score.coverage,
       components: [],
-      recommendation: {
+        recommendation: {
         tier: "Watch" as ScoringTier,
         stars: data.decision.verdict.stars,
         note: data.decision.verdict.label,
@@ -683,45 +710,129 @@ export function buildPremiumAnalysis(
     nowUtc: clock?.nowUtc,
     asOf: clock?.asOf,
   });
-  const currentlyActionable = actionability.isCurrentlyActionable;
   const frozen = data.frozenPrematchDecision ?? null;
   const hasFrozenPrematchDecision = frozen != null;
+  const currentlyActionable =
+    actionability.isCurrentlyActionable &&
+    hasFrozenPrematchDecision &&
+    frozen != null &&
+    canPublishFrozenCurrentBet(frozen);
+  const published = frozen?.scoring ?? null;
+  const modelProbability = frozen ? frozenModelProbability(frozen) : null;
+
+  const betting = currentlyActionable
+    ? {
+        selectionLabel: published?.selectionLabel?.trim() ?? "",
+        tier: published?.recommendationTier ?? null,
+        score:
+          published?.apexScore != null && Number.isFinite(published.apexScore)
+            ? Math.round(published.apexScore)
+            : null,
+        confidence:
+          published?.confidence != null && Number.isFinite(published.confidence)
+            ? published.confidence
+            : null,
+        confidenceBand: published?.confidenceBand ?? null,
+        confidenceCaption: "",
+        riskBand: published?.riskBand ?? null,
+        riskScore:
+          published?.riskScore != null && Number.isFinite(published.riskScore)
+            ? published.riskScore
+            : null,
+        expectedValue:
+          published?.expectedValue != null && Number.isFinite(published.expectedValue)
+            ? published.expectedValue
+            : null,
+        fairOdds:
+          published?.fairOdds != null && Number.isFinite(published.fairOdds)
+            ? published.fairOdds
+            : null,
+        bookmakerOdds:
+          published?.offeredOdds != null && Number.isFinite(published.offeredOdds)
+            ? published.offeredOdds
+            : null,
+        bookmaker: published?.bookmaker ?? null,
+        market: {
+          openingOdds: null,
+          currentOdds:
+            published?.offeredOdds != null && Number.isFinite(published.offeredOdds)
+              ? published.offeredOdds
+              : null,
+          fairOdds:
+            published?.fairOdds != null && Number.isFinite(published.fairOdds)
+              ? published.fairOdds
+              : null,
+          expectedValue:
+            published?.expectedValue != null &&
+            Number.isFinite(published.expectedValue)
+              ? published.expectedValue
+              : null,
+          modelProbability,
+          impliedProbability:
+            published?.impliedProbability != null &&
+            Number.isFinite(published.impliedProbability)
+              ? published.impliedProbability
+              : null,
+          move: "unpriced" as const,
+        },
+        summary: "",
+      }
+    : {
+        selectionLabel: scoring.selectionLabel,
+        tier: scoring.recommendation.tier,
+        score: Math.round(scoring.overall),
+        confidence: data.decision.confidence.value,
+        confidenceBand: data.decision.confidence.band,
+        confidenceCaption: data.decision.confidence.caption,
+        riskBand: data.decision.risk.band,
+        riskScore: data.decision.risk.score,
+        expectedValue: data.decision.value.expectedValue,
+        fairOdds: data.decision.value.fairOdds,
+        bookmakerOdds: data.decision.value.impliedOdds,
+        bookmaker: data.report.market.bookmaker,
+        market: {
+          openingOdds: null,
+          currentOdds: data.decision.value.impliedOdds,
+          fairOdds: data.decision.value.fairOdds,
+          expectedValue: data.decision.value.expectedValue,
+          modelProbability: data.decision.value.modelProbability,
+          impliedProbability: data.decision.value.marketProbability,
+          move: marketMove(data),
+        },
+        summary: briefing.executiveSummary,
+      };
 
   return {
-    selectionLabel: scoring.selectionLabel,
-    tier: scoring.recommendation.tier,
+    selectionLabel: betting.selectionLabel,
+    tier: betting.tier,
     currentlyActionable,
     actionabilityReason: actionability.reason,
     actionabilityCopyKey: currentlyActionable
       ? prematchActionabilityCopyKey(actionability)
-      : hasFrozenPrematchDecision
-        ? "frozenPrematchDecisionExists"
-        : prematchActionabilityCopyKey(actionability),
+      : actionability.isCurrentlyActionable
+        ? "noFrozenPrematchDecision"
+        : hasFrozenPrematchDecision
+          ? "frozenPrematchDecisionExists"
+          : prematchActionabilityCopyKey(actionability),
     hasFrozenPrematchDecision,
-    score: Math.round(scoring.overall),
-    confidence: data.decision.confidence.value,
-    confidenceBand: data.decision.confidence.band,
-    confidenceCaption: data.decision.confidence.caption,
-    riskBand: data.decision.risk.band,
-    riskScore: data.decision.risk.score,
-    expectedValue: data.decision.value.expectedValue,
-    fairOdds: data.decision.value.fairOdds,
-    bookmakerOdds: data.decision.value.impliedOdds,
-    bookmaker: data.report.market.bookmaker,
-    recommendations: currentlyActionable ? buildRecommendations(data) : [],
+    score: betting.score,
+    confidence: betting.confidence,
+    confidenceBand: betting.confidenceBand,
+    confidenceCaption: betting.confidenceCaption,
+    riskBand: betting.riskBand,
+    riskScore: betting.riskScore,
+    expectedValue: betting.expectedValue,
+    fairOdds: betting.fairOdds,
+    bookmakerOdds: betting.bookmakerOdds,
+    bookmaker: betting.bookmaker,
+    recommendations: currentlyActionable
+      ? buildRecommendationsFromTicket(data, frozen)
+      : [],
     contributions: buildContributions(data),
     comparison: buildComparison(data),
     context: buildContext(data),
-    market: {
-      openingOdds: null,
-      currentOdds: data.decision.value.impliedOdds,
-      fairOdds: data.decision.value.fairOdds,
-      expectedValue: data.decision.value.expectedValue,
-      modelProbability: data.decision.value.modelProbability,
-      impliedProbability: data.decision.value.marketProbability,
-      move: marketMove(data),
-    },
-    summary: briefing.executiveSummary,
+    market: betting.market,
+    summary: betting.summary,
     evidence: buildEvidence(data),
   };
 }

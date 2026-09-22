@@ -38,6 +38,19 @@ export {
 } from "@/lib/prematch-decision/from-match-analysis";
 
 export {
+  applyFrozenTicketToOpportunity,
+  canPublishFrozenCurrentBet,
+  frozenApexDecision,
+  frozenApexRating,
+  frozenModelProbability,
+  frozenRecommendation,
+  frozenSelectionOutcome,
+  frozenStars,
+  frozenValueBet,
+  type FrozenFeaturedDecision,
+} from "@/lib/prematch-decision/frozen-betting";
+
+export {
   captureScannerPrematchTicket,
   captureScannerPrematchTicketFromCenter,
   publishedSnapshotFromMatchCenter,
@@ -57,9 +70,11 @@ export {
   LayeredPrematchDecisionTicketStore,
   UnavailablePrematchDecisionTicketBackend,
   InMemoryPrematchDecisionTicketBackend,
+  confirmDurableByFixtureId,
   getPrematchDecisionTicketStore,
   resetPrematchDecisionTicketStoreForTests,
   setPrematchDecisionDurableBackendFactory,
+  type DurableTicketProof,
   type PrematchDecisionTicketDurableBackend,
   type PrematchDecisionTicketStore,
   type PrematchTicketInsertResult,

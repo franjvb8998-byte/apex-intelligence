@@ -139,7 +139,9 @@ export function AiMatchAnalysisPanel({ analysis, match }: AiMatchAnalysisPanelPr
               title={t("recommendation")}
               description={
                 presented.showCurrentRecommendation
-                  ? actionLabel[recommendation.action]
+                  ? recommendation.action
+                    ? actionLabel[recommendation.action]
+                    : recommendation.title
                   : t("actionWatch")
               }
               action={
@@ -180,9 +182,11 @@ export function AiMatchAnalysisPanel({ analysis, match }: AiMatchAnalysisPanelPr
             {presented.valueBet ? (
               <div className="space-y-2 text-sm text-[var(--apex-fg-muted)]">
                 <p>
-                  {t("modelPct", {
-                    pct: (presented.valueBet.modelProbability * 100).toFixed(0),
-                  })}
+                  {presented.valueBet.modelProbability == null
+                    ? "—"
+                    : t("modelPct", {
+                        pct: (presented.valueBet.modelProbability * 100).toFixed(0),
+                      })}
                   {presented.valueBet.impliedProbability != null && (
                     <>
                       {" "}
@@ -192,10 +196,16 @@ export function AiMatchAnalysisPanel({ analysis, match }: AiMatchAnalysisPanelPr
                   )}
                 </p>
                 <p>
-                  Edge{" "}
-                  <span className="text-[var(--apex-accent)]">
-                    {(presented.valueBet.edge * 100).toFixed(1)} pp
-                  </span>
+                  {presented.valueBet.edge == null ? (
+                    "—"
+                  ) : (
+                    <>
+                      Edge{" "}
+                      <span className="text-[var(--apex-accent)]">
+                        {(presented.valueBet.edge * 100).toFixed(1)} pp
+                      </span>
+                    </>
+                  )}
                 </p>
                 {presented.valueBet.explanation && (
                   <p className="text-xs">{presented.valueBet.explanation}</p>

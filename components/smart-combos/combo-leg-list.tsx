@@ -51,9 +51,11 @@ export function ComboLegList({
               </p>
             </div>
             <div className="flex flex-col items-end gap-1">
-              <Badge tone={VERDICT_BADGE_TONE[leg.verdict]} size="sm">
-                {leg.verdictLabel}
-              </Badge>
+              {leg.verdict ? (
+                <Badge tone={VERDICT_BADGE_TONE[leg.verdict]} size="sm">
+                  {leg.verdictLabel ?? "—"}
+                </Badge>
+              ) : null}
               <span className="font-mono text-[10px] tabular-nums text-[var(--apex-fg-subtle)]">
                 {leg.apexProbability == null
                   ? "p n/d"

@@ -9,7 +9,7 @@ export type ScannerRecommendation = ScoringTier;
 
 export function scannerRecommendation(
   row: ApexOpportunity,
-): ScannerRecommendation {
+): ScannerRecommendation | null {
   return row.recommendation;
 }
 

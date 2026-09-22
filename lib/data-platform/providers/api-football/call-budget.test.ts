@@ -126,6 +126,7 @@ describe("Sprint 5A.8 call-budget characterization", () => {
   it("SCENARIO 1 light: Scanner 20/5 terminal + 3 Match Centers (cold)", async () => {
     const coldCalls: string[] = [];
     const board = await getApexOpportunities({
+      nowUtc: "2027-08-15T14:00:00.000Z",
       provider: countingProvider({ items: mixed20, calls: coldCalls }),
     });
     expect(board.analyzed).toHaveLength(15);
@@ -167,10 +168,16 @@ describe("Sprint 5A.8 call-budget characterization", () => {
       calls,
       useCache: true,
     });
-    await getApexOpportunities({ provider });
+    await getApexOpportunities({
+      nowUtc: "2027-08-15T14:00:00.000Z",
+      provider,
+    });
     const afterCold = calls.length;
     expect(afterCold).toBeGreaterThan(0);
-    await getApexOpportunities({ provider });
+    await getApexOpportunities({
+      nowUtc: "2027-08-15T14:00:00.000Z",
+      provider,
+    });
     expect(calls.length).toBe(afterCold);
   }, 30_000);
 

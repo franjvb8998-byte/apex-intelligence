@@ -12,19 +12,27 @@ import type {
   LabResearchLoad,
   LabScanLoad,
 } from "@/lib/lab/load";
-import type { ApexDecision } from "@/lib/decision-engine/types";
+import type { FrozenFeaturedDecision } from "@/lib/prematch-decision/frozen-betting";
 
-function decisionKpis(decision: ApexDecision): LabKpi[] {
+function decisionKpis(decision: FrozenFeaturedDecision): LabKpi[] {
   return [
     { label: "Score", value: formatScore(decision.score.value), tone: "accent" },
     {
       label: "Conf",
       value: formatScore(decision.confidence.value),
-      tone: decision.confidence.band === "high" ? "success" : "warning",
+      tone:
+        decision.confidence.band === "high"
+          ? "success"
+          : decision.confidence.band == null
+            ? "neutral"
+            : "warning",
     },
     {
       label: "Risk",
-      value: `${formatScore(decision.risk.score)} ${decision.risk.band}`,
+      value:
+        decision.risk.score == null && decision.risk.band == null
+          ? "—"
+          : `${formatScore(decision.risk.score)}${decision.risk.band ? ` ${decision.risk.band}` : ""}`,
       tone: decision.risk.band === "high" ? "danger" : "neutral",
     },
     { label: "EV", value: formatEv(decision.value.expectedValue) },
@@ -35,7 +43,7 @@ function decisionKpis(decision: ApexDecision): LabKpi[] {
           ? "—"
           : `${decision.sizing.kellyPct.toFixed(1)}%`,
     },
-    { label: "Stake", value: decision.sizing.stakeLabel },
+    { label: "Stake", value: decision.sizing.stakeLabel ?? "—" },
   ];
 }
 
@@ -46,7 +54,7 @@ export function buildDecisionView(
   return {
     matchLabel: featured.label,
     href: featured.href,
-    verdictLabel: featured.decision.verdict.label,
+    verdictLabel: featured.decision.verdict.label ?? featured.decision.selectionLabel,
     verdictKind: featured.decision.verdict.kind,
     selectionLabel: featured.decision.selectionLabel,
     explanation: featured.decision.explanation,

@@ -16,6 +16,7 @@ import {
   type MatchAnalysisTicketExtras,
 } from "@/lib/prematch-decision/from-match-analysis";
 import {
+  confirmDurableByFixtureId,
   getPrematchDecisionTicketStore,
   type PrematchDecisionTicketStore,
 } from "@/lib/prematch-decision/store";
@@ -34,11 +35,17 @@ export async function attachPrematchDecisionTicket(
 ): Promise<MatchAnalysisData> {
   const store = options.store ?? getPrematchDecisionTicketStore();
   const fixtureId = vendorFixtureId(analysis.matchId) ?? analysis.matchId;
-  const existing = await store.getByFixtureId(fixtureId);
-  if (existing) {
+  const existing = await confirmDurableByFixtureId(store, fixtureId);
+  if (existing.confirmed) {
     return {
       ...analysis,
-      frozenPrematchDecision: existing,
+      frozenPrematchDecision: existing.ticket,
+    };
+  }
+  if (existing.reason === "DURABLE_STORE_UNAVAILABLE") {
+    return {
+      ...analysis,
+      frozenPrematchDecision: null,
     };
   }
 
@@ -84,5 +91,9 @@ export async function lookupFrozenPrematchDecision(
   fixtureId: string,
   store?: PrematchDecisionTicketStore,
 ) {
-  return (store ?? getPrematchDecisionTicketStore()).getByFixtureId(fixtureId);
+  const proof = await confirmDurableByFixtureId(
+    store ?? getPrematchDecisionTicketStore(),
+    fixtureId,
+  );
+  return proof.confirmed ? proof.ticket : null;
 }

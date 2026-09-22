@@ -4,7 +4,11 @@
  */
 
 import { cache } from "react";
-import { mapOpportunityFromCenter } from "@/lib/apex-opportunities/map";
+import {
+  applyFrozenTicketToOpportunity,
+  mapOpportunityFromCenter,
+} from "@/lib/apex-opportunities/map";
+import { canPublishFrozenCurrentBet } from "@/lib/prematch-decision/frozen-betting";
 import {
   defaultApexOpportunitiesShareKey,
   shareApexOpportunitiesBoard,
@@ -31,7 +35,10 @@ import type { LoadMatchCenterOptions } from "@/lib/match-center/load";
 import { filterCurrentActionableOpportunities } from "@/lib/prematch-decision/actionability";
 import type { InjectedClock } from "@/lib/prematch-decision/actionability";
 import { captureScannerPrematchTicketFromCenter } from "@/lib/prematch-decision/from-scanner";
-import type { PrematchDecisionTicketStore } from "@/lib/prematch-decision/store";
+import {
+  InMemoryPrematchDecisionTicketStore,
+  type PrematchDecisionTicketStore,
+} from "@/lib/prematch-decision/store";
 import type { FinalFixtureEvidenceStore } from "@/lib/final-evidence/store";
 import {
   ingestCatalogueFinalBundle,
@@ -46,6 +53,16 @@ import {
 } from "@/lib/repositories";
 
 const EVALUATE_CONCURRENCY = 3;
+
+function resolveTicketStore(
+  store?: PrematchDecisionTicketStore,
+): PrematchDecisionTicketStore | undefined {
+  if (store) return store;
+  if (process.env.VITEST === "true") {
+    return new InMemoryPrematchDecisionTicketStore();
+  }
+  return undefined;
+}
 
 export type LoadApexOpportunitiesOptions = LoadMatchCenterOptions & {
   /** Sprint 2.5 — removable profile session. Does not change board output. */
@@ -115,16 +132,17 @@ async function evaluateBundle(
     () => mapOpportunityFromCenter(center),
     { fixtures: 1 },
   );
-  if (row) {
-    await captureScannerPrematchTicketFromCenter({
-      center,
-      leagueId: bundle.league?.id ?? null,
-      season: bundle.league?.season ?? null,
-      clock: capture?.clock,
-      store: capture?.store,
-    });
-  }
-  return row;
+  if (!row) return null;
+  const captured = await captureScannerPrematchTicketFromCenter({
+    center,
+    leagueId: bundle.league?.id ?? null,
+    season: bundle.league?.season ?? null,
+    clock: capture?.clock,
+    store: capture?.store,
+  });
+  if (!captured?.ok || !captured.ticket) return null;
+  if (!canPublishFrozenCurrentBet(captured.ticket)) return null;
+  return applyFrozenTicketToOpportunity(row, captured.ticket);
 }
 
 type MapPoolResult<R> = {
@@ -244,12 +262,13 @@ async function computeApexOpportunitiesBoard(
   noteScannerFixtureCount(bundles.length);
   noteScannerFixtures("catalogue", bundles.length);
 
+  const ticketStore = resolveTicketStore(options.ticketStore);
   const capture = {
     clock: options.nowUtc,
-    store: options.ticketStore,
+    store: ticketStore,
   };
   const historical = {
-    ticketStore: options.ticketStore,
+    ticketStore,
     evidenceStore: options.evidenceStore,
     evaluationStore: options.evaluationStore,
     clock:
@@ -284,6 +303,7 @@ async function computeApexOpportunitiesBoard(
 
   const analyzed = filterCurrentActionableOpportunities(
     mapped.items.filter((row): row is NonNullable<typeof row> => row != null),
+    options.nowUtc,
   );
 
   return {

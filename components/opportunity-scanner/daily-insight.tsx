@@ -49,7 +49,10 @@ export function ScannerDailyInsight({ insight }: { insight: ScannerInsight }) {
     : insight.interestingMatch
       ? t("matchDetail", {
           league: insight.interestingMatch.leagueName,
-          score: Math.round(insight.interestingMatch.score),
+          score:
+            insight.interestingMatch.score == null
+              ? "—"
+              : Math.round(insight.interestingMatch.score),
         })
       : t("matchDetailEmpty");
 

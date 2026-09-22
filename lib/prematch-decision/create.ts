@@ -111,12 +111,21 @@ export async function createPrematchDecisionTicket(
   }
 
   const store = input.store ?? getPrematchDecisionTicketStore();
-  const existing = await store.getByTicketId(ticketId);
-  if (existing) {
+  const existing = await store.confirmDurableByTicketId(ticketId);
+  if (existing.confirmed) {
     return {
       ok: true,
       status: "idempotent",
-      ticket: existing,
+      ticket: existing.ticket,
+      actionability,
+    };
+  }
+  if (existing.reason === "DURABLE_STORE_UNAVAILABLE") {
+    return {
+      ok: false,
+      status: "durable_unavailable",
+      ticket: null,
+      reason: "DURABLE_STORE_UNAVAILABLE",
       actionability,
     };
   }

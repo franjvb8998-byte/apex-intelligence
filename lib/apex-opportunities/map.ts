@@ -1,5 +1,6 @@
 import type { ApexOpportunity } from "@/lib/apex-opportunities/types";
 import type { ApexDecision, ApexDecisionInput } from "@/lib/decision-engine/types";
+import { applyFrozenTicketToOpportunity } from "@/lib/prematch-decision/frozen-betting";
 import { countryFromLeague } from "@/lib/opportunity-scanner/country";
 import { fixtureIdFromMatch } from "@/lib/match-center/fixture-id";
 import type { MatchCenterData } from "@/lib/match-center/types";
@@ -130,8 +131,12 @@ export function mapOpportunityFromDecision(input: {
     reasonsFor: decision.reasonsFor,
     reasonsAgainst: decision.reasonsAgainst,
     positiveEdge: decision.value.positiveEdge,
+    durableTicketConfirmed: false,
+    frozenTicketId: null,
   };
   captureOpportunityRecommendation(row, scoring);
   persistOpportunityPrediction({ row, decision, scoring });
   return row;
 }
+
+export { applyFrozenTicketToOpportunity };

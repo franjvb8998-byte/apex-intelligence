@@ -10,12 +10,16 @@ import {
 } from "@/lib/match-center/fixture-id";
 import type { ApexOpportunity } from "@/lib/apex-opportunities/types";
 import type { BankrollData, BankrollFixture } from "@/lib/bankroll/types";
-import type { ApexDecision } from "@/lib/decision-engine/types";
 import type { ExplainablePrediction } from "@/lib/explainable-ai/types";
 import type { EvaluationReport } from "@/lib/learning-engine/types/evaluation";
 import type { KnowledgeDiscovery } from "@/lib/learning-engine/types/knowledge";
 import type { LearningCase } from "@/lib/learning-engine/types/case";
 import type { ApexMatchRating } from "@/lib/match-rating/types";
+import {
+  frozenApexDecision,
+  frozenApexRating,
+  type FrozenFeaturedDecision,
+} from "@/lib/prematch-decision/frozen-betting";
 
 export type LabScanLoad =
   | {
@@ -29,7 +33,7 @@ export type LabScanLoad =
 export type LabFeaturedLoad = {
   label: string | null;
   href: string;
-  decision: ApexDecision | null;
+  decision: FrozenFeaturedDecision | null;
   rating: ApexMatchRating | null;
   explainable: ExplainablePrediction | null;
   probability: {
@@ -106,8 +110,12 @@ export const loadLabFeatured = cache(async (): Promise<LabFeaturedLoad> => {
   return {
     label: `${matchCenter.match.homeTeam.name} vs ${matchCenter.match.awayTeam.name}`,
     href: fixtureId ? matchAnalysisHref(fixtureId) : "/match-analysis",
-    decision: analysis.decision,
-    rating: analysis.rating,
+    decision: analysis.frozenPrematchDecision
+      ? frozenApexDecision(analysis.frozenPrematchDecision)
+      : null,
+    rating: analysis.frozenPrematchDecision
+      ? frozenApexRating(analysis.frozenPrematchDecision)
+      : null,
     explainable: analysis.explainable,
     probability: {
       modelVersion: analysis.modelVersion,

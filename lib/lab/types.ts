@@ -2,7 +2,6 @@ import type { ApexTone } from "@/components/design-system/tokens";
 import type { ApexOpportunity } from "@/lib/apex-opportunities/types";
 import type { OpportunityRiskFilter } from "@/lib/apex-opportunities/types";
 import type {
-  ApexDecision,
   ApexDecisionVerdictKind,
   ApexScoreComponent,
 } from "@/lib/decision-engine/types";
@@ -12,6 +11,7 @@ import type { KnowledgeDiscovery } from "@/lib/learning-engine/types/knowledge";
 import type { LearningCase } from "@/lib/learning-engine/types/case";
 import type { ApexMatchRating } from "@/lib/match-rating/types";
 import type { BankrollData, BankrollFixture } from "@/lib/bankroll/types";
+import type { FrozenFeaturedDecision } from "@/lib/prematch-decision/frozen-betting";
 
 export type LabModelStatus = "production" | "research" | "stub";
 
@@ -142,7 +142,7 @@ export type LabDecisionView = {
   matchLabel: string;
   href: string;
   verdictLabel: string;
-  verdictKind: ApexDecisionVerdictKind;
+  verdictKind: ApexDecisionVerdictKind | null;
   selectionLabel: string;
   explanation: string;
   kpis: LabKpi[];
@@ -171,7 +171,7 @@ export type LabWorkspace = {
   featured: {
     label: string | null;
     href: string;
-    decision: ApexDecision | null;
+    decision: FrozenFeaturedDecision | null;
     rating: ApexMatchRating | null;
     explainable: ExplainablePrediction | null;
     probability: {

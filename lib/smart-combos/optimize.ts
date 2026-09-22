@@ -66,12 +66,18 @@ export function optimizeCombo(
 
     const safer = pool
       .filter((leg) => (leg.apexProbability ?? 0) > (weakest.apexProbability ?? 0))
-      .filter((leg) => leg.riskScore <= weakest.riskScore)
+      .filter(
+        (leg) =>
+          leg.riskScore != null &&
+          weakest.riskScore != null &&
+          leg.riskScore <= weakest.riskScore,
+      )
       .filter((leg) => canSwap(current.legs, weakest.fixtureId, leg))
       .sort(
         (a, b) =>
           (b.apexProbability ?? 0) - (a.apexProbability ?? 0) ||
-          a.riskScore - b.riskScore,
+          (a.riskScore ?? Number.POSITIVE_INFINITY) -
+            (b.riskScore ?? Number.POSITIVE_INFINITY),
       )[0];
     if (safer) {
       const next = analyzeCombo(

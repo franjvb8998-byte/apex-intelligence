@@ -46,7 +46,8 @@ function evTone(ev: number | null): CopilotEvTone {
 function preferredName(snapshot: CopilotMatchSnapshot): string {
   if (snapshot.predictedOutcome === "away") return snapshot.away.name;
   if (snapshot.predictedOutcome === "draw") return "the draw";
-  return snapshot.home.name;
+  if (snapshot.predictedOutcome === "home") return snapshot.home.name;
+  return snapshot.recommendation.title;
 }
 
 function callFromSnapshot(
@@ -73,22 +74,12 @@ function callFromSnapshot(
 function callForSide(outcome: CopilotMatchSnapshot["predictedOutcome"]): CopilotCall {
   if (outcome === "away") return "back_away";
   if (outcome === "draw") return "back_draw";
-  return "back_home";
+  if (outcome === "home") return "back_home";
+  return "watch_live";
 }
 
 function riskBand(snapshot: CopilotMatchSnapshot): CopilotIntelligence["riskBand"] {
-  if (snapshot.decision?.risk.band) return snapshot.decision.risk.band;
-  if (
-    snapshot.confidence.band === "low" ||
-    snapshot.oneXTwo.draw >= 0.32 ||
-    snapshot.injuries.length >= 3
-  ) {
-    return "high";
-  }
-  if (snapshot.confidence.band === "medium" || snapshot.injuries.length > 0) {
-    return "medium";
-  }
-  return "low";
+  return snapshot.decision?.risk.band ?? null;
 }
 
 function confidenceBand(
@@ -342,6 +333,9 @@ function confidenceWhy(
     (snapshot.away.played != null && snapshot.away.played < 6);
   const openGame = snapshot.oneXTwo.draw >= 0.28;
 
+  if (band == null) {
+    return "Frozen confidence is unavailable. This is not a low-confidence reading.";
+  }
   if (band === "high") {
     return "Confidence is high because enough of the match picture is published, and the sides are not a coin flip.";
   }

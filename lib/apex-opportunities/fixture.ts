@@ -47,6 +47,8 @@ export function opportunityFixture(
       },
     ],
     positiveEdge: true,
+    durableTicketConfirmed: true,
+    frozenTicketId: "apex:prematch-decision:v1:1035089",
     ...over,
   };
 }

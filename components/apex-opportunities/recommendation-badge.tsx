@@ -4,7 +4,7 @@ import { discoveryRecommendation } from "@/lib/apex-opportunities/discovery";
 import type { ApexOpportunity } from "@/lib/apex-opportunities/types";
 
 const REC_TONE: Record<
-  ReturnType<typeof discoveryRecommendation>,
+  Exclude<ReturnType<typeof discoveryRecommendation>, null>,
   { tone: ApexTone; mark: string }
 > = {
   "STRONG BET": { tone: "success", mark: "🟢" },
@@ -16,6 +16,7 @@ const REC_TONE: Record<
 
 export function RecommendationBadge({ row }: { row: ApexOpportunity }) {
   const label = discoveryRecommendation(row);
+  if (!label) return null;
   const { tone, mark } = REC_TONE[label];
   return (
     <Badge tone={tone} size="md" className="font-mono tracking-[0.12em]">

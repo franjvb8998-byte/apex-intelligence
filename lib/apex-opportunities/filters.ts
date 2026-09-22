@@ -2,6 +2,7 @@
  * Pure filter / sort for the Opportunities board.
  */
 
+import { descPresent } from "@/lib/apex-opportunities/present";
 import type {
   ApexOpportunity,
   OpportunityFilters,
@@ -42,8 +43,8 @@ export function opportunityPassesFilters(
   filters: OpportunityFilters,
 ): boolean {
   if (!isCurrentActionableOpportunity(row)) return false;
-  if (row.score < filters.minScore) return false;
-  if (row.confidence < filters.minConfidence) return false;
+  if (row.score == null || row.score < filters.minScore) return false;
+  if (row.confidence == null || row.confidence < filters.minConfidence) return false;
   if (!passesMinEv(row.expectedValue, filters.minEv)) return false;
   if (filters.league !== "all" && row.leagueName !== filters.league) return false;
   if (filters.market !== "all" && row.market !== filters.market) return false;
@@ -63,11 +64,12 @@ export function opportunityPassesFilters(
 
 export function sortOpportunities(rows: ApexOpportunity[]): ApexOpportunity[] {
   return [...rows].sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    const evA = a.expectedValue ?? Number.NEGATIVE_INFINITY;
-    const evB = b.expectedValue ?? Number.NEGATIVE_INFINITY;
-    if (evB !== evA) return evB - evA;
-    if (b.confidence !== a.confidence) return b.confidence - a.confidence;
+    const score = descPresent(a.score, b.score);
+    if (score !== 0) return score;
+    const ev = descPresent(a.expectedValue, b.expectedValue);
+    if (ev !== 0) return ev;
+    const confidence = descPresent(a.confidence, b.confidence);
+    if (confidence !== 0) return confidence;
     return a.fixtureId.localeCompare(b.fixtureId);
   });
 }

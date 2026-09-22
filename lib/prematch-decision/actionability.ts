@@ -81,6 +81,8 @@ const TERMINAL_VENDOR_STATUSES = new Set<string>([
 export type ActionableOpportunityRow = {
   vendorStatusShort?: string | null;
   kickoffAt: string;
+  /** Required for current betting publication. L1-only is not enough. */
+  durableTicketConfirmed?: boolean;
 };
 
 function resolveClock(clock: InjectedClock | undefined): Date {
@@ -184,7 +186,10 @@ export function isCurrentActionableOpportunity(
   row: ActionableOpportunityRow,
   clock?: InjectedClock,
 ): boolean {
-  return evaluateOpportunityActionability(row, clock).isCurrentlyActionable;
+  return (
+    row.durableTicketConfirmed === true &&
+    evaluateOpportunityActionability(row, clock).isCurrentlyActionable
+  );
 }
 
 export function filterCurrentActionableOpportunities<
@@ -226,7 +231,11 @@ export function evaluateMatchActionability(
 }
 
 export function presentMatchCenterBettingSurfaces<TValue>(
-  match: { vendorStatusShort?: string | null; kickoffAt: string },
+  match: {
+    vendorStatusShort?: string | null;
+    kickoffAt: string;
+    durableTicketConfirmed?: boolean;
+  },
   dashboard: { valueBet: TValue | null },
   clock?: InjectedClock,
 ): {
@@ -237,11 +246,17 @@ export function presentMatchCenterBettingSurfaces<TValue>(
   showCurrentRecommendation: boolean;
 } {
   const actionability = evaluateMatchActionability(match, clock);
-  const currentlyActionable = actionability.isCurrentlyActionable;
+  const ticketConfirmed = match.durableTicketConfirmed === true;
+  const currentlyActionable =
+    actionability.isCurrentlyActionable && ticketConfirmed;
   return {
     currentlyActionable,
     reason: actionability.reason,
-    copyKey: prematchActionabilityCopyKey(actionability),
+    copyKey: currentlyActionable
+      ? prematchActionabilityCopyKey(actionability)
+      : actionability.isCurrentlyActionable
+        ? "noFrozenPrematchDecision"
+        : prematchActionabilityCopyKey(actionability),
     valueBet: currentlyActionable ? dashboard.valueBet : null,
     showCurrentRecommendation: currentlyActionable,
   };

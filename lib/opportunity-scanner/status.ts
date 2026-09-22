@@ -78,7 +78,7 @@ function filterReason(
   if (filters.risk !== "all" && row.riskBand !== filters.risk) {
     return "filteredRisk";
   }
-  if (row.confidence < filters.minConfidence) {
+  if (row.confidence == null || row.confidence < filters.minConfidence) {
     return "confidenceFilter";
   }
   if (filters.oddsMin != null || filters.oddsMax != null) {

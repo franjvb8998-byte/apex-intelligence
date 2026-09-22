@@ -9,10 +9,7 @@ import {
   formatSignedPct,
   SCORING_BADGE_TONE,
 } from "@/lib/apex-opportunities/display";
-import {
-  opportunityAnalysisHref,
-  opportunityBankrollHref,
-} from "@/lib/apex-opportunities/hrefs";
+import { opportunityAnalysisHref } from "@/lib/apex-opportunities/hrefs";
 import type { ApexOpportunity } from "@/lib/apex-opportunities/types";
 import { formatMoney, formatSignedMoney } from "@/lib/bankroll/currency";
 import { formatPct } from "@/lib/bankroll/format";
@@ -84,13 +81,19 @@ function opportunityRow(row: ApexOpportunity): FeedRow {
     href: analysisHref(row.fixtureId),
     title: `${row.home.name} vs ${row.away.name}`,
     subtitle: `${row.leagueName} · ${formatKickoff(row.kickoffAt)} · ${row.selectionLabel}`,
-    badge: {
-      label: rec,
-      tone: SCORING_BADGE_TONE[row.recommendation],
-    },
+    badge: rec
+      ? {
+          label: rec,
+          tone: SCORING_BADGE_TONE[row.recommendation!],
+        }
+      : undefined,
     confidence: row.confidence,
     kpis: [
-      { label: "Score", value: String(Math.round(row.score)), tone: "accent" },
+      {
+        label: "Score",
+        value: row.score == null ? "—" : String(Math.round(row.score)),
+        tone: "accent",
+      },
       {
         label: "Conf",
         value: formatConf(row.confidence),
@@ -114,12 +117,21 @@ export function buildEliteCard(analyzed: ApexOpportunity[]): FeedCardModel {
       Number(b.recommendation === "Elite" || b.recommendation === "Strong Bet") -
       Number(a.recommendation === "Elite" || a.recommendation === "Strong Bet");
     if (eliteDelta !== 0) return eliteDelta;
-    if (b.score !== a.score) return b.score - a.score;
-    return b.confidence - a.confidence;
+    const score =
+      (b.score ?? Number.NEGATIVE_INFINITY) - (a.score ?? Number.NEGATIVE_INFINITY);
+    if (score !== 0) return score;
+    return (
+      (b.confidence ?? Number.NEGATIVE_INFINITY) -
+      (a.confidence ?? Number.NEGATIVE_INFINITY)
+    );
   });
   const rows = ranked.slice(0, FEED_ROW_LIMIT).map(opportunityRow);
   const shown = ranked.slice(0, FEED_ROW_LIMIT);
-  const avgConf = mean(shown.map((row) => row.confidence));
+  const avgConf = mean(
+    shown
+      .map((row) => row.confidence)
+      .filter((value): value is number => value != null && Number.isFinite(value)),
+  );
 
   return {
     kpis: [
@@ -141,8 +153,11 @@ export function buildEliteCard(analyzed: ApexOpportunity[]): FeedCardModel {
 
 export function buildConfidenceMovers(analyzed: ApexOpportunity[]): FeedCardModel {
   const ranked = [...analyzed].sort((a, b) => {
-    if (b.confidence !== a.confidence) return b.confidence - a.confidence;
-    return b.score - a.score;
+    const confidence =
+      (b.confidence ?? Number.NEGATIVE_INFINITY) -
+      (a.confidence ?? Number.NEGATIVE_INFINITY);
+    if (confidence !== 0) return confidence;
+    return (b.score ?? Number.NEGATIVE_INFINITY) - (a.score ?? Number.NEGATIVE_INFINITY);
   });
   const high = analyzed.filter((row) => row.confidenceBand === "high").length;
   const top = ranked[0];
@@ -161,7 +176,9 @@ export function buildConfidenceMovers(analyzed: ApexOpportunity[]): FeedCardMode
       {
         label: "Vs 50",
         value: top
-          ? `${top.confidence >= 50 ? "+" : ""}${Math.round(top.confidence - 50)}`
+          ? top.confidence == null
+            ? "—"
+            : `${top.confidence >= 50 ? "+" : ""}${Math.round(top.confidence - 50)}`
           : "—",
         tone: confidenceTone(top?.confidence),
       },
@@ -256,7 +273,11 @@ export function buildAlertCard(input: {
   }
 
   const deskNotes = [...input.analyzed]
-    .sort((a, b) => b.riskScore - a.riskScore)
+    .sort(
+      (a, b) =>
+        (b.riskScore ?? Number.NEGATIVE_INFINITY) -
+        (a.riskScore ?? Number.NEGATIVE_INFINITY),
+    )
     .slice(0, FEED_ROW_LIMIT);
   for (const row of deskNotes) {
     if (rows.length >= FEED_ROW_LIMIT) break;
@@ -267,11 +288,16 @@ export function buildAlertCard(input: {
       href: analysisHref(row.fixtureId),
       title: `${row.home.shortName} vs ${row.away.shortName}`,
       subtitle: row.explanation,
-      badge: { label: "badge.desk", tone: SCORING_BADGE_TONE[row.recommendation] },
+      badge: row.recommendation
+        ? { label: "badge.desk", tone: SCORING_BADGE_TONE[row.recommendation] }
+        : { label: "badge.desk", tone: "neutral" },
       confidence: row.confidence,
       kpis: [
-        { label: "Risk", value: row.riskBand, tone: "warning" },
-        { label: priority.shortLabel, value: String(Math.round(row.score)) },
+        { label: "Risk", value: row.riskBand ?? "—", tone: "warning" },
+        {
+          label: priority?.shortLabel ?? "—",
+          value: row.score == null ? "—" : String(Math.round(row.score)),
+        },
       ],
     });
   }

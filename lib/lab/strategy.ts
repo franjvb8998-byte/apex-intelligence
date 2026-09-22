@@ -75,8 +75,8 @@ export function labStrategyPasses(
   row: ApexOpportunity,
   spec: LabStrategySpec,
 ): boolean {
-  if (row.score < spec.minScore) return false;
-  if (row.confidence < spec.minConfidence) return false;
+  if (row.score == null || row.score < spec.minScore) return false;
+  if (row.confidence == null || row.confidence < spec.minConfidence) return false;
   if (spec.minEv != null) {
     if (row.expectedValue == null || !Number.isFinite(row.expectedValue)) {
       return false;
@@ -88,7 +88,10 @@ export function labStrategyPasses(
     }
   }
   if (spec.risk !== "all" && row.riskBand !== spec.risk) return false;
-  if (spec.verdicts.length > 0 && !spec.verdicts.includes(row.verdict)) {
+  if (
+    spec.verdicts.length > 0 &&
+    (row.verdict == null || !spec.verdicts.includes(row.verdict))
+  ) {
     return false;
   }
   return true;
@@ -104,8 +107,8 @@ export function paperLabStrategy(
     passed,
     scanned: analyzed.length,
     selected: passed.length,
-    averageScore: mean(passed.map((row) => row.score)),
-    averageConfidence: mean(passed.map((row) => row.confidence)),
+    averageScore: mean(finite(passed.map((row) => row.score))),
+    averageConfidence: mean(finite(passed.map((row) => row.confidence))),
     averageEv: mean(finite(passed.map((row) => row.expectedValue))),
     averageKelly: mean(finite(passed.map((row) => row.kellyPct))),
     elite: passed.filter((row) => row.verdict === "elite_pick").length,

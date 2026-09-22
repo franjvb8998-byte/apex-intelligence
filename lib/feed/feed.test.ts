@@ -18,12 +18,13 @@ import type { DashboardMatchSummary } from "@/lib/dashboard/types";
 
 function recFromVerdict(
   verdict: ApexOpportunity["verdict"],
-): ScoringTier {
+): ScoringTier | null {
   if (verdict === "elite_pick") return "Elite";
   if (verdict === "strong_bet") return "Strong Bet";
   if (verdict === "lean_bet") return "Value Bet";
   if (verdict === "pass") return "Watch";
-  return "Avoid";
+  if (verdict === "avoid") return "Avoid";
+  return null;
 }
 
 function opp(
@@ -39,7 +40,14 @@ function opp(
     predicted: "home",
     selectionLabel: "Arsenal",
     stars: 3,
-    confidenceBand: overrides.confidence >= 70 ? "high" : overrides.confidence >= 45 ? "medium" : "low",
+    confidenceBand:
+      overrides.confidence == null
+        ? null
+        : overrides.confidence >= 70
+          ? "high"
+          : overrides.confidence >= 45
+            ? "medium"
+            : "low",
     riskBand: "medium",
     riskScore: 40,
     fairOdds: 1.8,

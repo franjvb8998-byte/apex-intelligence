@@ -56,10 +56,20 @@ export function DailyDesk({
                 <div>
                   <dt className="text-[var(--apex-fg-subtle)]">APEX score</dt>
                   <dd>
-                    {Math.round(
-                      item.analysis.legs.reduce((sum, leg) => sum + leg.score, 0) /
-                        item.analysis.legs.length,
-                    )}
+                    {(() => {
+                      const scores = item.analysis.legs
+                        .map((leg) => leg.score)
+                        .filter(
+                          (value): value is number =>
+                            value != null && Number.isFinite(value),
+                        );
+                      return scores.length === 0
+                        ? "—"
+                        : Math.round(
+                            scores.reduce((sum, score) => sum + score, 0) /
+                              scores.length,
+                          );
+                    })()}
                   </dd>
                 </div>
                 <div>

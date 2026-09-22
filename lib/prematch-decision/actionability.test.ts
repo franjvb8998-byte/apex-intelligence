@@ -164,12 +164,21 @@ describe("prematch actionability", () => {
         vendorStatusShort: "NS",
         kickoffAt: KICKOFF,
         recommendation: "Elite" as const,
+        durableTicketConfirmed: true,
+      },
+      {
+        fixtureId: "ns-unconfirmed",
+        vendorStatusShort: "NS",
+        kickoffAt: KICKOFF,
+        recommendation: "Value Bet" as const,
+        durableTicketConfirmed: false,
       },
       {
         fixtureId: "stale-ns",
         vendorStatusShort: "NS",
         kickoffAt: "2026-09-21T12:00:00.000Z",
         recommendation: "Value Bet" as const,
+        durableTicketConfirmed: true,
       },
       {
         fixtureId: "live",

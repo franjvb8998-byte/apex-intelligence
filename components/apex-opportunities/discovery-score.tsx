@@ -5,7 +5,10 @@ import type { ApexOpportunity } from "@/lib/apex-opportunities/types";
 
 const BLOCKS = 14;
 
-const BAR_TONE: Record<ApexOpportunity["verdict"], string> = {
+const BAR_TONE: Record<
+  Exclude<ApexOpportunity["verdict"], null>,
+  string
+> = {
   elite_pick: "bg-emerald-400",
   strong_bet: "bg-sky-400",
   lean_bet: "bg-amber-400",
@@ -14,15 +17,17 @@ const BAR_TONE: Record<ApexOpportunity["verdict"], string> = {
 };
 
 export function OpportunityScoreViz({ row }: { row: ApexOpportunity }) {
-  const score = Math.min(100, Math.max(0, row.score));
-  const filled = Math.round((score / 100) * BLOCKS);
+  const score = row.score;
+  const filled =
+    score == null ? 0 : Math.round((Math.min(100, Math.max(0, score)) / 100) * BLOCKS);
   const priority = discoveryPriority(row);
+  const barTone = row.verdict ? BAR_TONE[row.verdict] : "bg-slate-500";
 
   return (
     <div
       className="min-w-[8.5rem]"
       role="img"
-      aria-label={`APEX Score ${formatScore(score)}, ${priority.shortLabel}`}
+      aria-label={`APEX Score ${formatScore(score)}${priority ? `, ${priority.shortLabel}` : ""}`}
     >
       <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--apex-fg-subtle)]">
         APEX Score
@@ -36,14 +41,16 @@ export function OpportunityScoreViz({ row }: { row: ApexOpportunity }) {
             key={index}
             className={cx(
               "h-2 flex-1 rounded-[1px]",
-              index < filled ? BAR_TONE[row.verdict] : "bg-slate-800",
+              score != null && index < filled ? barTone : "bg-slate-800",
             )}
           />
         ))}
       </div>
-      <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--apex-accent)]">
-        {priority.shortLabel}
-      </p>
+      {priority ? (
+        <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--apex-accent)]">
+          {priority.shortLabel}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import type { ApexOpportunity } from "@/lib/apex-opportunities/types";
-import type { ApexDecision } from "@/lib/decision-engine/types";
+import type { FrozenFeaturedDecision } from "@/lib/prematch-decision/frozen-betting";
 import type { ExplainablePrediction } from "@/lib/explainable-ai/types";
 import type { EvaluationReport } from "@/lib/learning-engine/types/evaluation";
 import type { ApexMatchRating } from "@/lib/match-rating/types";
@@ -24,7 +24,7 @@ export function compareDecisionScan(
   analyzed: ApexOpportunity[],
 ): LabEngineCompareRow {
   const model = modelById("decision-engine");
-  const avgScore = mean(analyzed.map((row) => row.score));
+  const avgScore = mean(finite(analyzed.map((row) => row.score)));
   const avgEv = mean(finite(analyzed.map((row) => row.expectedValue)));
   return {
     id: model.id,
@@ -63,7 +63,7 @@ export function compareLearningReport(
 export function compareFeaturedMatch(input: {
   label: string | null;
   href: string;
-  decision: ApexDecision | null;
+  decision: FrozenFeaturedDecision | null;
   rating: ApexMatchRating | null;
   explainable: ExplainablePrediction | null;
   probability: {
@@ -83,13 +83,16 @@ export function compareFeaturedMatch(input: {
     rows.push({
       id: "paired-decision",
       name: model.name,
-      version: input.decision.engineId,
+      version: "frozen-ticket",
       sample,
       paired: true,
       primaryLabel: "Verdict",
-      primary: input.decision.verdict.label,
+      primary: input.decision.verdict.label ?? input.decision.selectionLabel,
       secondaryLabel: "Score",
-      secondary: String(Math.round(input.decision.score.value)),
+      secondary:
+        input.decision.score.value == null
+          ? "—"
+          : String(Math.round(input.decision.score.value)),
       href: input.href,
       tone: input.decision.verdict.kind === "avoid" ? "danger" : "accent",
     });
@@ -160,7 +163,7 @@ export function buildComparison(input: {
   featured: {
     label: string | null;
     href: string;
-    decision: ApexDecision | null;
+    decision: FrozenFeaturedDecision | null;
     rating: ApexMatchRating | null;
     explainable: ExplainablePrediction | null;
     probability: {
