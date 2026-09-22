@@ -26,7 +26,14 @@ export type PrematchLifecycleReport = {
   voidTerminalCount: number;
   invalidFixtureIdCount: number;
   skippedCount: number;
+  /** Total observed errors (isolated + run-level). Additive; not an exit signal alone. */
   errorCount: number;
+  /**
+   * Run-level operational failures that should fail a scheduler job red.
+   * Does not include ordinary isolated per-fixture/item errors.
+   * Aggregate counter only — never carries exception text or payloads.
+   */
+  fatalErrorCount: number;
 };
 
 export function emptyPrematchLifecycleReport(
@@ -57,5 +64,6 @@ export function emptyPrematchLifecycleReport(
     invalidFixtureIdCount: 0,
     skippedCount: 0,
     errorCount: 0,
+    fatalErrorCount: 0,
   };
 }

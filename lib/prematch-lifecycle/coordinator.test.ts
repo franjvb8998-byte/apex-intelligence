@@ -472,7 +472,50 @@ describe("Phase 1D.2A automatic durable lifecycle coordinator", () => {
     });
     expect(report.newTicketsCreated).toBe(0);
     expect(report.errorCount).toBeGreaterThan(0);
+    expect(report.fatalErrorCount).toBeGreaterThan(0);
     expect(await tickets.getByFixtureId("8001")).toBeNull();
+  });
+
+  it("L2. one discovery date failure with other success is isolated (not fatal)", async () => {
+    let calls = 0;
+    const report = await runPrematchLifecycle({
+      nowUtc: T60,
+      config: CONFIG,
+      listFixturesByDate: async (date) => {
+        calls += 1;
+        if (date === "2033-05-31") throw new Error("today down");
+        return [];
+      },
+      attachOdds,
+      fetchFixturesByIds: fetchByIds,
+      ticketStore: tickets,
+      evidenceStore: evidence,
+      evaluationStore: evaluations,
+    });
+    expect(calls).toBe(2);
+    expect(report.errorCount).toBeGreaterThan(0);
+    expect(report.fatalErrorCount).toBe(0);
+    expect(report.newTicketsCreated).toBe(0);
+  });
+
+  it("L3. capture-path quota exhaustion is run-level fatal", async () => {
+    const report = await runPrematchLifecycle({
+      nowUtc: T60,
+      config: CONFIG,
+      listFixturesByDate: discovery({
+        "2033-05-31": [lifecycleBundle(template, { fixtureId: "8001" })],
+      }),
+      attachOdds: async () => {
+        throw Object.assign(new Error("rate limited"), { code: "rate_limited" });
+      },
+      fetchFixturesByIds: fetchByIds,
+      ticketStore: tickets,
+      evidenceStore: evidence,
+      evaluationStore: evaluations,
+    });
+    expect(report.newTicketsCreated).toBe(0);
+    expect(report.errorCount).toBeGreaterThan(0);
+    expect(report.fatalErrorCount).toBeGreaterThan(0);
   });
 
   it("M. durable store unavailable creates no authorized ticket", async () => {
@@ -488,6 +531,7 @@ describe("Phase 1D.2A automatic durable lifecycle coordinator", () => {
     });
     expect(report.newTicketsCreated).toBe(0);
     expect(report.errorCount).toBeGreaterThan(0);
+    expect(report.fatalErrorCount).toBeGreaterThan(0);
     expect(await store.getByFixtureId("8001")).toBeNull();
   });
 
@@ -1013,6 +1057,7 @@ describe("Phase 1D.2A automatic durable lifecycle coordinator", () => {
       },
     });
     expect(report.errorCount).toBeGreaterThan(0);
+    expect(report.fatalErrorCount).toBe(0);
     expect(report.evidenceCreated).toBeGreaterThan(0);
   });
 
@@ -1044,6 +1089,7 @@ describe("Phase 1D.2A automatic durable lifecycle coordinator", () => {
       },
     });
     expect(report.errorCount).toBeGreaterThan(0);
+    expect(report.fatalErrorCount).toBe(0);
     expect(await inner.getCanonicalByFixtureId("8502")).not.toBeNull();
     expect(await inner.getCanonicalByFixtureId("8501")).toBeNull();
   });
@@ -1075,6 +1121,7 @@ describe("Phase 1D.2A automatic durable lifecycle coordinator", () => {
       },
     });
     expect(report.errorCount).toBeGreaterThan(0);
+    expect(report.fatalErrorCount).toBe(0);
     expect(
       await inner.getByIdentity(
         prematchDecisionTicketId("8602")!,
@@ -1217,6 +1264,7 @@ describe("Phase 1D.2A automatic durable lifecycle coordinator", () => {
     expect(report.newTicketsCreated).toBe(0);
     expect(report.eligibleT120Count).toBe(0);
     expect(report.errorCount).toBeGreaterThan(0);
+    expect(report.fatalErrorCount).toBeGreaterThan(0);
     expect(oddsCalls).toBe(0);
   });
 

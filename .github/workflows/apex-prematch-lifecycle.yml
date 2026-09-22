@@ -1,0 +1,51 @@
+# Automatic durable prematch lifecycle — direct in-process execution.
+# Does NOT call the HTTP lifecycle route. Does NOT require a public deployment.
+# Schedule runs only from the repository DEFAULT branch (verify before activation).
+#
+# Kill switches (no code change):
+#   1. Empty/remove APEX_LIFECYCLE_LEAGUE_IDS → runner fails closed (no capture)
+#   2. Disable this workflow in GitHub UI → stops all automatic runs
+#
+# Do not expose production secrets to untrusted PR code paths.
+
+name: APEX Prematch Lifecycle
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 15-minute cadence offset from :00/:15/:30/:45 (GitHub docs: higher load near hour start).
+    - cron: "7,22,37,52 * * * *"
+
+concurrency:
+  group: apex-prematch-lifecycle
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prematch-lifecycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run prematch lifecycle
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+          APEX_LIFECYCLE_LEAGUE_IDS: ${{ vars.APEX_LIFECYCLE_LEAGUE_IDS }}
+          APEX_LIFECYCLE_MAX_NEW_TICKETS_PER_RUN: ${{ vars.APEX_LIFECYCLE_MAX_NEW_TICKETS_PER_RUN }}
+        run: npm run lifecycle:prematch

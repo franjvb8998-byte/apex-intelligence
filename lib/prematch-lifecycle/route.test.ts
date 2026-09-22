@@ -34,6 +34,7 @@ describe("POST /api/internal/prematch-lifecycle", () => {
       invalidFixtureIdCount: 0,
       skippedCount: 0,
       errorCount: 0,
+      fatalErrorCount: 0,
     });
     process.env[LIFECYCLE_CRON_SECRET_ENV] = "test-cron-secret";
   });

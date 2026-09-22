@@ -26,3 +26,11 @@ export {
   type PrematchLifecycleDependencies,
 } from "@/lib/prematch-lifecycle/coordinator";
 export type { PrematchLifecycleReport } from "@/lib/prematch-lifecycle/report";
+export {
+  RUNNER_EXIT,
+  executePrematchLifecycleRunner,
+  sanitizePrematchLifecycleReport,
+  validatePrematchLifecycleRunnerEnv,
+  type PrematchLifecycleRunnerDeps,
+  type PrematchLifecycleSanitizedSummary,
+} from "@/lib/prematch-lifecycle/runner";

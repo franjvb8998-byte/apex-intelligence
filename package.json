@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "lifecycle:prematch": "tsx scripts/run-prematch-lifecycle.ts",
     "calibration:microcollect": "npx --yes tsx lib/debug/calibration/run-microcollect.ts --execute",
     "calibration:pilot": "npx --yes tsx lib/debug/calibration/run-pilot.ts --execute",
     "calibration:experiment-5b5": "npx --yes tsx lib/debug/calibration/experiment-5b5-run.ts",
@@ -41,6 +42,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^4.1.10"
   }

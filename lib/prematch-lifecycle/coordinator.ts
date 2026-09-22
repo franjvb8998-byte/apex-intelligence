@@ -154,6 +154,15 @@ function indexBundles(
   return index;
 }
 
+function noteIsolatedError(report: PrematchLifecycleReport): void {
+  report.errorCount += 1;
+}
+
+function noteFatalError(report: PrematchLifecycleReport): void {
+  report.errorCount += 1;
+  report.fatalErrorCount += 1;
+}
+
 async function discoverDateCatalogues(
   dates: string[],
   listFixturesByDate: (date: string) => Promise<ApexMatchBundle[]>,
@@ -161,13 +170,21 @@ async function discoverDateCatalogues(
 ): Promise<ApexMatchBundle[]> {
   const discovered: ApexMatchBundle[] = [];
   const seen = new Set<string>();
+  let successfulDates = 0;
   for (const date of dates) {
     let rows: ApexMatchBundle[];
     try {
       rows = await listFixturesByDate(date);
+      successfulDates += 1;
     } catch (error) {
+      // Per-date catalogue failure: counted in errorCount. Run-level fatal
+      // only when every discovery date fails (below) or quota stops the loop
+      // with zero successful dates.
       report.errorCount += 1;
-      if (isQuotaError(error)) break;
+      if (isQuotaError(error)) {
+        if (successfulDates === 0) report.fatalErrorCount += 1;
+        break;
+      }
       continue;
     }
     for (const bundle of rows) {
@@ -176,6 +193,9 @@ async function discoverDateCatalogues(
       seen.add(id);
       discovered.push(bundle);
     }
+  }
+  if (dates.length > 0 && successfulDates === 0 && report.fatalErrorCount === 0) {
+    report.fatalErrorCount += 1;
   }
   return discovered;
 }
@@ -193,7 +213,7 @@ export async function runPrematchLifecycle(
   );
   report.leagueAllowlistInvalid = config.leagueAllowlistInvalid;
   if (config.leagueAllowlistInvalid) {
-    report.errorCount += 1;
+    noteFatalError(report);
   }
 
   const transport =
@@ -260,7 +280,7 @@ export async function runPrematchLifecycle(
       continue;
     }
     if (proof.reason === "DURABLE_STORE_UNAVAILABLE") {
-      report.errorCount += 1;
+      noteFatalError(report);
       continue;
     }
     missing.push(bundle);
@@ -279,7 +299,7 @@ export async function runPrematchLifecycle(
   for (const bundle of capped) {
     const fixtureId = fixtureIdOf(bundle);
     if (!fixtureId) {
-      report.errorCount += 1;
+      noteIsolatedError(report);
       continue;
     }
     const proof = await confirmDurableByFixtureId(ticketStore, fixtureId);
@@ -288,7 +308,7 @@ export async function runPrematchLifecycle(
       continue;
     }
     if (proof.reason === "DURABLE_STORE_UNAVAILABLE") {
-      report.errorCount += 1;
+      noteFatalError(report);
       continue;
     }
     try {
@@ -304,12 +324,12 @@ export async function runPrematchLifecycle(
         store: ticketStore,
       });
       if (!captured) {
-        report.errorCount += 1;
+        noteIsolatedError(report);
         continue;
       }
       if (!captured.ok) {
         if (captured.status === "durable_unavailable") {
-          report.errorCount += 1;
+          noteFatalError(report);
         } else {
           report.skippedCount += 1;
         }
@@ -318,8 +338,11 @@ export async function runPrematchLifecycle(
       if (captured.status === "created") report.newTicketsCreated += 1;
       else report.newTicketsIdempotent += 1;
     } catch (error) {
-      report.errorCount += 1;
-      if (isQuotaError(error)) break;
+      if (isQuotaError(error)) {
+        noteFatalError(report);
+        break;
+      }
+      noteIsolatedError(report);
     }
   }
 
@@ -359,7 +382,7 @@ async function listPendingTicketsPaged(input: {
       after,
     );
     if (!listed.ok) {
-      input.report.errorCount += 1;
+      noteFatalError(input.report);
       return null;
     }
     input.report.ticketListPages += 1;
@@ -463,7 +486,7 @@ async function finalizeTicketedFixtures(input: {
       }
       pendingFetch.push(ticket);
     } catch {
-      input.report.errorCount += 1;
+      noteIsolatedError(input.report);
     }
   }
 
@@ -489,8 +512,11 @@ async function finalizeTicketedFixtures(input: {
     try {
       bundles = await input.fetchFixturesByIds(batch);
     } catch (error) {
-      input.report.errorCount += 1;
-      if (isQuotaError(error)) break;
+      if (isQuotaError(error)) {
+        noteFatalError(input.report);
+        break;
+      }
+      noteIsolatedError(input.report);
       continue;
     }
     const byId = indexBundles(bundles);
@@ -509,7 +535,7 @@ async function finalizeTicketedFixtures(input: {
           report: input.report,
         });
       } catch {
-        input.report.errorCount += 1;
+        noteIsolatedError(input.report);
       }
     }
   }
@@ -546,7 +572,7 @@ async function completeEvaluationFromEvidence(input: {
   if (!built) return;
   const inserted = await input.evaluationStore.insertIfAbsent(built);
   if (inserted.unavailable || !inserted.evaluation) {
-    input.report.errorCount += 1;
+    noteFatalError(input.report);
     return;
   }
   if (inserted.created) input.report.evaluationsCreated += 1;
@@ -587,7 +613,7 @@ async function ingestTerminalBundle(input: {
     input.report.evaluationsIdempotent += 1;
   }
   if (ingested.result.state === "durable_unavailable") {
-    input.report.errorCount += 1;
+    noteFatalError(input.report);
   }
   return "ingested";
 }
