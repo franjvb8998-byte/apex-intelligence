@@ -404,18 +404,16 @@ describe("apex-prematch-lifecycle workflow contract", () => {
     expect(yaml).toMatch(/^\s*workflow_dispatch:\s*$/m);
   });
 
-  // Phase 1D.2B.2A temporary manual-dispatch activation gate:
-  // schedule/cron are intentionally absent so first production smoke can be
-  // dispatched without arming automatic execution. Restore affirmative
-  // schedule + exact-cron assertions when cron is deliberately re-enabled
-  // in the later activation phase (do not leave this gate permanently).
-  it("L. schedule does not exist (1D.2B.2A manual-only gate)", () => {
-    expect(yaml).not.toMatch(/^\s*schedule\s*:/m);
+  // Phase 1D.2B.3: controlled automatic scheduler activation — restore the
+  // frozen 15-minute cadence while keeping workflow_dispatch for manual runs.
+  it("L. has schedule", () => {
+    expect(yaml).toMatch(/^\s*schedule:\s*$/m);
   });
 
-  it("M. cron does not exist (1D.2B.2A manual-only gate)", () => {
-    // Key-form only (line-start) so narrative comments cannot satisfy/trip this.
-    expect(yaml).not.toMatch(/^\s*-?\s*cron\s*:/m);
+  it("M. schedule is exactly 7,22,37,52 * * * *", () => {
+    expect(yaml).toMatch(/cron:\s*["']7,22,37,52 \* \* \* \*["']/);
+    expect(yaml).not.toMatch(/cron:\s*["']\*\/15/);
+    expect(yaml).not.toMatch(/0,15,30,45/);
   });
 
   it("N. permissions contents read only", () => {
@@ -448,12 +446,9 @@ describe("apex-prematch-lifecycle workflow contract", () => {
     expect(yaml).not.toMatch(/npx --yes tsx/);
   });
 
-  // Phase 1D.2B.2A: fail if any automatic GitHub trigger is reintroduced
-  // while this manual-only activation gate is active. Line-start key matches
-  // avoid false positives from workflow comments.
-  it("S. no automatic triggers (manual-only activation gate)", () => {
-    expect(yaml).not.toMatch(/^\s*schedule\s*:/m);
-    expect(yaml).not.toMatch(/^\s*-?\s*cron\s*:/m);
+  // Phase 1D.2B.3: schedule is intentional; forbid all other automatic triggers.
+  // Line-start key matches avoid false positives from workflow comments.
+  it("S. no push/PR/workflow_run/repository_dispatch triggers", () => {
     expect(yaml).not.toMatch(/^\s*push\s*:/m);
     expect(yaml).not.toMatch(/^\s*pull_request\s*:/m);
     expect(yaml).not.toMatch(/^\s*pull_request_target\s*:/m);
@@ -494,10 +489,16 @@ describe("apex-prematch-lifecycle workflow contract", () => {
     expect(yaml).not.toMatch(/APEX_LIFECYCLE_CRON_SECRET/);
   });
 
-  it("X. no hardcoded competition 677 in workflow/script/runner", () => {
+  it("X. no hardcoded competition/league ids in workflow/script/runner", () => {
     expect(yaml).not.toMatch(/\b677\b/);
+    expect(yaml).not.toMatch(/\b72\b/);
+    expect(yaml).not.toMatch(/\b39\b/);
     expect(scriptSource).not.toMatch(/\b677\b/);
+    expect(scriptSource).not.toMatch(/\b72\b/);
+    expect(scriptSource).not.toMatch(/\b39\b/);
     expect(runnerSource).not.toMatch(/\b677\b/);
+    expect(runnerSource).not.toMatch(/\b72\b/);
+    expect(runnerSource).not.toMatch(/\b39\b/);
   });
 
   it("uses ubuntu-latest and Node 22", () => {
@@ -505,7 +506,7 @@ describe("apex-prematch-lifecycle workflow contract", () => {
     expect(yaml).toMatch(/node-version:\s*["']22["']/);
   });
 
-  it("manual dispatch uses a single shared job", () => {
+  it("manual dispatch and schedule share the same job", () => {
     const jobsSection = yaml.split(/^jobs:\s*$/m)[1] ?? "";
     const jobNames = [...jobsSection.matchAll(/^ {2}([a-z0-9_-]+):\s*$/gm)].map(
       (m) => m[1],
