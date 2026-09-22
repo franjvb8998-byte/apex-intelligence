@@ -25,6 +25,7 @@ import type {
   MatchCenterRecentMatch,
 } from "@/lib/match-center/types";
 import type { PrematchDecisionTicket } from "@/lib/prematch-decision/ticket";
+import type { HistoricalPrematchView } from "@/lib/prematch-evaluation/types";
 
 export type MatchAnalysisTeam = {
   id: UUID;
@@ -164,4 +165,9 @@ export type MatchAnalysisData = {
    * Null when none exists. Never a live or post-match regeneration.
    */
   frozenPrematchDecision?: PrematchDecisionTicket | null;
+  /**
+   * Historical read model. Snapshot is the frozen ticket, not recomputed PE.
+   * Null when neither ticket nor final evidence exists.
+   */
+  historicalPrematch?: HistoricalPrematchView | null;
 };

@@ -30,6 +30,16 @@ import {
 } from "@/lib/repositories";
 import { lookupFrozenPrematchDecision } from "@/lib/prematch-decision/attach";
 import type { PrematchDecisionTicketStore } from "@/lib/prematch-decision/store";
+import type { FinalFixtureEvidenceStore } from "@/lib/final-evidence/store";
+import { loadHistoricalPrematchView } from "@/lib/prematch-evaluation/historical";
+import {
+  getFinalFixtureEvidenceStore,
+} from "@/lib/final-evidence/store";
+import {
+  getPrematchDecisionEvaluationStore,
+  type PrematchDecisionEvaluationStore,
+} from "@/lib/prematch-evaluation/store";
+import { getPrematchDecisionTicketStore } from "@/lib/prematch-decision/store";
 
 export type LoadMatchCenterOptions = {
   /** External fixture id (API-Football fixture id or Apex id). */
@@ -51,6 +61,8 @@ export type LoadMatchCenterOptions = {
    */
   includeLiveRefresh?: boolean;
   ticketStore?: PrematchDecisionTicketStore;
+  evidenceStore?: FinalFixtureEvidenceStore;
+  evaluationStore?: PrematchDecisionEvaluationStore;
 };
 
 export function resolveMatchCenterProvider(
@@ -190,6 +202,17 @@ async function loadRichMatchCenter(input: {
         frozenPrematchDecision: frozen,
       };
     }
+    data.preview.analysis = {
+      ...data.preview.analysis,
+      historicalPrematch: await loadHistoricalPrematchView(fixtureId, {
+        ticketStore:
+          input.options.ticketStore ?? getPrematchDecisionTicketStore(),
+        evidenceStore:
+          input.options.evidenceStore ?? getFinalFixtureEvidenceStore(),
+        evaluationStore:
+          input.options.evaluationStore ?? getPrematchDecisionEvaluationStore(),
+      }),
+    };
   }
   data.fixtures = input.skipCatalogue
     ? []

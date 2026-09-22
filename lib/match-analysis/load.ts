@@ -30,6 +30,14 @@ import { createRepositories } from "@/lib/repositories";
 import { attachPrematchDecisionTicket } from "@/lib/prematch-decision/attach";
 import type { InjectedClock } from "@/lib/prematch-decision/actionability";
 import type { PrematchDecisionTicketStore } from "@/lib/prematch-decision/store";
+import { getPrematchDecisionTicketStore } from "@/lib/prematch-decision/store";
+import {
+  getFinalFixtureEvidenceStore,
+} from "@/lib/final-evidence/store";
+import { loadHistoricalPrematchView } from "@/lib/prematch-evaluation/historical";
+import {
+  getPrematchDecisionEvaluationStore,
+} from "@/lib/prematch-evaluation/store";
 
 export type LoadMatchAnalysisOptions = LoadMatchCenterOptions & {
   nowUtc?: InjectedClock;
@@ -124,7 +132,7 @@ export async function getMatchAnalysisData(
     },
   };
 
-  return await attachPrematchDecisionTicket(payload, {
+  const withTicket = await attachPrematchDecisionTicket(payload, {
     leagueId: bundle.league?.id ?? null,
     season: bundle.league?.season ?? null,
     odds: extras.odds,
@@ -135,6 +143,16 @@ export async function getMatchAnalysisData(
     asOf: options.asOf,
     store: options.ticketStore,
   });
+  const fixtureId = vendorFixtureId(withTicket.matchId) ?? withTicket.matchId;
+  return {
+    ...withTicket,
+    historicalPrematch: await loadHistoricalPrematchView(fixtureId, {
+      ticketStore: options.ticketStore ?? getPrematchDecisionTicketStore(),
+      evidenceStore: options.evidenceStore ?? getFinalFixtureEvidenceStore(),
+      evaluationStore:
+        options.evaluationStore ?? getPrematchDecisionEvaluationStore(),
+    }),
+  };
 }
 
 function leaguePositionFromStanding(

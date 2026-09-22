@@ -32,6 +32,12 @@ import { filterCurrentActionableOpportunities } from "@/lib/prematch-decision/ac
 import type { InjectedClock } from "@/lib/prematch-decision/actionability";
 import { captureScannerPrematchTicketFromCenter } from "@/lib/prematch-decision/from-scanner";
 import type { PrematchDecisionTicketStore } from "@/lib/prematch-decision/store";
+import type { FinalFixtureEvidenceStore } from "@/lib/final-evidence/store";
+import {
+  ingestCatalogueFinalBundle,
+  shouldSkipScannerPrematchEngine,
+} from "@/lib/prematch-evaluation/opportunistic";
+import type { PrematchDecisionEvaluationStore } from "@/lib/prematch-evaluation/store";
 import {
   createRepositories,
   ignoreNonQuotaErrors,
@@ -46,6 +52,8 @@ export type LoadApexOpportunitiesOptions = LoadMatchCenterOptions & {
   scannerProfile?: ScannerProfileSession;
   nowUtc?: InjectedClock;
   ticketStore?: PrematchDecisionTicketStore;
+  evidenceStore?: FinalFixtureEvidenceStore;
+  evaluationStore?: PrematchDecisionEvaluationStore;
 };
 
 async function attachOdds(
@@ -189,7 +197,9 @@ function isShareableApexOpportunitiesOptions(
     options.env == null &&
     options.scannerProfile == null &&
     options.nowUtc == null &&
-    options.ticketStore == null
+    options.ticketStore == null &&
+    options.evidenceStore == null &&
+    options.evaluationStore == null
   );
 }
 
@@ -238,8 +248,31 @@ async function computeApexOpportunitiesBoard(
     clock: options.nowUtc,
     store: options.ticketStore,
   };
+  const historical = {
+    ticketStore: options.ticketStore,
+    evidenceStore: options.evidenceStore,
+    evaluationStore: options.evaluationStore,
+    clock:
+      typeof options.nowUtc === "string"
+        ? options.nowUtc
+        : options.nowUtc instanceof Date
+          ? options.nowUtc.toISOString()
+          : undefined,
+  };
   const mapped = await mapPool(bundles, EVALUATE_CONCURRENCY, async (bundle) => {
     try {
+      // Phase 1C: evaluate already-fetched terminal rows before PE.
+      // Unit tests mutate only when stores are injected — never the live project.
+      if (
+        options.evidenceStore != null ||
+        options.evaluationStore != null ||
+        process.env.VITEST !== "true"
+      ) {
+        await ingestCatalogueFinalBundle(bundle, historical).catch(() => null);
+      }
+      if (shouldSkipScannerPrematchEngine(bundle)) {
+        return null;
+      }
       return await evaluateBundle(repos, bundle, capture);
     } catch (error) {
       if (isQuotaError(error)) throw error;
