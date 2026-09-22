@@ -171,6 +171,9 @@ describe("Phase 1D.1 fail-closed durable recommendation", () => {
         async getByTicketId() {
           throw new Error("durable timeout");
         },
+        async listByKickoffRange() {
+          throw new Error("durable timeout");
+        },
         async insertIfAbsent() {
           throw new Error("durable timeout");
         },

@@ -80,6 +80,51 @@ export class PostgresPrematchDecisionTicketBackend
     }
   }
 
+  async listByKickoffRange(
+    fromUtc: string,
+    toUtc: string,
+    limit = 500,
+    after?: { kickoffUtc: string; ticketId: string } | null,
+  ): Promise<
+    | { ok: true; tickets: PrematchDecisionTicket[] }
+    | { ok: false; unavailable: true }
+  > {
+    const client = this.clientFactory();
+    if (!client) return { ok: false, unavailable: true };
+    const from = Date.parse(fromUtc);
+    const to = Date.parse(toUtc);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || from > to) {
+      return { ok: true, tickets: [] };
+    }
+    try {
+      let query = client
+        .from(PREMATCH_DECISION_TICKETS_TABLE)
+        .select("payload")
+        .gte("kickoff_utc", new Date(from).toISOString())
+        .lte("kickoff_utc", new Date(to).toISOString());
+      if (after) {
+        const kickoff = JSON.stringify(after.kickoffUtc);
+        const ticketId = JSON.stringify(after.ticketId);
+        query = query.or(
+          `kickoff_utc.gt.${kickoff},and(kickoff_utc.eq.${kickoff},ticket_id.gt.${ticketId})`,
+        );
+      }
+      const { data, error } = await query
+        .order("kickoff_utc", { ascending: true })
+        .order("ticket_id", { ascending: true })
+        .limit(Math.max(0, limit));
+      if (error) return { ok: false, unavailable: true };
+      return {
+        ok: true,
+        tickets: (data ?? [])
+          .map((row) => asTicket(row.payload))
+          .filter((ticket): ticket is PrematchDecisionTicket => ticket != null),
+      };
+    } catch {
+      return { ok: false, unavailable: true };
+    }
+  }
+
   async insertIfAbsent(
     ticket: PrematchDecisionTicket,
   ): Promise<

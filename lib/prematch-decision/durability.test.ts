@@ -407,6 +407,9 @@ describe("PrematchDecisionTicket durability + capture window", () => {
       async confirmDurableByTicketId() {
         throw new Error("ticket store down");
       },
+      async listByKickoffRange() {
+        throw new Error("ticket store down");
+      },
       clear() {},
     };
     const board = await getApexOpportunities({

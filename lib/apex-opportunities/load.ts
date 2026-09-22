@@ -16,7 +16,6 @@ import {
 } from "@/lib/apex-opportunities/shared-board";
 import type { ApexOpportunitiesBoard } from "@/lib/apex-opportunities/types";
 import type { ApexMatchBundle } from "@/lib/data-platform/types/bundle";
-import { isTerminalApexMatchStatus } from "@/lib/data-platform/types/match";
 import {
   bindScannerProfile,
   instrumentRepositories,
@@ -28,9 +27,10 @@ import {
   noteScannerQuotaExhausted,
   type ScannerProfileSession,
 } from "@/lib/debug/scanner-profile";
-import { EMPTY_MATCH_CENTER_ENRICHMENT } from "@/lib/match-center/enrich";
-import { fixtureIdFromMatch } from "@/lib/match-center/fixture-id";
-import { createMatchCenterFromApexBundle } from "@/lib/match-center/from-data-platform";
+import {
+  attachScannerOdds,
+  createScannerMatchCenter,
+} from "@/lib/apex-opportunities/scanner-canonical";
 import type { LoadMatchCenterOptions } from "@/lib/match-center/load";
 import { filterCurrentActionableOpportunities } from "@/lib/prematch-decision/actionability";
 import type { InjectedClock } from "@/lib/prematch-decision/actionability";
@@ -47,7 +47,6 @@ import {
 import type { PrematchDecisionEvaluationStore } from "@/lib/prematch-evaluation/store";
 import {
   createRepositories,
-  ignoreNonQuotaErrors,
   isQuotaError,
   type ApexRepositories,
 } from "@/lib/repositories";
@@ -73,31 +72,6 @@ export type LoadApexOpportunitiesOptions = LoadMatchCenterOptions & {
   evaluationStore?: PrematchDecisionEvaluationStore;
 };
 
-async function attachOdds(
-  repos: ApexRepositories,
-  bundle: ApexMatchBundle,
-): Promise<ApexMatchBundle> {
-  if (bundle.odds.length > 0) return bundle;
-  // Finished / cancelled cannot become a betting opportunity. Keep the
-  // catalogue row and skip /odds. This is not an empty-odds error fallback
-  // and must not set quotaExhausted.
-  if (isTerminalApexMatchStatus(bundle.match.status)) return bundle;
-  const matchId = fixtureIdFromMatch({
-    id: bundle.match.id,
-    externalId: bundle.match.externalRefs[0]?.externalId ?? null,
-  });
-  if (!matchId) return bundle;
-  const odds = await ignoreNonQuotaErrors(
-    () => repos.odds.listForFixture(matchId),
-    [],
-  );
-  if (odds.length === 0) return bundle;
-  return {
-    ...bundle,
-    odds,
-  };
-}
-
 /**
  * Sprint 3 odds-only path for every catalogue size.
  *
@@ -117,16 +91,13 @@ async function evaluateBundle(
 ) {
   const withOdds = await measurePhase(
     "attachOdds",
-    () => attachOdds(repos, bundle),
+    () => attachScannerOdds(repos, bundle),
     { fixtures: 1 },
   );
   if (withOdds.odds.length > 0) noteScannerOddsAttached();
   noteScannerFixtures("decisionEngine", 1);
   noteScannerFixtures("scoring", 1);
-  const center = createMatchCenterFromApexBundle(withOdds, {
-    enrichment: EMPTY_MATCH_CENTER_ENRICHMENT,
-    probabilityDiagnosticContext: "scanner",
-  });
+  const center = createScannerMatchCenter(withOdds);
   const row = measurePhaseSync(
     "serialization",
     () => mapOpportunityFromCenter(center),

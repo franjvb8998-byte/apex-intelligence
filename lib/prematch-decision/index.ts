@@ -74,10 +74,13 @@ export {
   getPrematchDecisionTicketStore,
   resetPrematchDecisionTicketStoreForTests,
   setPrematchDecisionDurableBackendFactory,
+  comparePrematchTicketListCursor,
   type DurableTicketProof,
   type PrematchDecisionTicketDurableBackend,
   type PrematchDecisionTicketStore,
   type PrematchTicketInsertResult,
+  type PrematchTicketListCursor,
+  type PrematchTicketListResult,
 } from "@/lib/prematch-decision/store";
 
 export {

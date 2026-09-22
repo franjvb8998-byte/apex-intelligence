@@ -29,10 +29,25 @@ export type DurableTicketProof =
       ticket: null;
     };
 
+export type PrematchTicketListResult =
+  | { ok: true; tickets: PrematchDecisionTicket[] }
+  | { ok: false; unavailable: true };
+
+export type PrematchTicketListCursor = {
+  kickoffUtc: string;
+  ticketId: string;
+};
+
 export type PrematchDecisionTicketStore = {
   getByTicketId(ticketId: string): Promise<PrematchDecisionTicket | null>;
   getByFixtureId(fixtureId: string): Promise<PrematchDecisionTicket | null>;
   confirmDurableByTicketId(ticketId: string): Promise<DurableTicketProof>;
+  listByKickoffRange(
+    fromUtc: string,
+    toUtc: string,
+    limit?: number,
+    after?: PrematchTicketListCursor | null,
+  ): Promise<PrematchTicketListResult>;
   insertIfAbsent(ticket: PrematchDecisionTicket): Promise<PrematchTicketInsertResult>;
   clear(): void;
 };
@@ -42,6 +57,12 @@ export type PrematchDecisionTicketDurableBackend = {
     | { ok: true; ticket: PrematchDecisionTicket | null }
     | { ok: false; unavailable: true }
   >;
+  listByKickoffRange(
+    fromUtc: string,
+    toUtc: string,
+    limit?: number,
+    after?: PrematchTicketListCursor | null,
+  ): Promise<PrematchTicketListResult>;
   insertIfAbsent(ticket: PrematchDecisionTicket): Promise<
     | { ok: true; created: boolean; ticket: PrematchDecisionTicket }
     | { ok: false; unavailable: true }
@@ -60,6 +81,40 @@ function deepFreeze<T>(value: T): T {
 
 function freezeTicket(ticket: PrematchDecisionTicket): PrematchDecisionTicket {
   return deepFreeze(clonePrematchDecisionTicket(ticket));
+}
+
+export function comparePrematchTicketListCursor(
+  left: { kickoffUtc: string; ticketId: string },
+  right: { kickoffUtc: string; ticketId: string },
+): number {
+  return (
+    left.kickoffUtc.localeCompare(right.kickoffUtc) ||
+    left.ticketId.localeCompare(right.ticketId)
+  );
+}
+
+function ticketsInKickoffRange(
+  rows: Iterable<PrematchDecisionTicket>,
+  fromUtc: string,
+  toUtc: string,
+  limit = 500,
+  after?: PrematchTicketListCursor | null,
+): PrematchDecisionTicket[] {
+  const from = Date.parse(fromUtc);
+  const to = Date.parse(toUtc);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from > to) {
+    return [];
+  }
+  const matched = [...rows].filter((ticket) => {
+    const kickoff = Date.parse(ticket.kickoffUtc);
+    if (!Number.isFinite(kickoff) || kickoff < from || kickoff > to) {
+      return false;
+    }
+    if (!after) return true;
+    return comparePrematchTicketListCursor(ticket, after) > 0;
+  });
+  matched.sort(comparePrematchTicketListCursor);
+  return matched.slice(0, Math.max(0, limit));
 }
 
 export class InMemoryPrematchDecisionTicketStore
@@ -83,6 +138,24 @@ export class InMemoryPrematchDecisionTicketStore
       return { confirmed: false, reason: "MISSING", ticket: null };
     }
     return { confirmed: true, source: "durable_read", ticket };
+  }
+
+  async listByKickoffRange(
+    fromUtc: string,
+    toUtc: string,
+    limit?: number,
+    after?: PrematchTicketListCursor | null,
+  ): Promise<PrematchTicketListResult> {
+    return {
+      ok: true,
+      tickets: ticketsInKickoffRange(
+        this.rows.values(),
+        fromUtc,
+        toUtc,
+        limit,
+        after,
+      ),
+    };
   }
 
   hydrate(ticket: PrematchDecisionTicket): PrematchDecisionTicket {
@@ -159,6 +232,29 @@ export class LayeredPrematchDecisionTicketStore
     }
   }
 
+  async listByKickoffRange(
+    fromUtc: string,
+    toUtc: string,
+    limit?: number,
+    after?: PrematchTicketListCursor | null,
+  ): Promise<PrematchTicketListResult> {
+    try {
+      const remote = await this.durable.listByKickoffRange(
+        fromUtc,
+        toUtc,
+        limit,
+        after,
+      );
+      if (!remote.ok) return { ok: false, unavailable: true };
+      return {
+        ok: true,
+        tickets: remote.tickets.map((ticket) => this.memory.hydrate(ticket)),
+      };
+    } catch {
+      return { ok: false, unavailable: true };
+    }
+  }
+
   async insertIfAbsent(
     ticket: PrematchDecisionTicket,
   ): Promise<PrematchTicketInsertResult> {
@@ -217,6 +313,15 @@ export class InMemoryPrematchDecisionTicketBackend
     return { ok: true, ticket: await this.inner.getByTicketId(ticketId) };
   }
 
+  async listByKickoffRange(
+    fromUtc: string,
+    toUtc: string,
+    limit?: number,
+    after?: PrematchTicketListCursor | null,
+  ): Promise<PrematchTicketListResult> {
+    return this.inner.listByKickoffRange(fromUtc, toUtc, limit, after);
+  }
+
   async insertIfAbsent(
     ticket: PrematchDecisionTicket,
   ): Promise<
@@ -239,6 +344,10 @@ export class UnavailablePrematchDecisionTicketBackend
   implements PrematchDecisionTicketDurableBackend
 {
   async getByTicketId(): Promise<{ ok: false; unavailable: true }> {
+    return { ok: false, unavailable: true };
+  }
+
+  async listByKickoffRange(): Promise<{ ok: false; unavailable: true }> {
     return { ok: false, unavailable: true };
   }
 
