@@ -41,6 +41,9 @@ export { vendorLeagueIdFromCompetitionId } from "@/lib/prematch-lifecycle/season
 
 export {
   createProductionSeasonUniverseLoader,
+  createSeasonUniverseLoaderFromApiFootballUnpagedClient,
   createSeasonUniversePageTransportFromApiFootballClient,
+  evaluateApiFootballUnpagedFixturesCompleteness,
+  isApiFootballSeasonListErrorsEmpty,
   mapApiFootballFixtureItemToSeasonUniverseRow,
 } from "@/lib/prematch-lifecycle/season-universe/api-football-paged-transport";

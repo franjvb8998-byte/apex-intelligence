@@ -451,7 +451,8 @@ describe("PE-3F pre-live dry run — exact dependency path", () => {
       },
     };
 
-    // Exact production wiring shape: client → page transport → paged loader.
+    // Architectural paged path (still supported). Production API-Football uses
+    // createSeasonUniverseLoaderFromApiFootballUnpagedClient (PE-3H).
     const loader = createSeasonUniverseLoaderFromPagedTransport(
       createSeasonUniversePageTransportFromApiFootballClient(client),
     );

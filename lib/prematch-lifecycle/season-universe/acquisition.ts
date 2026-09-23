@@ -1,7 +1,9 @@
 /**
  * Season universe acquisition contract for PE-3C/E.
  *
- * Preferred transport: paged GET /fixtures?league&season (complete-fetch),
+ * Preferred production transport: unpaged GET /fixtures?league&season with
+ * envelope completeness proof (PE-3H). Architectural paged complete-fetch
+ * remains available for providers that support page walking.
  * NOT /teams/statistics.
  *
  * PROVIDER TRUST BOUNDARY (residual — not solved by completeness):
