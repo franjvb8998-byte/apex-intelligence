@@ -3,6 +3,7 @@
  * Does not call the Probability Engine or any provider.
  */
 
+import type { PrematchInputProvenance } from "@/lib/prematch-decision/input-provenance";
 import type { MatchCenterData } from "@/lib/match-center/types";
 import {
   createPrematchDecisionTicket,
@@ -18,6 +19,7 @@ export function publishedSnapshotFromMatchCenter(
   extras: {
     leagueId?: string | null;
     season?: string | null;
+    inputProvenance?: PrematchInputProvenance | null;
   } = {},
 ): PrematchPublishedSnapshot {
   return publishedSnapshotFromMatchAnalysis(data.preview.analysis, {
@@ -28,6 +30,7 @@ export function publishedSnapshotFromMatchCenter(
     homeForm: data.preview.dashboard.form.home,
     awayForm: data.preview.dashboard.form.away,
     sourceMode: "scanner",
+    inputProvenance: extras.inputProvenance,
   });
 }
 
@@ -74,11 +77,13 @@ export async function captureScannerPrematchTicketFromCenter(input: {
   season?: string | null;
   clock?: InjectedClock;
   store?: PrematchDecisionTicketStore;
+  inputProvenance?: PrematchInputProvenance | null;
 }): Promise<CreatePrematchDecisionTicketResult | null> {
   return captureScannerPrematchTicket({
     published: publishedSnapshotFromMatchCenter(input.center, {
       leagueId: input.leagueId,
       season: input.season,
+      inputProvenance: input.inputProvenance,
     }),
     clock: input.clock,
     store: input.store,

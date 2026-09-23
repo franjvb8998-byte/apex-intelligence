@@ -40,6 +40,20 @@ export {
 } from "@/lib/match-center/from-data-platform";
 
 export {
+  catalogueEloFromPlayedStats,
+  PRODUCTION_AWAY_ELO_BASE,
+  PRODUCTION_HOME_ELO_BASE,
+} from "@/lib/match-center/catalogue-elo";
+
+export {
+  resolvePrematchStrengthFromUniverse,
+  PREMATCH_STRENGTH_REGIME_C0_RECON_V1,
+  type PrematchStrengthResult,
+  type PrematchStrengthTarget,
+  type PrematchStrengthUniverseFixture,
+} from "@/lib/match-center/prematch-strength";
+
+export {
   getMatchCenterData,
   listMatchCenterFixtures,
   listMatchCenterFixtureBundles,

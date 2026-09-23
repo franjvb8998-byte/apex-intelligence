@@ -43,6 +43,7 @@ import {
 } from "@/lib/intelligence/modules/probability";
 import type { MatchAnalysisTeamStatSnapshot } from "@/lib/match-analysis/analysis-types";
 import { createMatchAnalysisService } from "@/lib/match-analysis/match-analysis-service";
+import { catalogueEloFromPlayedStats } from "@/lib/match-center/catalogue-elo";
 import { buildPreviewDashboard } from "@/lib/match-center/dashboard";
 import {
   absencesToAnalysisInjuries,
@@ -145,12 +146,18 @@ export function resolveEloWithProvenance(
     };
   }
   const played = snapshot!.played!;
-  const winRate = (snapshot!.wins ?? 0) / played;
-  const goalDiff =
-    (snapshot!.goalsFor ?? 0) - (snapshot!.goalsAgainst ?? 0);
-  const clampedDiff = Math.max(-30, Math.min(30, goalDiff));
+  const wins = snapshot!.wins ?? 0;
+  const goalsFor = snapshot!.goalsFor ?? 0;
+  const goalsAgainst = snapshot!.goalsAgainst ?? 0;
+  const goalDiff = goalsFor - goalsAgainst;
   return {
-    elo: Math.round(base - 80 + winRate * 220 + clampedDiff * 2.5),
+    elo: catalogueEloFromPlayedStats({
+      base,
+      played,
+      wins,
+      goalsFor,
+      goalsAgainst,
+    }),
     source: "catalogue",
     base,
     played,

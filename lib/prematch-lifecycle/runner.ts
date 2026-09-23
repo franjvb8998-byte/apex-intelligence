@@ -50,6 +50,17 @@ export type PrematchLifecycleSanitizedSummary = {
   skippedCount: number;
   errorCount: number;
   fatalErrorCount: number;
+  peInputMode: "base_prior" | "c0_recon";
+  inputRegime: string;
+  c0ReconAttempts: number;
+  c0ReconTicketsCreated: number;
+  c0ReconFallbackBasePrior: number;
+  c0ReconMixed: number;
+  c0ReconSkipped: number;
+  seasonUniverseAcquisitions: number;
+  seasonUniverseHttpRequests: number;
+  seasonUniverseCacheHits: number;
+  c0LastSkipReason: string | null;
 };
 
 export type PrematchLifecycleRunnerValidation =
@@ -90,6 +101,17 @@ export function sanitizePrematchLifecycleReport(
     skippedCount: report.skippedCount,
     errorCount: report.errorCount,
     fatalErrorCount: report.fatalErrorCount,
+    peInputMode: report.peInputMode,
+    inputRegime: report.inputRegime,
+    c0ReconAttempts: report.c0ReconAttempts,
+    c0ReconTicketsCreated: report.c0ReconTicketsCreated,
+    c0ReconFallbackBasePrior: report.c0ReconFallbackBasePrior,
+    c0ReconMixed: report.c0ReconMixed,
+    c0ReconSkipped: report.c0ReconSkipped,
+    seasonUniverseAcquisitions: report.seasonUniverseAcquisitions,
+    seasonUniverseHttpRequests: report.seasonUniverseHttpRequests,
+    seasonUniverseCacheHits: report.seasonUniverseCacheHits,
+    c0LastSkipReason: report.c0LastSkipReason,
   };
 }
 

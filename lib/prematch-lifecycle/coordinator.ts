@@ -27,6 +27,10 @@ import {
   canonicalPrematchFixtureId,
 } from "@/lib/prematch-decision/identity";
 import {
+  REGIME_LIFECYCLE_BASE_PRIOR_V1,
+  REGIME_LIFECYCLE_C0_RECON_V1,
+} from "@/lib/prematch-decision/input-provenance";
+import {
   comparePrematchTicketListCursor,
   confirmDurableByFixtureId,
   getPrematchDecisionTicketStore,
@@ -53,11 +57,24 @@ import {
   readPrematchLifecycleConfig,
   type PrematchLifecycleConfig,
 } from "@/lib/prematch-lifecycle/config";
+import {
+  classifyC0StrengthForReport,
+  prepareLifecycleC0MatchCenter,
+} from "@/lib/prematch-lifecycle/c0-recon-lifecycle";
 import { bundleMatchesLifecycleLeagues } from "@/lib/prematch-lifecycle/leagues";
+import {
+  resolveLifecyclePeInputMode,
+  type LifecyclePeInputMode,
+} from "@/lib/prematch-lifecycle/pe3-activation";
 import {
   emptyPrematchLifecycleReport,
   type PrematchLifecycleReport,
 } from "@/lib/prematch-lifecycle/report";
+import {
+  createRunScopedSeasonUniverseCache,
+  type SeasonUniverseLoader,
+} from "@/lib/prematch-lifecycle/season-universe";
+import { createProductionSeasonUniverseLoader } from "@/lib/prematch-lifecycle/season-universe/api-football-paged-transport";
 import { createPrematchLifecycleTransport } from "@/lib/prematch-lifecycle/transport";
 import {
   addUtcDays,
@@ -76,6 +93,18 @@ export type PrematchLifecycleDependencies = {
   ticketStore?: PrematchDecisionTicketStore;
   evidenceStore?: FinalFixtureEvidenceStore;
   evaluationStore?: PrematchDecisionEvaluationStore;
+  /**
+   * PE-3C test seam. Production omits this and uses resolveLifecyclePeInputMode()
+   * (default base_prior while PE3C_C0_RECON_ACTIVATION is false).
+   * Manual C0 smoke injects `c0_recon` without flipping the global gate.
+   */
+  peInputMode?: LifecyclePeInputMode;
+  /**
+   * Optional season-universe loader. When peInputMode is c0_recon and this is
+   * omitted, the coordinator lazily builds the production paged API-Football
+   * loader (PE-3F). Never constructed while mode is base_prior.
+   */
+  seasonUniverseLoader?: SeasonUniverseLoader;
 };
 
 function clockIso(clock: Date): string {
@@ -296,6 +325,24 @@ export async function runPrematchLifecycle(
   report.skippedCount += missing.length - capped.length;
   report.newTicketAttempts = capped.length;
 
+  const peInputMode: LifecyclePeInputMode =
+    deps.peInputMode ?? resolveLifecyclePeInputMode();
+  report.peInputMode = peInputMode;
+  report.inputRegime =
+    peInputMode === "c0_recon"
+      ? REGIME_LIFECYCLE_C0_RECON_V1
+      : REGIME_LIFECYCLE_BASE_PRIOR_V1;
+
+  const seasonUniverseCache =
+    peInputMode === "c0_recon" ? createRunScopedSeasonUniverseCache() : null;
+  // Production paged loader only when C0 is selected and no test/manual inject.
+  // Default/scheduled BASE path never constructs or invokes this factory.
+  const seasonUniverseLoader: SeasonUniverseLoader | null =
+    peInputMode === "c0_recon"
+      ? (deps.seasonUniverseLoader ??
+        createProductionSeasonUniverseLoader(env))
+      : null;
+
   for (const bundle of capped) {
     const fixtureId = fixtureIdOf(bundle);
     if (!fixtureId) {
@@ -314,6 +361,67 @@ export async function runPrematchLifecycle(
     try {
       if (needsOddsFetch(bundle)) report.oddsRequests += 1;
       const withOdds = await attachOdds(bundle);
+
+      if (peInputMode === "c0_recon") {
+        report.c0ReconAttempts += 1;
+        if (!seasonUniverseCache) {
+          report.c0ReconSkipped += 1;
+          report.skippedCount += 1;
+          continue;
+        }
+        const prepared = await prepareLifecycleC0MatchCenter({
+          bundle: withOdds,
+          cache: seasonUniverseCache,
+          loader: seasonUniverseLoader,
+          evidenceAcquiredAtUtc: nowIso,
+        });
+        if (prepared.cacheHit) report.seasonUniverseCacheHits += 1;
+        report.seasonUniverseAcquisitions = seasonUniverseCache.acquisitions;
+        report.seasonUniverseHttpRequests = seasonUniverseCache.httpRequests;
+        report.seasonUniverseRequests = report.seasonUniverseAcquisitions;
+
+        if (!prepared.ok) {
+          report.c0ReconSkipped += 1;
+          report.skippedCount += 1;
+          report.c0LastSkipReason = prepared.reason;
+          continue;
+        }
+
+        const flags = classifyC0StrengthForReport(prepared.strength);
+        if (flags.fallbackBasePrior) report.c0ReconFallbackBasePrior += 1;
+        if (flags.mixed) report.c0ReconMixed += 1;
+
+        report.peComputations += 1;
+        const captured = await captureScannerPrematchTicketFromCenter({
+          center: prepared.center,
+          leagueId: withOdds.league?.id ?? null,
+          season: withOdds.league?.season ?? null,
+          clock: now,
+          store: ticketStore,
+          inputProvenance: prepared.provenance,
+        });
+        if (!captured) {
+          noteIsolatedError(report);
+          continue;
+        }
+        if (!captured.ok) {
+          if (captured.status === "durable_unavailable") {
+            noteFatalError(report);
+          } else {
+            report.c0ReconSkipped += 1;
+            report.skippedCount += 1;
+          }
+          continue;
+        }
+        if (captured.status === "created") {
+          report.newTicketsCreated += 1;
+          report.c0ReconTicketsCreated += 1;
+        } else {
+          report.newTicketsIdempotent += 1;
+        }
+        continue;
+      }
+
       report.peComputations += 1;
       const center = createScannerMatchCenter(withOdds);
       const captured = await captureScannerPrematchTicketFromCenter({
@@ -341,6 +449,9 @@ export async function runPrematchLifecycle(
       if (isQuotaError(error)) {
         noteFatalError(report);
         break;
+      }
+      if (peInputMode === "c0_recon") {
+        report.c0ReconSkipped += 1;
       }
       noteIsolatedError(report);
     }

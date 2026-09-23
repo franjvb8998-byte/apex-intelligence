@@ -96,6 +96,22 @@ export {
 } from "@/lib/prematch-decision/ticket";
 
 export {
+  PREMATCH_INPUT_PROVENANCE_VERSION,
+  REGIME_LIFECYCLE_BASE_PRIOR_V1,
+  REGIME_LIFECYCLE_C0_RECON_V1,
+  assertCohortFromTicketResolutions,
+  assertSameInputRegimeCohort,
+  isPrematchInputProvenance,
+  provenanceForBasePriorLifecycle,
+  provenanceFromC0Strength,
+  resolveTicketInputRegime,
+  resolveTicketInputRegimeResolution,
+  type PrematchInputProvenance,
+  type PrematchInputRegime,
+  type TicketInputRegimeResolution,
+} from "@/lib/prematch-decision/input-provenance";
+
+export {
   CANONICAL_CAPTURE_WINDOW_MINUTES,
   evaluatePrematchCaptureWindow,
   isWithinCanonicalCaptureWindow,

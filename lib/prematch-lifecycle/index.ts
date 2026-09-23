@@ -34,3 +34,17 @@ export {
   type PrematchLifecycleRunnerDeps,
   type PrematchLifecycleSanitizedSummary,
 } from "@/lib/prematch-lifecycle/runner";
+export {
+  PE3C_C0_RECON_ACTIVATION,
+  isC0ReconLifecycleActivated,
+  resolveLifecyclePeInputMode,
+  type LifecyclePeInputMode,
+} from "@/lib/prematch-lifecycle/pe3-activation";
+export {
+  MANUAL_C0_CONFIRM_FLAG,
+  MANUAL_C0_ENABLE_FLAG,
+  MANUAL_C0_SMOKE_MAX_NEW_TICKETS,
+  isManualC0SmokeArgv,
+  parseManualC0SmokeArgv,
+  type ManualC0SmokeControls,
+} from "@/lib/prematch-lifecycle/pe3-controlled-activation";

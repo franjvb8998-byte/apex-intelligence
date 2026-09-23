@@ -18,6 +18,7 @@ import type {
   PrematchPublishedSnapshot,
   PrematchTicketMarketId,
 } from "@/lib/prematch-decision/ticket";
+import type { PrematchInputProvenance } from "@/lib/prematch-decision/input-provenance";
 
 export type MatchAnalysisTicketExtras = {
   leagueId?: string | null;
@@ -27,6 +28,7 @@ export type MatchAnalysisTicketExtras = {
   homeForm?: MatchCenterFormSide | null;
   awayForm?: MatchCenterFormSide | null;
   sourceMode?: PrematchPublishedSnapshot["sourceMode"];
+  inputProvenance?: PrematchInputProvenance | null;
 };
 
 const PUBLISHED_MARKETS = new Set<PrematchTicketMarketId>([
@@ -187,5 +189,8 @@ export function publishedSnapshotFromMatchAnalysis(
     quotes: quotesFromOdds(extras.odds),
     scoring: scoringFromAnalysis(data),
     evidence: evidenceFromAnalysis(data, extras),
+    ...(extras.inputProvenance != null
+      ? { inputProvenance: extras.inputProvenance }
+      : {}),
   };
 }

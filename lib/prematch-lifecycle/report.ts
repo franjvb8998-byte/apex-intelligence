@@ -34,6 +34,33 @@ export type PrematchLifecycleReport = {
    * Aggregate counter only — never carries exception text or payloads.
    */
   fatalErrorCount: number;
+  /**
+   * Resolved PE input mode for this run (`base_prior` | `c0_recon`).
+   * Observable proof of whether C0 path was selected.
+   */
+  peInputMode: "base_prior" | "c0_recon";
+  /**
+   * Canonical input regime label for this run
+   * (REGIME_LIFECYCLE_BASE_PRIOR_V1 | REGIME_LIFECYCLE_C0_RECON_V1).
+   */
+  inputRegime: string;
+  /** PE-3C: C0 reconstruction attempts (mode=c0_recon only). */
+  c0ReconAttempts: number;
+  c0ReconTicketsCreated: number;
+  c0ReconFallbackBasePrior: number;
+  c0ReconMixed: number;
+  c0ReconSkipped: number;
+  /** Logical season-universe acquisitions (one per league+season key). */
+  seasonUniverseAcquisitions: number;
+  /** HTTP page requests across season-universe acquisitions. */
+  seasonUniverseHttpRequests: number;
+  /**
+   * @deprecated Alias of seasonUniverseAcquisitions (PE-3C compat).
+   */
+  seasonUniverseRequests: number;
+  seasonUniverseCacheHits: number;
+  /** Last C0 skip reason in this run (bounded enum string); empty if none. */
+  c0LastSkipReason: string | null;
 };
 
 export function emptyPrematchLifecycleReport(
@@ -65,5 +92,17 @@ export function emptyPrematchLifecycleReport(
     skippedCount: 0,
     errorCount: 0,
     fatalErrorCount: 0,
+    peInputMode: "base_prior",
+    inputRegime: "REGIME_LIFECYCLE_BASE_PRIOR_V1",
+    c0ReconAttempts: 0,
+    c0ReconTicketsCreated: 0,
+    c0ReconFallbackBasePrior: 0,
+    c0ReconMixed: 0,
+    c0ReconSkipped: 0,
+    seasonUniverseAcquisitions: 0,
+    seasonUniverseHttpRequests: 0,
+    seasonUniverseRequests: 0,
+    seasonUniverseCacheHits: 0,
+    c0LastSkipReason: null,
   };
 }

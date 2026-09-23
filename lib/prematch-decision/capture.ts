@@ -176,5 +176,8 @@ export function snapshotPrematchDecisionTicket(
     selections,
     scoring,
     evidence: snapshotEvidence(published),
+    ...(published.inputProvenance != null
+      ? { inputProvenance: published.inputProvenance }
+      : {}),
   };
 }

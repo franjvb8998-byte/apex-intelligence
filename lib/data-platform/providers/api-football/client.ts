@@ -101,9 +101,14 @@ export type ApiFootballClient = {
   getFixturesByIds(
     fixtureIds: Array<string | number>,
   ): Promise<ApiFootballFixturesResponse>;
+  /**
+   * League+season fixture list. Optional `page` enables bounded pagination
+   * for season-universe completeness (PE-3E). Omit page for legacy unpaged call.
+   */
   getFixturesByLeague(
     league: string | number,
     season: string | number,
+    page?: number,
   ): Promise<ApiFootballFixturesResponse>;
   getTeamLastFixtures(
     team: string | number,
@@ -261,11 +266,12 @@ export function createApiFootballClient(
         { maxAttempts: LIVE_TRANSPORT_MAX_ATTEMPTS },
       );
     },
-    getFixturesByLeague(league, season) {
-      return get<ApiFootballFixturesResponse>("/fixtures", {
-        league,
-        season,
-      });
+    getFixturesByLeague(league, season, page) {
+      const params: Record<string, string | number> = { league, season };
+      if (page != null) {
+        params.page = page;
+      }
+      return get<ApiFootballFixturesResponse>("/fixtures", params);
     },
     getTeamLastFixtures(team, last = 5) {
       return get<ApiFootballFixturesResponse>("/fixtures", {
@@ -441,9 +447,12 @@ export function withApiFootballClientCache(
       cached(liveFixturesCacheKey(fixtureIds), () =>
         client.getFixturesByIds(fixtureIds),
       ),
-    getFixturesByLeague: (league, season) =>
-      cached(`af:fixtures:league:${league}:${season}`, () =>
-        client.getFixturesByLeague(league, season),
+    getFixturesByLeague: (league, season, page) =>
+      cached(
+        page == null
+          ? `af:fixtures:league:${league}:${season}`
+          : `af:fixtures:league:${league}:${season}:page:${page}`,
+        () => client.getFixturesByLeague(league, season, page),
       ),
     getTeamLastFixtures: (team, last) =>
       cached(`af:fixtures:team:${team}:last:${last ?? 5}`, () =>

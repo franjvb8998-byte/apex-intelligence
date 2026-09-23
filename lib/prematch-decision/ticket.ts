@@ -9,6 +9,7 @@
 import type {
   PrematchActionabilityReason,
 } from "@/lib/prematch-decision/actionability";
+import type { PrematchInputProvenance } from "@/lib/prematch-decision/input-provenance";
 import type { ApexConfidenceBand, ApexDecisionVerdictKind, ApexRiskBand } from "@/lib/decision-engine/types";
 import type { ScoringTier } from "@/lib/scoring-engine/types";
 
@@ -120,6 +121,11 @@ export type PrematchDecisionTicket = {
   selections: PrematchTicketSelection[];
   scoring: PrematchTicketScoring | null;
   evidence: PrematchEvidenceAvailability;
+  /**
+   * Optional PE-3B+ input provenance. Absent on legacy tickets ⇒ interpret as
+   * REGIME_LIFECYCLE_BASE_PRIOR_V1. Never backfill old rows.
+   */
+  inputProvenance?: PrematchInputProvenance | null;
 };
 
 export type PrematchPublishedSelection = {
@@ -172,4 +178,6 @@ export type PrematchPublishedSnapshot = {
   quotes?: PrematchPublishedQuote[];
   scoring?: PrematchPublishedScoring | null;
   evidence?: Partial<PrematchEvidenceAvailability> | null;
+  /** Optional; frozen onto the ticket when present (PE-3B+). */
+  inputProvenance?: PrematchInputProvenance | null;
 };

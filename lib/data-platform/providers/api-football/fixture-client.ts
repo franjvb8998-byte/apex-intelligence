@@ -49,7 +49,9 @@ export function createFixtureApiFootballClient(): ApiFootballClient {
       buildFixtureIdsQuery(fixtureIds);
       return emptyList<ApiFootballFixturesResponse>("fixtures");
     },
-    async getFixturesByLeague(league, _season) {
+    async getFixturesByLeague(league, season, page) {
+      void season;
+      void page;
       if (String(league) !== "39") {
         return emptyList<ApiFootballFixturesResponse>("fixtures");
       }
@@ -120,7 +122,8 @@ export function createFixtureApiFootballClient(): ApiFootballClient {
     async getInjuries(query) {
       return recordedInjuries(query);
     },
-    async getPlayer(id, _season?) {
+    async getPlayer(id, season?) {
+      void season;
       return createRecordedApiFootballPlayersResponse(id);
     },
     async getLeague(id) {
