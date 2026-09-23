@@ -48,3 +48,12 @@ export {
   parseManualC0SmokeArgv,
   type ManualC0SmokeControls,
 } from "@/lib/prematch-lifecycle/pe3-controlled-activation";
+export {
+  PE3_C0_ACCEPTANCE_MODEL_VERSION,
+  evaluatePe3C0LiveAcceptance,
+  type Pe3C0AcceptanceResult,
+} from "@/lib/prematch-lifecycle/c0-live-acceptance";
+export {
+  parseC0AcceptanceArgv,
+  runPe3C0AcceptanceVerification,
+} from "@/lib/prematch-lifecycle/c0-live-acceptance-cli";

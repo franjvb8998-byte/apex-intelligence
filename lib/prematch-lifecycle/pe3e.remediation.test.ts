@@ -505,6 +505,7 @@ describe("PE-3E runner observability + activation gate + fingerprints", () => {
     expect(summary.seasonUniverseHttpRequests).toBe(3);
     expect(summary.c0LastSkipReason).toBe("provider_failure");
     expect(summary).not.toHaveProperty("seasonUniverseRequests");
+    expect(summary).not.toHaveProperty("seasonUniversePagesFetched");
   });
 
   it("activation remains OFF; fingerprints unchanged", () => {

@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "lifecycle:prematch": "tsx scripts/run-prematch-lifecycle.ts",
     "lifecycle:prematch:c0-smoke": "tsx scripts/run-prematch-lifecycle-c0-smoke.ts",
+    "lifecycle:verify-c0-acceptance": "tsx scripts/verify-prematch-c0-acceptance.ts",
     "calibration:microcollect": "npx --yes tsx lib/debug/calibration/run-microcollect.ts --execute",
     "calibration:pilot": "npx --yes tsx lib/debug/calibration/run-pilot.ts --execute",
     "calibration:experiment-5b5": "npx --yes tsx lib/debug/calibration/experiment-5b5-run.ts",
