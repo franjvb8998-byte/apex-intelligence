@@ -60,6 +60,26 @@ export function createFixtureApiFootballClient(): ApiFootballClient {
     async getTeamLastFixtures(team, last = 5) {
       return recordedTeamLastFixtures(team, last);
     },
+    async getTeamFixturesBySeason(team, season) {
+      void team;
+      void season;
+      return emptyCompleteFixturesList({
+        team: String(team),
+        season: String(season),
+      });
+    },
+    async getTeamFixturesBySeasonWindow(team, season, fromDate, toDate) {
+      void team;
+      void season;
+      void fromDate;
+      void toDate;
+      return emptyCompleteFixturesList({
+        team: String(team),
+        season: String(season),
+        from: fromDate,
+        to: toDate,
+      });
+    },
     async getTeam(id) {
       return createRecordedApiFootballTeamsResponse(id);
     },
@@ -146,6 +166,19 @@ function emptyList<T extends { response: unknown[] }>(get: string): T {
     paging: { current: 1, total: 1 },
     response: [],
   } as unknown as T;
+}
+
+function emptyCompleteFixturesList(
+  parameters: Record<string, string>,
+): ApiFootballFixturesResponse {
+  return {
+    get: "fixtures",
+    parameters,
+    errors: [],
+    results: 0,
+    paging: { current: 1, total: 1 },
+    response: [],
+  };
 }
 
 function recordedMiniFixture(options: {

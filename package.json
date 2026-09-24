@@ -25,7 +25,21 @@
     "calibration:draw-5b13": "npx --yes tsx lib/debug/calibration/draw-5b13-run.ts",
     "calibration:hs-5b14": "npx --yes tsx lib/debug/calibration/hs-5b14-run.ts",
     "calibration:tr-5b15": "npx --yes tsx lib/debug/calibration/tr-5b15-run.ts",
-    "calibration:lm-5b16": "npx --yes tsx lib/debug/calibration/lm-5b16-run.ts"
+    "calibration:lm-5b16": "npx --yes tsx lib/debug/calibration/lm-5b16-run.ts",
+    "calibration:pe4g3-expectation-dataset": "npx --yes tsx lib/debug/calibration/run-pe4g3-expectation-dataset.ts",
+    "calibration:pe4g4-expectation-poc": "npx --yes tsx lib/debug/calibration/run-pe4g4-expectation-poc.ts",
+    "calibration:pe4g5-expectation-refinement": "npx --yes tsx lib/debug/calibration/run-pe4g5-expectation-refinement.ts",
+    "calibration:pe4h1-form-signal": "npx --yes tsx lib/debug/calibration/run-pe4h1-form-signal-audit.ts",
+    "calibration:goals1b-evidence": "npx --yes tsx lib/debug/calibration/run-goals1b-evidence-dataset.ts",
+    "calibration:goals1c-g0": "npx --yes tsx lib/debug/calibration/run-goals1c-g0-baseline.ts",
+    "calibration:goals1d-g1": "npx --yes tsx lib/debug/calibration/run-goals1d-g1-attack-defense.ts",
+    "calibration:goals1e-g3": "npx --yes tsx lib/debug/calibration/run-goals1e-g3-opponent-adjusted.ts",
+    "calibration:goals1f1-dist-audit": "npx --yes tsx lib/debug/calibration/run-goals1f1-distributional-audit.ts",
+    "calibration:goals1g1-mcal-audit": "npx --yes tsx lib/debug/calibration/run-goals1g1-market-calibration-audit.ts",
+    "calibration:goals1g2-mcal-poc": "npx --yes tsx lib/debug/calibration/run-goals1g2-market-calibration-poc.ts",
+    "calibration:goals1g3-mcal-refine": "npx --yes tsx lib/debug/calibration/run-goals1g3-match-total-refinement.ts",
+    "calibration:goals1h1-rad-audit": "npx --yes tsx lib/debug/calibration/run-goals1h1-recent-attack-defense-audit.ts",
+    "calibration:goals1i1-rest-schedule": "npx --yes tsx lib/debug/calibration/run-goals1i1-rest-schedule-audit.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

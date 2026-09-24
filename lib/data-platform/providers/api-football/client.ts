@@ -114,6 +114,26 @@ export type ApiFootballClient = {
     team: string | number,
     last?: number,
   ): Promise<ApiFootballFixturesResponse>;
+  /**
+   * PE-4F verified: GET /fixtures?team=&season=
+   * Cross-competition team schedule for one provider season.
+   * No page=. No last=. No from/to.
+   */
+  getTeamFixturesBySeason(
+    team: string | number,
+    season: string | number,
+  ): Promise<ApiFootballFixturesResponse>;
+  /**
+   * PE-4F verified: GET /fixtures?team=&season=&from=&to=
+   * Bounded cross-competition window (YYYY-MM-DD). Season required.
+   * No page=. No last=.
+   */
+  getTeamFixturesBySeasonWindow(
+    team: string | number,
+    season: string | number,
+    fromDate: string,
+    toDate: string,
+  ): Promise<ApiFootballFixturesResponse>;
   getTeam(id: string): Promise<ApiFootballTeamsResponse>;
   getTeamStatistics(
     team: string | number,
@@ -166,6 +186,47 @@ function assertApiKey(apiKey: string): void {
     throw new ApiFootballError({
       message: "API_FOOTBALL_KEY is required for live HTTP calls",
       code: "missing_api_key",
+    });
+  }
+}
+
+const CALENDAR_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function assertApiFootballTeamId(team: string | number): void {
+  const raw = String(team).trim();
+  if (!/^[1-9]\d*$/.test(raw)) {
+    throw new ApiFootballError({
+      message: "team id must be a positive integer string",
+      code: "invalid_ids",
+    });
+  }
+}
+
+function assertApiFootballSeason(season: string | number): void {
+  const raw = String(season).trim();
+  if (!/^\d{4}$/.test(raw)) {
+    throw new ApiFootballError({
+      message: "season must be a 4-digit year",
+      code: "invalid_ids",
+    });
+  }
+}
+
+function assertApiFootballCalendarDate(
+  value: string,
+  field: "from" | "to",
+): void {
+  if (typeof value !== "string" || !CALENDAR_DATE_RE.test(value.trim())) {
+    throw new ApiFootballError({
+      message: `${field} must be YYYY-MM-DD`,
+      code: "invalid_ids",
+    });
+  }
+  const ms = Date.parse(`${value.trim()}T00:00:00.000Z`);
+  if (!Number.isFinite(ms)) {
+    throw new ApiFootballError({
+      message: `${field} must be a valid calendar date`,
+      code: "invalid_ids",
     });
   }
 }
@@ -277,6 +338,32 @@ export function createApiFootballClient(
       return get<ApiFootballFixturesResponse>("/fixtures", {
         team,
         last,
+      });
+    },
+    getTeamFixturesBySeason(team, season) {
+      assertApiFootballTeamId(team);
+      assertApiFootballSeason(season);
+      return get<ApiFootballFixturesResponse>("/fixtures", {
+        team,
+        season,
+      });
+    },
+    getTeamFixturesBySeasonWindow(team, season, fromDate, toDate) {
+      assertApiFootballTeamId(team);
+      assertApiFootballSeason(season);
+      assertApiFootballCalendarDate(fromDate, "from");
+      assertApiFootballCalendarDate(toDate, "to");
+      if (fromDate > toDate) {
+        throw new ApiFootballError({
+          message: "from date must be <= to date",
+          code: "invalid_ids",
+        });
+      }
+      return get<ApiFootballFixturesResponse>("/fixtures", {
+        team,
+        season,
+        from: fromDate,
+        to: toDate,
       });
     },
     getTeam(id) {
@@ -457,6 +544,21 @@ export function withApiFootballClientCache(
     getTeamLastFixtures: (team, last) =>
       cached(`af:fixtures:team:${team}:last:${last ?? 5}`, () =>
         client.getTeamLastFixtures(team, last),
+      ),
+    getTeamFixturesBySeason: (team, season) =>
+      cached(`af:fixtures:team:${team}:season:${season}`, () =>
+        client.getTeamFixturesBySeason(team, season),
+      ),
+    getTeamFixturesBySeasonWindow: (team, season, fromDate, toDate) =>
+      cached(
+        `af:fixtures:team:${team}:season:${season}:from:${fromDate}:to:${toDate}`,
+        () =>
+          client.getTeamFixturesBySeasonWindow(
+            team,
+            season,
+            fromDate,
+            toDate,
+          ),
       ),
     getTeam: (id) => cached(`af:team:${id}`, () => client.getTeam(id)),
     getTeamStatistics: (team, league, season) =>
