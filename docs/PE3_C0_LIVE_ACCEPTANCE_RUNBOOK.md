@@ -55,3 +55,5 @@ npm run lifecycle:verify-c0-acceptance -- --fixture-id <FIXTURE_ID>
 
 Healthy smoke no-ops (no eligible fixture) do **not** close PE-3.  
 PE-3 closes only after verifier PASS on a team-specific catalogue-discriminating C0 ticket.
+
+**PE-3 closed:** see `docs/PE3_FINAL_CLOSURE_AUDIT.md` (fixture `1490209`, `PE3_C0_LIVE_ACCEPTANCE=PASS`, C0 remains default OFF).

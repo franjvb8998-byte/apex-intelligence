@@ -33,7 +33,10 @@ async function main(): Promise<void> {
         hint: `Example: npm run lifecycle:prematch:c0-smoke -- ${MANUAL_C0_ENABLE_FLAG} ${MANUAL_C0_CONFIRM_FLAG}`,
       }),
     );
-    process.exit(1);
+    // Soft exit: hard process.exit() after HTTP keep-alive can trip
+    // Windows libuv UV_HANDLE_CLOSING (async.c) during handle teardown.
+    process.exitCode = 1;
+    return;
   }
 
   const base = readPrematchLifecycleConfig(process.env);
@@ -53,7 +56,7 @@ async function main(): Promise<void> {
         seasonUniverseLoader: createProductionSeasonUniverseLoader(process.env),
       }),
   });
-  process.exit(code);
+  process.exitCode = code;
 }
 
 void main();

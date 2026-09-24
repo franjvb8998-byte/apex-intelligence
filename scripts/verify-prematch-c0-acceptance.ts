@@ -22,7 +22,10 @@ async function main(): Promise<void> {
         hint: "Example: npm run lifecycle:verify-c0-acceptance -- --fixture-id 1234567",
       }),
     );
-    process.exit(1);
+    // Soft exit: hard process.exit() after fetch/Supabase I/O can trip
+    // Windows libuv UV_HANDLE_CLOSING (async.c) during keep-alive teardown.
+    process.exitCode = 1;
+    return;
   }
 
   try {
@@ -30,7 +33,7 @@ async function main(): Promise<void> {
       fixtureId: parsed.fixtureId,
     });
     console.log(JSON.stringify(result));
-    process.exit(result.PE3_C0_LIVE_ACCEPTANCE === "PASS" ? 0 : 2);
+    process.exitCode = result.PE3_C0_LIVE_ACCEPTANCE === "PASS" ? 0 : 2;
   } catch {
     console.error(
       JSON.stringify({
@@ -41,7 +44,7 @@ async function main(): Promise<void> {
         },
       }),
     );
-    process.exit(1);
+    process.exitCode = 1;
   }
 }
 

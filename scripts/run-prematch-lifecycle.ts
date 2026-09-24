@@ -8,7 +8,8 @@ import { executePrematchLifecycleRunner } from "@/lib/prematch-lifecycle/runner"
 
 async function main(): Promise<void> {
   const code = await executePrematchLifecycleRunner(process.env);
-  process.exit(code);
+  // Soft exit avoids Windows libuv UV_HANDLE_CLOSING after HTTP keep-alive teardown.
+  process.exitCode = code;
 }
 
 void main();
