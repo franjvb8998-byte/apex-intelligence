@@ -39,7 +39,20 @@
     "calibration:goals1g2-mcal-poc": "npx --yes tsx lib/debug/calibration/run-goals1g2-market-calibration-poc.ts",
     "calibration:goals1g3-mcal-refine": "npx --yes tsx lib/debug/calibration/run-goals1g3-match-total-refinement.ts",
     "calibration:goals1h1-rad-audit": "npx --yes tsx lib/debug/calibration/run-goals1h1-recent-attack-defense-audit.ts",
-    "calibration:goals1i1-rest-schedule": "npx --yes tsx lib/debug/calibration/run-goals1i1-rest-schedule-audit.ts"
+    "calibration:goals1i1-rest-schedule": "npx --yes tsx lib/debug/calibration/run-goals1i1-rest-schedule-audit.ts",
+    "calibration:pe4i2-acquisition-plan": "npx --yes tsx lib/debug/calibration/run-pe4i2-acquisition-plan.ts --plan-only",
+    "calibration:pe4i3-live-smoke": "npx --yes tsx lib/debug/calibration/run-pe4i3-controlled-live-smoke.ts",
+    "calibration:pe4i4-bulk-plan": "npx --yes tsx lib/debug/calibration/run-pe4i4-bulk-acquisition-plan.ts",
+    "calibration:pe4i5-stage1-schedule": "npx --yes tsx lib/debug/calibration/run-pe4i5-stage1-schedule-discovery.ts",
+    "calibration:pe4i6-stage2a-stats": "npx --yes tsx lib/debug/calibration/run-pe4i6-stage2a-statistics-batch.ts",
+    "calibration:pe4i7-stage2b-stats": "npx --yes tsx lib/debug/calibration/run-pe4i7-stage2b-statistics-batch.ts",
+    "calibration:pe4i8-stage2c-stats": "npx --yes tsx lib/debug/calibration/run-pe4i8-stage2c-statistics-batch.ts",
+    "calibration:pe4i9-stage2d-stats": "npx --yes tsx lib/debug/calibration/run-pe4i9-stage2d-statistics-batch.ts",
+    "calibration:pe4i10-stage2e-stats": "npx --yes tsx lib/debug/calibration/run-pe4i10-stage2e-statistics-batch.ts",
+    "calibration:pe4i11-stage2f-stats": "npx --yes tsx lib/debug/calibration/run-pe4i11-stage2f-statistics-batch.ts",
+    "calibration:pe4i12-stage2g-stats": "npx --yes tsx lib/debug/calibration/run-pe4i12-stage2g-statistics-batch.ts",
+    "calibration:pe4i13-stage2h-final-stats": "npx --yes tsx lib/debug/calibration/run-pe4i13-stage2h-final-statistics-batch.ts",
+    "calibration:pe4i14-integrity-audit": "npx --yes tsx lib/debug/calibration/run-pe4i14-integrity-audit.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
