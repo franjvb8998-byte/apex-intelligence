@@ -52,7 +52,12 @@
     "calibration:pe4i11-stage2f-stats": "npx --yes tsx lib/debug/calibration/run-pe4i11-stage2f-statistics-batch.ts",
     "calibration:pe4i12-stage2g-stats": "npx --yes tsx lib/debug/calibration/run-pe4i12-stage2g-statistics-batch.ts",
     "calibration:pe4i13-stage2h-final-stats": "npx --yes tsx lib/debug/calibration/run-pe4i13-stage2h-final-statistics-batch.ts",
-    "calibration:pe4i14-integrity-audit": "npx --yes tsx lib/debug/calibration/run-pe4i14-integrity-audit.ts"
+    "calibration:pe4i14-integrity-audit": "npx --yes tsx lib/debug/calibration/run-pe4i14-integrity-audit.ts",
+    "calibration:pe4i15-feature-plan": "npx --yes tsx lib/debug/calibration/run-pe4i15-feature-plan.ts",
+    "calibration:pe4i16-offline-ledger-features": "npx --yes tsx lib/debug/calibration/run-pe4i16-offline-ledger-features.ts",
+    "calibration:pe4i17-offline-dev-feature-dataset": "npx --yes tsx lib/debug/calibration/run-pe4i17-offline-dev-feature-dataset.ts",
+    "calibration:pe4i18-feature-structure-audit": "npx --yes tsx lib/debug/calibration/run-pe4i18-feature-structure-audit.ts",
+    "calibration:pe4i19-strength-catalogue": "npx --yes tsx lib/debug/calibration/run-pe4i19-strength-catalogue.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
