@@ -21,24 +21,32 @@ export type Pe4I18FeatureFamilyRow = {
 export type Pe4I18FeatureFamilyMatrix = {
   families: Pe4I18FeatureFamilyRow[];
   unsupported: Array<{ id: string; reason: string; structuralStatus: "UNAVAILABLE" }>;
-  opponentStrengthStatus: "UNAVAILABLE";
-  opponentStrengthReason: typeof PE4I16_OPPONENT_STRENGTH_UNAVAILABLE_REASON;
+  opponentStrengthStatus: Pe4I18StructuralStatus;
+  opponentStrengthReason: string;
 };
 
 export function buildFeatureFamilyMatrix(input?: {
   scheduleRestAvailableShare?: number;
   recentResultsAvailableShare?: number;
   xgPresentShare?: number;
+  opponentStrengthAvailableShare?: number;
 }): Pe4I18FeatureFamilyMatrix {
   const scheduleShare = input?.scheduleRestAvailableShare ?? 0;
   const resultsShare = input?.recentResultsAvailableShare ?? 0;
   const xgShare = input?.xgPresentShare ?? 0;
+  const opponentStrengthShare = input?.opponentStrengthAvailableShare ?? 0;
 
   const statusFor = (
     id: Pe4I15FeatureFamilyId,
   ): { status: Pe4I18StructuralStatus; notes: string } => {
     switch (id) {
       case "opponent_strength_join":
+        if (opponentStrengthShare > 0) {
+          return {
+            status: opponentStrengthShare === 1 ? "AVAILABLE" : "PARTIAL",
+            notes: `complete fail-closed join share≈${opponentStrengthShare.toFixed(3)}; unavailable rows remain null`,
+          };
+        }
         return {
           status: "UNAVAILABLE",
           notes: PE4I16_OPPONENT_STRENGTH_UNAVAILABLE_REASON,
@@ -113,7 +121,15 @@ export function buildFeatureFamilyMatrix(input?: {
       reason: u.reason,
       structuralStatus: "UNAVAILABLE" as const,
     })),
-    opponentStrengthStatus: "UNAVAILABLE",
-    opponentStrengthReason: PE4I16_OPPONENT_STRENGTH_UNAVAILABLE_REASON,
+    opponentStrengthStatus:
+      opponentStrengthShare === 1
+        ? "AVAILABLE"
+        : opponentStrengthShare > 0
+          ? "PARTIAL"
+          : "UNAVAILABLE",
+    opponentStrengthReason:
+      opponentStrengthShare > 0
+        ? "complete_as_of_m_catalogue_join_with_null_unavailable_rows"
+        : PE4I16_OPPONENT_STRENGTH_UNAVAILABLE_REASON,
   };
 }

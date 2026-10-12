@@ -46,3 +46,6 @@ export * from "@/lib/debug/calibration/pe4-as-of-t-features/feature-family-audit
 export * from "@/lib/debug/calibration/pe4-as-of-t-features/sparse-history-audit";
 export * from "@/lib/debug/calibration/pe4-as-of-t-features/structure-audit-run";
 export * from "@/lib/debug/calibration/pe4-as-of-t-features/strength-catalogue";
+export * from "@/lib/debug/calibration/pe4-as-of-t-features/pe4i20-protocol";
+export * from "@/lib/debug/calibration/pe4-as-of-t-features/pe4i20-dataset";
+export * from "@/lib/debug/calibration/pe4-as-of-t-features/pe4i20-structure-audit";

@@ -389,7 +389,8 @@ export function buildSchemaInventory(input: {
     allowlist: [...new Set(allowlist)].sort(),
     fields,
     derivedCandidates,
-    opponentStrengthStatus: "UNAVAILABLE",
+    opponentStrengthStatus:
+      input.pathASample.opponentStrength != null ? "PARTIAL" : "UNAVAILABLE",
   };
 }
 
@@ -445,6 +446,19 @@ export function canonicalNumericAllowlist(): string[] {
     ...derivedCandidatesPaths(),
   );
   return [...new Set(paths)].sort();
+}
+
+/** PE-4I.20 extends, but does not mutate, the historical PE-4I.18 allowlist. */
+export function pe4I20NumericAllowlist(): string[] {
+  return [
+    ...canonicalNumericAllowlist(),
+    "opponentStrength.meanOpponentCommonStrengthAsOfM",
+    "opponentStrength.observationCount",
+    "opponentStrength.matchedCount",
+    "opponentStrength.missingCount",
+    "opponentStrength.selectedHistoryRegulationAmbiguityCount",
+    "opponentStrength.cataloguePriorRegulationAmbiguityCandidateCount",
+  ].sort();
 }
 
 function derivedCandidatesPaths(): string[] {

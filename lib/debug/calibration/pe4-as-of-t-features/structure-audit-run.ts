@@ -176,7 +176,7 @@ async function* readJsonlLines(
   }
 }
 
-type LoadedRow = {
+export type LoadedRow = {
   meta: Pe4I18RowMeta;
   numerics: Record<string, number>;
 };
@@ -316,6 +316,7 @@ function runAccumulators(
   scheduleRestAvailableShare: number;
   recentResultsAvailableShare: number;
   anyXgPresentShare: number;
+  opponentStrengthAvailableShare: number;
 } {
   const presenceState = createPresenceAccumulator();
   const descriptiveState = createDescriptiveAccumulator(allowlist);
@@ -328,6 +329,7 @@ function runAccumulators(
   let scheduleAvail = 0;
   let obsGe3 = 0;
   let xgPresent = 0;
+  let opponentStrengthAvailable = 0;
 
   for (const row of rows) {
     presenceState.rowCount += 1;
@@ -347,6 +349,9 @@ function runAccumulators(
     if (Number.isFinite(obs) && obs >= 3) obsGe3 += 1;
     const xg = row.numerics["pathB.anyXgPresent"];
     if (xg === 1) xgPresent += 1;
+    if (Number.isFinite(row.numerics["opponentStrength.meanOpponentCommonStrengthAsOfM"])) {
+      opponentStrengthAvailable += 1;
+    }
   }
 
   const n = rows.length || 1;
@@ -361,6 +366,7 @@ function runAccumulators(
     scheduleRestAvailableShare: scheduleAvail / n,
     recentResultsAvailableShare: obsGe3 / n,
     anyXgPresentShare: xgPresent / n,
+    opponentStrengthAvailableShare: opponentStrengthAvailable / n,
   };
 }
 
@@ -465,6 +471,7 @@ export async function runPe4I18StructureAudit(input?: {
     scheduleRestAvailableShare: pass1.scheduleRestAvailableShare,
     recentResultsAvailableShare: pass1.recentResultsAvailableShare,
     xgPresentShare: pass1.anyXgPresentShare,
+    opponentStrengthAvailableShare: pass1.opponentStrengthAvailableShare,
   });
 
   const digestPayloadBase = {
@@ -714,6 +721,7 @@ export function runStructureAuditOnRows(input: {
     scheduleRestAvailableShare: pass.scheduleRestAvailableShare,
     recentResultsAvailableShare: pass.recentResultsAvailableShare,
     xgPresentShare: pass.anyXgPresentShare,
+    opponentStrengthAvailableShare: pass.opponentStrengthAvailableShare,
   });
   const auditDigest = digestStructureAuditPayload({
     presenceSummary: pass.presence.summary,
