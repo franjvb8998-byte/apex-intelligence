@@ -59,7 +59,8 @@
     "calibration:pe4i18-feature-structure-audit": "npx --yes tsx lib/debug/calibration/run-pe4i18-feature-structure-audit.ts",
     "calibration:pe4i19-strength-catalogue": "npx --yes tsx lib/debug/calibration/run-pe4i19-strength-catalogue.ts",
     "calibration:pe4i20-strength-dataset": "npx --yes tsx lib/debug/calibration/run-pe4i20-strength-integrated-dataset.ts",
-    "calibration:pe4i20-strength-structure-audit": "npx --yes tsx lib/debug/calibration/run-pe4i20-strength-structure-audit.ts"
+    "calibration:pe4i20-strength-structure-audit": "npx --yes tsx lib/debug/calibration/run-pe4i20-strength-structure-audit.ts",
+    "calibration:pe4i21-feature-contract": "npx --yes tsx lib/debug/calibration/run-pe4i21-feature-contract.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
