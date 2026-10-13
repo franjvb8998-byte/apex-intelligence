@@ -1,6 +1,7 @@
 /**
- * PE-5.3B — probe transport boundary.
- * The runner depends on this interface only. No HTTP client lives here.
+ * PE-5.3C — probe transport shapes.
+ * These types describe an in-memory double. They do not authorize one.
+ * A caller-supplied label or callback is not evidence of offline isolation.
  */
 
 export type Pe53bTransportQuery = {
@@ -18,7 +19,10 @@ export type Pe53bTransportResponse = {
   headers?: Readonly<Record<string, string | undefined>>;
 };
 
+/**
+ * Untrusted double shape used by the testing boundary.
+ * Possession of this shape is not a capability.
+ */
 export type Pe53bTransport = {
-  readonly kind: "in_memory";
   request(input: Pe53bTransportRequest): Promise<Pe53bTransportResponse>;
 };
