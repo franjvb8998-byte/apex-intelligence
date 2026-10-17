@@ -1,23 +1,23 @@
 /**
- * PE-5.3C — offline historical squad-coverage probe runner.
+ * PE-5.3D — offline historical squad-coverage probe runner.
  *
- * Public entry: runPe53bProbe. Dry-run by default. In-memory mode uses the
- * builtin offline transport only. Caller callbacks are not read.
+ * Public entry: runPe53bProbe. Dry-run by default. In-memory mode calls the
+ * offline fixture reader captured when this module initialized. The public
+ * input has no transport field. Extra properties are not read.
  *
- * The dispatch budget is one in-process counter shared through globalThis.
- * It is not a cross-process, cross-worker, or distributed cap. The test reset
- * is explicit; the runner does not refill the counter between runs.
+ * The dispatch budget is a closed-over integer in this module instance.
+ * Every runPe53bProbe call on that instance shares it. Reservation is a
+ * synchronous decrement before the fixture read. This is not a process-wide,
+ * worker-wide, or multi-bundle cap: a second evaluation of this module has
+ * its own integer. The public entry cannot refill it.
  *
- * Source-level isolation is not a sandbox. The testing boundary can stamp a
- * double the public entry cannot see.
+ * Source-level isolation is not an OS sandbox.
  */
 
+import { types } from "node:util";
+
 import { classifyPe5Evidence } from "@/lib/debug/calibration/pe5-availability/evidence-class";
-import {
-  createPe53bBuiltinOfflineTransport,
-  isPe53bBrandedOfflineTransport,
-  type Pe53bBrandedOfflineTransport,
-} from "@/lib/debug/calibration/pe5-availability/probe-offline-capability";
+import { readPe53bOfflineFixture as loadOfflineFixture } from "@/lib/debug/calibration/pe5-availability/probe-offline-fixture";
 import {
   isPe53bFixtureAllowed,
   pe53bFixtureById,
@@ -38,16 +38,28 @@ import type {
   Pe53bTransportResponse,
 } from "@/lib/debug/calibration/pe5-availability/probe-transport";
 
-export const PE53B_RUNNER_VERSION = "pe5.probe_runner.v2" as const;
+const offlineFixtureReader = loadOfflineFixture;
 
-export const PE53C_REPORT_LIMITATIONS = Object.freeze({
+export const PE53B_RUNNER_VERSION = "pe5.probe_runner.v3" as const;
+
+export const PE53D_REPORT_LIMITATIONS = Object.freeze({
   measurements: "coverage_counts_only",
   missingObservations: "stay_missing_not_zero_not_available",
   historicalEvidence: "CURRENT_SNAPSHOT_UNPROVEN",
   writeAccounting: "runner_local_counter_not_a_storage_audit",
-  dispatchBudget: "in_process_shared_counter_not_cross_process",
-  transportIsolation: "public_entry_local_transport_not_a_sandbox",
+  dispatchBudget: "closed_counter_in_one_module_instance_not_process_wide",
+  perRunAttempts: "originRequestsAttempted_counts_this_run_only",
+  sharedBalance: "not_reported_because_a_process_balance_is_not_verifiable",
+  transportIsolation: "runner_calls_its_own_offline_fixture_reader_not_a_sandbox",
+  fixtureIdentity: "omitted_provider_echo_is_unverified_and_not_inferred",
+  emptyObservationProbe:
+    "classifier_receives_present_so_current_snapshot_stays_unproven_measurement_stays_missing",
 } as const);
+
+export const PE53D_SHARED_BUDGET = Object.freeze({
+  reported: false as const,
+  scope: "module_instance" as const,
+});
 
 export type Pe53bEndpoint = "lineups" | "injuries";
 
@@ -136,7 +148,8 @@ export type Pe53bProbeReport = {
   liveResponsesStored: false;
   retriesAttempted: 0;
   liveProviderAuthorized: false;
-  limitations: typeof PE53C_REPORT_LIMITATIONS;
+  sharedBudget: typeof PE53D_SHARED_BUDGET;
+  limitations: typeof PE53D_REPORT_LIMITATIONS;
 };
 
 export type Pe53bProbeInput = {
@@ -149,15 +162,19 @@ export type Pe53bProbeInput = {
 const DAILY_QUOTA_RE = /request limit for the day|daily request quota/i;
 const DAILY_REMAINING_HEADER = "x-ratelimit-requests-remaining";
 const FIXTURE_ID_RE = /^[1-9]\d{0,11}$/;
-const DISPATCH_BUDGET_SLOT = Symbol.for("apex.pe53c.offlineProbeDispatchBudget");
 
-type DispatchBudget = { remaining: number };
-type BudgetGlobal = typeof globalThis & {
-  [DISPATCH_BUDGET_SLOT]?: DispatchBudget;
-};
+function createModuleDispatchBudget(cap: number): { tryReserve(): boolean } {
+  let attemptsLeft = cap;
+  return Object.freeze({
+    tryReserve() {
+      if (attemptsLeft <= 0) return false;
+      attemptsLeft -= 1;
+      return true;
+    },
+  });
+}
 
-const localBudget: DispatchBudget = { remaining: PE53B_ORIGIN_REQUEST_CAP };
-let budgetOwner: DispatchBudget | null = null;
+const moduleDispatchBudget = createModuleDispatchBudget(PE53B_ORIGIN_REQUEST_CAP);
 
 type Interpretation =
   | { stopReason: Pe53bStopReason }
@@ -174,56 +191,13 @@ type FinishInput = {
   stoppedAtOrdinal: number | null;
 };
 
-/**
- * In-process dispatch budget.
- * The first module copy publishes one counter on globalThis. Later copies
- * adopt it. Replacing or deleting the slot is written back to that object.
- * A second OS process, worker, or realm has its own counter.
- */
-function sharedDispatchBudget(): DispatchBudget {
-  const g = globalThis as BudgetGlobal;
-  if (budgetOwner) {
-    g[DISPATCH_BUDGET_SLOT] = budgetOwner;
-    return budgetOwner;
-  }
-  const existing = g[DISPATCH_BUDGET_SLOT];
-  if (existing && typeof existing === "object") {
-    if (
-      !Number.isInteger(existing.remaining) ||
-      existing.remaining < 0 ||
-      existing.remaining > PE53B_ORIGIN_REQUEST_CAP
-    ) {
-      existing.remaining = 0;
-    }
-    budgetOwner = existing;
-    return existing;
-  }
-  budgetOwner = localBudget;
-  g[DISPATCH_BUDGET_SLOT] = budgetOwner;
-  return budgetOwner;
-}
+type OwnData =
+  | { state: "missing" }
+  | { state: "unsafe" }
+  | { state: "value"; value: unknown };
 
-function tryReserveDispatch(): boolean {
-  const budget = sharedDispatchBudget();
-  if (
-    !Number.isInteger(budget.remaining) ||
-    budget.remaining <= 0 ||
-    budget.remaining > PE53B_ORIGIN_REQUEST_CAP
-  ) {
-    budget.remaining = 0;
-    return false;
-  }
-  budget.remaining -= 1;
-  return true;
-}
-
-export function resetPe53cDispatchBudgetForTests(): void {
-  const budget = sharedDispatchBudget();
-  budget.remaining = PE53B_ORIGIN_REQUEST_CAP;
-}
-
-export function pe53cDispatchBudgetRemainingForTests(): number {
-  return sharedDispatchBudget().remaining;
+function reserveDispatchAttempt(): boolean {
+  return moduleDispatchBudget.tryReserve();
 }
 
 export function buildPe53bPlan(): readonly Pe53bPlannedRequest[] {
@@ -262,95 +236,83 @@ export function authorizePe53bLiveProvider(input: {
 export async function runPe53bProbe(
   input: Pe53bProbeInput = {},
 ): Promise<Pe53bProbeReport> {
+  let plan: readonly Pe53bPlannedRequest[] = [];
   try {
-    const plan = buildPe53bPlan();
-    if (input.requestLiveProvider === true) {
+    plan = buildPe53bPlan();
+    if (input == null || typeof input !== "object") {
+      return fatalBeforeDispatch(plan);
+    }
+    const requestLiveProvider = input.requestLiveProvider === true;
+    const liveConfirmation = input.liveConfirmation;
+    const mode = input.mode ?? "dry_run";
+    const inMemoryConfirmation = input.inMemoryConfirmation;
+    if (requestLiveProvider) {
       const auth = authorizePe53bLiveProvider({
         requestLiveProvider: true,
-        liveConfirmation: input.liveConfirmation,
+        liveConfirmation,
       });
       return rejectedReport(plan, auth.reason);
     }
-    const mode = input.mode ?? "dry_run";
     if (mode === "dry_run") return dryRunReport(plan);
     if (mode !== "in_memory") {
       return rejectedReport(plan, "in_memory_transport_required");
     }
-    if (input.inMemoryConfirmation !== PE53B_IN_MEMORY_CONFIRMATION) {
+    if (inMemoryConfirmation !== PE53B_IN_MEMORY_CONFIRMATION) {
       return rejectedReport(plan, "in_memory_confirmation_missing");
     }
-    return await executePe53bPlan(plan, createPe53bBuiltinOfflineTransport());
+    return await executeOfficialPlan(plan);
   } catch {
-    return fatalReport("unexpected_provider_behavior");
+    return fatalBeforeDispatch(plan);
   }
 }
 
-export async function executePe53bBrandedPlan(input: {
-  plan: readonly Pe53bPlannedRequest[];
-  transport: unknown;
-  inMemoryConfirmation?: string | null;
-}): Promise<Pe53bProbeReport> {
-  try {
-    const officialPlan = buildPe53bPlan();
-    if (input.inMemoryConfirmation !== PE53B_IN_MEMORY_CONFIRMATION) {
-      return rejectedReport(officialPlan, "in_memory_confirmation_missing");
-    }
-    if (!isPe53bBrandedOfflineTransport(input.transport)) {
-      return rejectedReport(officialPlan, "in_memory_transport_required");
-    }
-    return await executePe53bPlan(input.plan, input.transport);
-  } catch {
-    return fatalReport("unexpected_provider_behavior");
-  }
-}
-
-async function executePe53bPlan(
+async function executeOfficialPlan(
   plan: readonly Pe53bPlannedRequest[],
-  transport: Pe53bBrandedOfflineTransport,
 ): Promise<Pe53bProbeReport> {
-  const send = transport.request;
-  let snapshots: Pe53bPlannedRequest[];
+  const measurements: Pe53bMeasurement[] = [];
+  let snapshots: Pe53bPlannedRequest[] = [];
+  let attempted = 0;
+  let stopOrdinal: number | null = null;
   try {
     snapshots = snapshotPlan(plan);
-  } catch {
-    return finish({
-      plan: [],
-      attempted: 0,
-      measurements: [],
-      stopped: true,
-      stopReason: "unexpected_provider_behavior",
-      stoppedAtOrdinal: null,
-    });
-  }
-
-  const measurements: Pe53bMeasurement[] = [];
-  let attempted = 0;
-
-  for (const request of snapshots) {
-    const shape = safeDispatchShape(request);
-    if (shape.stopReason) {
-      return finish({
-        plan: snapshots,
-        attempted,
-        measurements,
-        stopped: true,
-        stopReason: shape.stopReason,
-        stoppedAtOrdinal: ordinalOf(request),
-      });
-    }
-    if (!tryReserveDispatch()) {
-      return finish({
-        plan: snapshots,
-        attempted,
-        measurements,
-        stopped: true,
-        stopReason: "request_cap",
-        stoppedAtOrdinal: null,
-      });
-    }
-    attempted += 1;
-    try {
-      const response = await send({
+    for (const request of snapshots) {
+      stopOrdinal = ordinalOf(request);
+      const shape = safeDispatchShape(request);
+      if (shape.stopReason) {
+        return finish({
+          plan: snapshots,
+          attempted,
+          measurements,
+          stopped: true,
+          stopReason: shape.stopReason,
+          stoppedAtOrdinal: stopOrdinal,
+        });
+      }
+      let reserved = false;
+      try {
+        reserved = reserveDispatchAttempt();
+      } catch {
+        return finish({
+          plan: snapshots,
+          attempted,
+          measurements,
+          stopped: true,
+          stopReason: "unexpected_provider_behavior",
+          stoppedAtOrdinal: stopOrdinal,
+        });
+      }
+      if (!reserved) {
+        return finish({
+          plan: snapshots,
+          attempted,
+          measurements,
+          stopped: true,
+          stopReason: "request_cap",
+          stoppedAtOrdinal: null,
+        });
+      }
+      attempted += 1;
+      const response = await offlineFixtureReader({
         path: shape.path,
         query: { fixture: shape.fixture },
       });
@@ -362,30 +324,29 @@ async function executePe53bPlan(
           measurements,
           stopped: true,
           stopReason: interpreted.stopReason,
-          stoppedAtOrdinal: ordinalOf(request),
+          stoppedAtOrdinal: stopOrdinal,
         });
       }
       measurements.push(interpreted.measurement);
-    } catch {
-      return finish({
-        plan: snapshots,
-        attempted,
-        measurements,
-        stopped: true,
-        stopReason: "unexpected_provider_behavior",
-        stoppedAtOrdinal: ordinalOf(request),
-      });
     }
+    return finish({
+      plan: snapshots,
+      attempted,
+      measurements,
+      stopped: false,
+      stopReason: null,
+      stoppedAtOrdinal: null,
+    });
+  } catch {
+    return finish({
+      plan: snapshots,
+      attempted,
+      measurements,
+      stopped: true,
+      stopReason: "unexpected_provider_behavior",
+      stoppedAtOrdinal: stopOrdinal,
+    });
   }
-
-  return finish({
-    plan: snapshots,
-    attempted,
-    measurements,
-    stopped: false,
-    stopReason: null,
-    stoppedAtOrdinal: null,
-  });
 }
 
 function plannedRequest(
@@ -433,7 +394,11 @@ function copyQuery(query: unknown): Record<PropertyKey, unknown> {
   if (!isPlainObject(query)) return {};
   const copy: Record<PropertyKey, unknown> = {};
   for (const key of Reflect.ownKeys(query)) {
-    copy[key] = Reflect.get(query, key);
+    const desc = Object.getOwnPropertyDescriptor(query, key);
+    if (!desc || desc.get != null || desc.set != null || !("value" in desc)) {
+      throw new Error("query");
+    }
+    copy[key] = desc.value;
   }
   return copy;
 }
@@ -484,7 +449,9 @@ function queryRejected(request: Pe53bPlannedRequest): boolean {
   if (!isPlainObject(query)) return true;
   const keys = Reflect.ownKeys(query);
   if (keys.length !== 1 || keys[0] !== "fixture") return true;
-  return query.fixture !== request.fixtureId;
+  const fixture = readOwnData(query, "fixture");
+  if (fixture.state !== "value") return true;
+  return fixture.value !== request.fixtureId;
 }
 
 function pathDisagrees(request: Pe53bPlannedRequest): boolean {
@@ -519,8 +486,8 @@ function interpretResponse(
     return stop("unexpected_provider_behavior");
   }
   if (bodyQuota) return stop("quota_exhausted");
-  if (status === 429) return stop("rate_limited");
   if (headerQuota === "malformed") return stop("malformed_response");
+  if (status === 429) return stop("rate_limited");
   if (status !== 200) return stop("malformed_response");
   return interpretSuccessBody(request, response.body);
 }
@@ -529,13 +496,15 @@ function interpretSuccessBody(
   request: Pe53bPlannedRequest,
   bodyValue: unknown,
 ): Interpretation {
-  if (!isPlainObject(bodyValue)) return stop("malformed_response");
+  if (!isSafeDataObject(bodyValue)) return stop("malformed_response");
   const body = bodyValue;
   if (!Array.isArray(body.errors) || body.errors.length !== 0) {
     return stop("malformed_response");
   }
   if (!Array.isArray(body.response)) return stop("malformed_response");
-  const paging = classifyPaging(body.paging);
+  const pagingData = readOwnData(body, "paging");
+  if (pagingData.state !== "value") return stop("malformed_response");
+  const paging = classifyPaging(pagingData.value);
   if (paging !== "ok") return stop(paging);
   if (getMismatches(request, body.get)) {
     return stop("unexpected_provider_behavior");
@@ -550,9 +519,8 @@ function interpretSuccessBody(
   if (body.results !== body.response.length) {
     return stop("unexpected_provider_behavior");
   }
-  if (fixtureIdMismatches(request.fixtureId, body)) {
-    return stop("fixture_id_mismatch");
-  }
+  const echoed = classifyFixtureEcho(request.fixtureId, body);
+  if (echoed !== "ok") return stop(echoed);
   if (rowsAreMalformed(request, body.response)) {
     return stop("malformed_response");
   }
@@ -615,6 +583,10 @@ function classifyHistoricalQuery(request: Pe53bPlannedRequest): {
   }
   const kind: Pe5SquadEvidenceKind =
     request.endpoint === "lineups" ? "confirmed_starting_xi" : "injury_unavailability";
+  // Empty bodies are stored as observation "missing". The classifier is still
+  // called with "present": a missing observation returns
+  // UNSUPPORTED_OR_UNAVAILABLE before the current-snapshot rule, which would
+  // trip evidence_promotion_blocked and drop the coverage row. PE-5.2 is unchanged.
   const decision = classifyPe5Evidence({
     evidenceId: `pe53b-${request.fixtureId}-${request.endpoint}`,
     kind,
@@ -728,21 +700,80 @@ function summarizeCoverage(
   };
 }
 
-function fixtureIdMismatches(
+/**
+ * Omitted fixture identity is unverified. It is not copied from the request
+ * and it is not treated as a provider confirmation. A present own-property
+ * echo must be the requested id. Accessors, proxies, and inherited counters
+ * are malformed.
+ */
+function classifyFixtureEcho(
   fixtureId: string,
   body: Record<string, unknown>,
-): boolean {
-  if (isPlainObject(body.parameters) && "fixture" in body.parameters) {
-    if (String(body.parameters.fixture) !== fixtureId) return true;
+): "ok" | "fixture_id_mismatch" | "malformed_response" {
+  const parameters = readOwnData(body, "parameters");
+  if (parameters.state === "unsafe") return "malformed_response";
+  if (parameters.state === "value" && parameters.value != null) {
+    if (!isSafeDataObject(parameters.value)) return "malformed_response";
+    const echoed = readOwnData(parameters.value, "fixture");
+    if (echoed.state === "unsafe") return "malformed_response";
+    if (echoed.state === "missing") {
+      if (inheritsKey(parameters.value, "fixture")) return "malformed_response";
+    } else if (echoed.value == null) {
+      return "malformed_response";
+    } else {
+      const compared = compareFixtureId(echoed.value, fixtureId);
+      if (compared !== "match") return compared;
+    }
   }
-  if (!Array.isArray(body.response)) return false;
+
+  if (!Array.isArray(body.response)) return "malformed_response";
   for (const row of body.response) {
-    if (!isPlainObject(row) || !isPlainObject(row.fixture) || row.fixture.id == null) {
+    if (!isSafeDataObject(row)) continue;
+    const fixture = readOwnData(row, "fixture");
+    if (fixture.state === "missing") {
+      if (inheritsKey(row, "fixture")) return "malformed_response";
       continue;
     }
-    if (String(row.fixture.id) !== fixtureId) return true;
+    if (fixture.state === "unsafe") return "malformed_response";
+    if (fixture.value == null) continue;
+    if (!isSafeDataObject(fixture.value)) return "malformed_response";
+    const id = readOwnData(fixture.value, "id");
+    if (id.state === "unsafe") return "malformed_response";
+    if (id.state === "missing") {
+      if (inheritsKey(fixture.value, "id")) return "malformed_response";
+      continue;
+    }
+    if (id.value == null) return "malformed_response";
+    const compared = compareFixtureId(id.value, fixtureId);
+    if (compared !== "match") return compared;
   }
-  return false;
+  return "ok";
+}
+
+function compareFixtureId(
+  value: unknown,
+  expected: string,
+): "match" | "fixture_id_mismatch" | "malformed_response" {
+  if (typeof value === "string") {
+    return value === expected ? "match" : "fixture_id_mismatch";
+  }
+  if (typeof value === "number" && Number.isSafeInteger(value) && value > 0) {
+    return String(value) === expected ? "match" : "fixture_id_mismatch";
+  }
+  return "malformed_response";
+}
+
+function inheritsKey(target: object, key: string): boolean {
+  try {
+    let proto = Object.getPrototypeOf(target);
+    while (proto && proto !== Object.prototype) {
+      if (Object.hasOwn(proto, key)) return true;
+      proto = Object.getPrototypeOf(proto);
+    }
+    return false;
+  } catch {
+    return true;
+  }
 }
 
 function getMismatches(request: Pe53bPlannedRequest, getValue: unknown): boolean {
@@ -756,13 +787,16 @@ function getMismatches(request: Pe53bPlannedRequest, getValue: unknown): boolean
 function classifyPaging(
   paging: unknown,
 ): "ok" | "malformed_response" | "unexpected_pagination" {
-  if (!isPlainObject(paging)) return "malformed_response";
-  const current = paging.current;
-  const total = paging.total;
-  if (!isPositiveSafeInteger(current) || !isPositiveSafeInteger(total)) {
+  if (!isSafeDataObject(paging)) return "malformed_response";
+  const current = readOwnData(paging, "current");
+  const total = readOwnData(paging, "total");
+  if (current.state !== "value" || total.state !== "value") {
     return "malformed_response";
   }
-  if (current !== 1 || total !== 1) return "unexpected_pagination";
+  if (!isPositiveSafeInteger(current.value) || !isPositiveSafeInteger(total.value)) {
+    return "malformed_response";
+  }
+  if (current.value !== 1 || total.value !== 1) return "unexpected_pagination";
   return "ok";
 }
 
@@ -780,12 +814,50 @@ function readDailyQuotaHeader(
   headers: unknown,
 ): "absent" | "exhausted" | "malformed" {
   if (headers == null) return "absent";
-  if (!isPlainObject(headers)) return "malformed";
-  for (const [key, value] of Object.entries(headers)) {
-    if (key.toLowerCase() !== DAILY_REMAINING_HEADER) continue;
-    if (typeof value === "string" && value.trim() === "0") return "exhausted";
+  if (!isSafeDataObject(headers)) return "malformed";
+  let sawHeader = false;
+  let exhausted = false;
+  let keys: PropertyKey[];
+  try {
+    keys = Reflect.ownKeys(headers);
+  } catch {
+    return "malformed";
   }
-  return "absent";
+  for (const key of keys) {
+    if (typeof key !== "string" || key.toLowerCase() !== DAILY_REMAINING_HEADER) {
+      continue;
+    }
+    const owned = readOwnData(headers, key);
+    if (owned.state !== "value") return "malformed";
+    sawHeader = true;
+    const parsed = parseQuotaRemaining(owned.value);
+    if (parsed === "malformed") return "malformed";
+    if (parsed === "exhausted") exhausted = true;
+  }
+  if (!sawHeader) return "absent";
+  return exhausted ? "exhausted" : "absent";
+}
+
+function parseQuotaRemaining(
+  value: unknown,
+): "exhausted" | "available" | "malformed" {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || !Number.isInteger(value)) return "malformed";
+    if (value === 0) return "exhausted";
+    if (value < 0) return "malformed";
+    return "available";
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (/^0+$/.test(trimmed)) return "exhausted";
+    if (/^[1-9]\d*$/.test(trimmed)) {
+      const parsed = Number(trimmed);
+      if (!Number.isSafeInteger(parsed)) return "malformed";
+      return "available";
+    }
+    return "malformed";
+  }
+  return "malformed";
 }
 
 function bodyHasDailyQuota(body: unknown): boolean {
@@ -839,6 +911,20 @@ function ordinalOf(request: Pe53bPlannedRequest): number | null {
     : null;
 }
 
+function readOwnData(target: object, key: string): OwnData {
+  try {
+    if (types.isProxy(target)) return { state: "unsafe" };
+    if (!Object.hasOwn(target, key)) return { state: "missing" };
+    const desc = Object.getOwnPropertyDescriptor(target, key);
+    if (!desc || desc.get != null || desc.set != null || !("value" in desc)) {
+      return { state: "unsafe" };
+    }
+    return { state: "value", value: desc.value };
+  } catch {
+    return { state: "unsafe" };
+  }
+}
+
 function stop(stopReason: Pe53bStopReason): Interpretation {
   return { stopReason };
 }
@@ -872,15 +958,17 @@ function rejectedReport(
   });
 }
 
-function fatalReport(stopReason: Pe53bStopReason): Pe53bProbeReport {
+function fatalBeforeDispatch(
+  plan: readonly Pe53bPlannedRequest[],
+): Pe53bProbeReport {
   return finish({
     mode: "rejected",
     rejectionReason: null,
-    plan: [],
+    plan,
     attempted: 0,
     measurements: [],
     stopped: true,
-    stopReason,
+    stopReason: "unexpected_provider_behavior",
     stoppedAtOrdinal: null,
   });
 }
@@ -902,14 +990,28 @@ function finish(input: FinishInput): Pe53bProbeReport {
     liveResponsesStored: false,
     retriesAttempted: 0,
     liveProviderAuthorized: false,
-    limitations: PE53C_REPORT_LIMITATIONS,
+    sharedBudget: PE53D_SHARED_BUDGET,
+    limitations: PE53D_REPORT_LIMITATIONS,
   };
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  try {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return false;
+    }
+    const proto = Object.getPrototypeOf(value);
+    return proto === Object.prototype || proto === null;
+  } catch {
     return false;
   }
-  const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
+}
+
+function isSafeDataObject(value: unknown): value is Record<string, unknown> {
+  if (!isPlainObject(value)) return false;
+  try {
+    return !types.isProxy(value);
+  } catch {
+    return false;
+  }
 }

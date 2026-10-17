@@ -1,5 +1,7 @@
 # PE-5.3C — Offline Probe Runner Safety Hardening
 
+> **Superseded.** Budget ownership and transport authorization in this note were replaced by [PE-5.3D](PE5_3D_OFFLINE_PROBE_RUNNER.md). The `globalThis` counter, the exported test reset, and the symbol-branded callback seam are gone. The historical description below is not the current mechanism.
+
 PE-5.3C hardens the PE-5.3B offline squad-coverage probe. It does not authorize a live provider call, and it does not change PE-5.2 classification semantics.
 
 **Parent checkpoint:** `71bc98e` (`research(calibration): checkpoint PE-5.3B offline squad coverage probe runner`)

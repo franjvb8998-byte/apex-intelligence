@@ -1,7 +1,9 @@
 /**
- * PE-5.3C — probe transport shapes.
- * These types describe an in-memory double. They do not authorize one.
- * A caller-supplied label or callback is not evidence of offline isolation.
+ * PE-5.3D — offline fixture shapes.
+ *
+ * These types describe the envelope the runner reads. They do not authorize a
+ * caller callback, and no production entry accepts an object of this shape as
+ * a transport.
  */
 
 export type Pe53bTransportQuery = {
@@ -16,13 +18,5 @@ export type Pe53bTransportRequest = {
 export type Pe53bTransportResponse = {
   status: number;
   body: unknown;
-  headers?: Readonly<Record<string, string | undefined>>;
-};
-
-/**
- * Untrusted double shape used by the testing boundary.
- * Possession of this shape is not a capability.
- */
-export type Pe53bTransport = {
-  request(input: Pe53bTransportRequest): Promise<Pe53bTransportResponse>;
+  headers?: Readonly<Record<string, string | number | undefined>>;
 };
