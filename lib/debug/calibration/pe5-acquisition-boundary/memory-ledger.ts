@@ -1,32 +1,43 @@
 /**
- * PE-5.4C increment 2 — in-memory reservation ledger simulator.
+ * PE-5.4C increment 4 — in-memory reservation ledger simulator.
  *
  * One ledger object per approval. Occupancy checks and writes for that object
  * share one queue. This is not a durable, distributed, or production quota
  * system, and it does not prove cross-process atomicity.
  *
  * Operation ids are caller-supplied opaque strings. They are not canonical
- * hashes. Vendor-day rebind is not implemented: daily buckets use the UTC
- * date of the injected clock, and beginSend refuses when that bucket differs
- * from the row's charge day.
+ * hashes. Vendor-day labels are offline accounting identities computed from
+ * the bound approval and the injected ledger clock. They are not a verified
+ * provider civil date or quota reset.
+ *
+ * The bound boundary is immutable after createMemoryLedger.
+ * replaceVendorDayBoundaryForTests may only remove that boundary or restore
+ * the same canonical value. It is a simulator control in this module, which
+ * has no live transport and no production entry point.
+ *
+ * Daily accounting for the bound credential uses that one boundary. This
+ * object does not share rows with another ledger or approval. Cross-approval
+ * consistency for one shared credential remains a live-pilot blocker.
  *
  * No network, credentials, process-global registry, or production cache.
  */
 
 import {
+  parseApprovalVendorDayBoundary,
   protocolFlagsDeny,
   readRealProtocolFlags,
+  VENDOR_DAY_MS,
 } from "@/lib/debug/calibration/pe5-acquisition-boundary/authorize";
 import {
   PROTOCOL_FLAG_KEYS,
   type AcquisitionApproval,
   type ProtocolFlagKey,
   type ProtocolFlagSnapshot,
+  type VendorDayBoundary,
 } from "@/lib/debug/calibration/pe5-acquisition-boundary/types";
 
 export const PE5_4C_LEDGER_DEFERRED = {
   fetchCount: "no-transport-in-increment-2",
-  vendorDayRollover: "increment-4",
   canonicalOperationId: "increment-3",
 } as const;
 
@@ -34,6 +45,7 @@ export const PE5_4C_MEMORY_LEDGER_LIMIT = {
   durability: "in-process-only",
   atomicity: "single-process-serialized-queue",
   productionQuota: false,
+  credentialBoundary: "single-ledger-instance-only",
 } as const;
 
 export const RESERVATION_STATES = [
@@ -64,7 +76,8 @@ export const LEDGER_DENY_REASONS = [
   "stale_token",
   "lease_expired",
   "lease_too_short",
-  "vendor_day_rebind_deferred",
+  "vendor_day_unknown",
+  "vendor_day_ceiling",
   "invalid_transition",
   "reservation_missing",
 ] as const;
@@ -265,6 +278,7 @@ type BoundApproval = {
   readonly fetchTimeoutMs: number;
   readonly maxAgeMs: number;
   readonly expiry: number;
+  readonly vendorDayBoundary: VendorDayBoundary | null;
 };
 
 type Row = {
@@ -295,7 +309,11 @@ type LedgerState = {
   readonly kind: "pe5-memory-ledger-state";
   readonly approval: BoundApproval | null;
   readonly approvalId: string;
-  readonly configDeny: "approval_invalid" | "mode_denied" | null;
+  readonly configDeny: "approval_invalid" | "approval_inconsistent" | "mode_denied" | null;
+  /** Active boundary. Null when absent. Never a second, incompatible value. */
+  vendorDayBoundary: VendorDayBoundary | null;
+  /** Canonical identity captured at bind. The test control cannot replace it. */
+  readonly canonicalVendorDayBoundary: VendorDayBoundary | null;
   readonly clock: LedgerClock | null;
   readonly rows: Map<string, Row>;
   kill: unknown;
@@ -335,6 +353,8 @@ export function createMemoryLedger(config: {
     approval,
     approvalId: approval == null ? "approval-unbound" : `approval:${approval.ledgerInstanceId}`,
     configDeny: parsed.ok ? null : parsed.deny,
+    vendorDayBoundary: approval?.vendorDayBoundary ?? null,
+    canonicalVendorDayBoundary: approval?.vendorDayBoundary ?? null,
     clock,
     rows: new Map(),
     kill: null,
@@ -432,6 +452,37 @@ export async function replaceKillSwitch(
 }
 
 /**
+ * Simulator-only control. Removes the active boundary, or restores the
+ * canonical boundary captured at bind. A different boundary is rejected.
+ * This does not edit the rest of the approval and is not a live entry point.
+ */
+export async function replaceVendorDayBoundaryForTests(
+  ledger: MemoryLedger,
+  boundary: unknown,
+): Promise<
+  | { ok: true }
+  | { ok: false; reason: "unavailable" | "approval_invalid" | "approval_inconsistent" }
+> {
+  return run(ledger, async (state) => {
+    if (state.unavailable) return { ok: false as const, reason: "unavailable" as const };
+    if (state.approval == null || state.configDeny != null) {
+      return { ok: false as const, reason: "approval_invalid" as const };
+    }
+    const parsed = parseApprovalVendorDayBoundary({ vendorDayBoundary: boundary });
+    if (!parsed.ok) return { ok: false as const, reason: parsed.reason };
+    if (parsed.boundary == null) {
+      state.vendorDayBoundary = null;
+      return { ok: true as const };
+    }
+    if (!sameVendorDayBoundary(parsed.boundary, state.canonicalVendorDayBoundary)) {
+      return { ok: false as const, reason: "approval_inconsistent" as const };
+    }
+    state.vendorDayBoundary = state.canonicalVendorDayBoundary;
+    return { ok: true as const };
+  });
+}
+
+/**
  * Fake product spender for this simulator. The row occupies daily and rate
  * capacity for the ledger credential. It does not occupy the research ceiling
  * and cannot begin a PE-5 send.
@@ -482,8 +533,9 @@ export async function readSnapshot(ledger: MemoryLedger): Promise<SnapshotResult
     if (state.approval == null) return denied("approval_invalid");
     const now = readNow(state.clock);
     if (now == null) return denied("clock_unavailable");
-    const chargeDay = chargeDayOf(now);
-    if (chargeDay == null) return denied("clock_unavailable");
+    const vendorDay = resolveActiveVendorDay(state, now);
+    if (vendorDay == null) return denied("vendor_day_unknown");
+    const chargeDay = vendorDay.label;
     return {
       ok: true as const,
       snapshot: {
@@ -514,6 +566,12 @@ async function reserveBody(state: LedgerState, input: TryReserveInput): Promise<
   await interleave();
   const confirmed = evaluateReserve(state, input);
   if (confirmed.kind !== "insert") return confirmed.result;
+  if (first.boundaryKey !== confirmed.boundaryKey) {
+    return deniedAudit(state, "approval_inconsistent", {
+      at: confirmed.now,
+      operationId: confirmed.operationId,
+    });
+  }
 
   const token = `fence-${state.nextFence}`;
   state.nextFence += 1;
@@ -567,7 +625,15 @@ async function reserveBody(state: LedgerState, input: TryReserveInput): Promise<
 }
 
 type ReserveEvaluation =
-  | { kind: "insert"; now: number; operationId: string; chargeDay: string; leaseDeadline: number; credentialId: string }
+  | {
+      kind: "insert";
+      now: number;
+      operationId: string;
+      chargeDay: string;
+      boundaryKey: string;
+      leaseDeadline: number;
+      credentialId: string;
+    }
   | { kind: "done"; result: TryReserveResult };
 
 function evaluateReserve(state: LedgerState, input: TryReserveInput): ReserveEvaluation {
@@ -582,8 +648,6 @@ function evaluateReserve(state: LedgerState, input: TryReserveInput): ReserveEva
 
   const now = readNow(state.clock);
   if (now == null) return done(deniedAudit(state, "clock_unavailable"));
-  const chargeDay = chargeDayOf(now);
-  if (chargeDay == null) return done(deniedAudit(state, "clock_unavailable", { at: now }));
   if (now >= state.approval.expiry) {
     return done(deniedAudit(state, "approval_expired", { at: now }));
   }
@@ -623,6 +687,12 @@ function evaluateReserve(state: LedgerState, input: TryReserveInput): ReserveEva
     return done(deniedAudit(state, "clock_unavailable", { at: now, operationId: input.operationId }));
   }
 
+  const vendorDay = resolveActiveVendorDay(state, now);
+  if (vendorDay == null) {
+    return done(deniedAudit(state, "vendor_day_unknown", { at: now, operationId: input.operationId }));
+  }
+  const chargeDay = vendorDay.label;
+
   if (dailyOccupancy(state, chargeDay) >= state.approval.dailyCeiling) {
     return done(deniedAudit(state, "daily_ceiling", { at: now, operationId: input.operationId }));
   }
@@ -638,6 +708,7 @@ function evaluateReserve(state: LedgerState, input: TryReserveInput): ReserveEva
     now,
     operationId: input.operationId,
     chargeDay,
+    boundaryKey: vendorDay.boundaryKey,
     leaseDeadline,
     credentialId: state.approval.credentialId,
   };
@@ -649,9 +720,17 @@ async function commitBeginSend(state: LedgerState, input: BeginSendInput): Promi
   await interleave();
   const confirmed = evaluateBeginSend(state, input);
   if (confirmed.kind !== "commit") return confirmed.result;
+  if (first.boundaryKey !== confirmed.boundaryKey) {
+    return deniedAudit(state, "approval_inconsistent", {
+      at: confirmed.now,
+      operationId: confirmed.row.operationId,
+      reservationId: confirmed.row.reservationId,
+    });
+  }
 
   const sendToken = `send-${state.nextSend}`;
   state.nextSend += 1;
+  confirmed.row.chargeDay = confirmed.sendDay;
   confirmed.row.state = "sending";
   confirmed.row.sendingCommittedAt = confirmed.now;
   confirmed.row.fencingToken = null;
@@ -685,7 +764,7 @@ async function commitBeginSend(state: LedgerState, input: BeginSendInput): Promi
 }
 
 type BeginEvaluation =
-  | { kind: "commit"; now: number; row: Row }
+  | { kind: "commit"; now: number; row: Row; sendDay: string; boundaryKey: string }
   | { kind: "done"; result: BeginSendResult };
 
 function evaluateBeginSend(state: LedgerState, input: BeginSendInput): BeginEvaluation {
@@ -696,9 +775,18 @@ function evaluateBeginSend(state: LedgerState, input: BeginSendInput): BeginEval
   }
 
   const now = readNow(state.clock);
-  if (now == null) return { kind: "done", result: deniedAudit(state, "clock_unavailable") };
-  const sendDay = chargeDayOf(now);
-  if (sendDay == null) return { kind: "done", result: deniedAudit(state, "clock_unavailable", { at: now }) };
+  if (now == null) {
+    return { kind: "done", result: deniedAudit(state, "vendor_day_unknown") };
+  }
+  if (state.vendorDayBoundary == null) {
+    return {
+      kind: "done",
+      result: deniedAudit(state, "vendor_day_unknown", {
+        at: now,
+        reservationId: reservationIdOrBlank(input),
+      }),
+    };
+  }
 
   const kill = assessKill(state.kill, now);
   if (!kill.ok) return { kind: "done", result: deniedAudit(state, kill.reason, { at: now }) };
@@ -740,10 +828,23 @@ function evaluateBeginSend(state: LedgerState, input: BeginSendInput): BeginEval
       }),
     };
   }
-  if (row.chargeDay !== sendDay) {
+
+  const vendorDay = resolveActiveVendorDay(state, now);
+  if (vendorDay == null) {
     return {
       kind: "done",
-      result: deniedAudit(state, "vendor_day_rebind_deferred", {
+      result: deniedAudit(state, "vendor_day_unknown", {
+        at: now,
+        operationId: row.operationId,
+        reservationId: row.reservationId,
+      }),
+    };
+  }
+  const sendDay = vendorDay.label;
+  if (row.chargeDay !== sendDay && dailyOccupancy(state, sendDay) >= state.approval.dailyCeiling) {
+    return {
+      kind: "done",
+      result: deniedAudit(state, "vendor_day_ceiling", {
         at: now,
         operationId: row.operationId,
         reservationId: row.reservationId,
@@ -751,7 +852,7 @@ function evaluateBeginSend(state: LedgerState, input: BeginSendInput): BeginEval
     };
   }
 
-  return { kind: "commit", now, row };
+  return { kind: "commit", now, row, sendDay, boundaryKey: vendorDay.boundaryKey };
 }
 
 async function commitOutcome(state: LedgerState, input: OutcomeInput): Promise<OutcomeResult> {
@@ -923,14 +1024,17 @@ async function commitExternalCharge(
   if (state.approval == null || state.configDeny != null) return denied("approval_invalid");
   const now = readNow(state.clock);
   if (now == null) return denied("clock_unavailable");
-  const chargeDay = chargeDayOf(now);
-  if (chargeDay == null) return denied("clock_unavailable");
   if (!isIdentity(input.operationId)) return denied("operation_rejected");
   if (!isExternalState(input.state)) return denied("operation_rejected");
 
   const existing = state.rows.get(input.operationId);
   if (existing != null) {
     return { ok: true, inserted: false, reservationId: existing.reservationId };
+  }
+
+  const vendorDay = resolveActiveVendorDay(state, now);
+  if (vendorDay == null) {
+    return deniedAudit(state, "vendor_day_unknown", { at: now, operationId: input.operationId });
   }
 
   await interleave();
@@ -940,9 +1044,19 @@ async function commitExternalCharge(
     return { ok: true, inserted: false, reservationId: again.reservationId };
   }
   const committedNow = readNow(state.clock);
-  const committedDay = committedNow == null ? null : chargeDayOf(committedNow);
-  if (committedNow == null || committedDay == null || state.approval == null) {
-    return denied("clock_unavailable");
+  if (committedNow == null || state.approval == null) return denied("clock_unavailable");
+  const committedDay = resolveActiveVendorDay(state, committedNow);
+  if (committedDay == null) {
+    return deniedAudit(state, "vendor_day_unknown", {
+      at: committedNow,
+      operationId: input.operationId,
+    });
+  }
+  if (vendorDay.boundaryKey !== committedDay.boundaryKey) {
+    return deniedAudit(state, "approval_inconsistent", {
+      at: committedNow,
+      operationId: input.operationId,
+    });
   }
 
   const reservationId = `res-${state.nextReservation}`;
@@ -957,7 +1071,7 @@ async function commitExternalCharge(
     state: input.state,
     fencingToken: null,
     sendToken: null,
-    chargeDay: committedDay,
+    chargeDay: committedDay.label,
     leaseDeadline: committedNow,
     sendingCommittedAt: charged ? committedNow : null,
     failedReason: input.state === "failed" ? "external_charge" : null,
@@ -1156,7 +1270,9 @@ function copyKill(record: unknown): unknown {
 
 function parseBoundApproval(
   value: unknown,
-): { ok: true; approval: BoundApproval } | { ok: false; deny: "approval_invalid" | "mode_denied" } {
+):
+  | { ok: true; approval: BoundApproval }
+  | { ok: false; deny: "approval_invalid" | "approval_inconsistent" | "mode_denied" } {
   if (!isDataRecord(value) || hasSecretField(value)) return { ok: false, deny: "approval_invalid" };
 
   const mode = readData(value, "mode");
@@ -1186,6 +1302,9 @@ function parseBoundApproval(
   const expiry = readData(value, "expiry");
   if (!expiry.present || !isEpochMillis(expiry.value)) return { ok: false, deny: "approval_invalid" };
 
+  const boundary = parseApprovalVendorDayBoundary(value);
+  if (!boundary.ok) return { ok: false, deny: boundary.reason };
+
   return {
     ok: true,
     approval: {
@@ -1200,6 +1319,7 @@ function parseBoundApproval(
       fetchTimeoutMs: durations.fetchTimeoutMs,
       maxAgeMs: durations.maxAgeMs,
       expiry: expiry.value,
+      vendorDayBoundary: boundary.boundary,
     },
   };
 }
@@ -1231,6 +1351,8 @@ function isClock(value: unknown): value is LedgerClock {
   return now.present && typeof now.value === "function";
 }
 
+const LEDGER_CLOCK_LIMIT = 8_640_000_000_000_000;
+
 function readNow(clock: LedgerClock | null): number | null {
   if (clock == null) return null;
   let value: unknown;
@@ -1240,17 +1362,73 @@ function readNow(clock: LedgerClock | null): number | null {
     return null;
   }
   if (!isEpochMillis(value)) return null;
-  if (Math.abs(value) > 8_640_000_000_000_000) return null;
+  if (value > LEDGER_CLOCK_LIMIT) return null;
   return value;
 }
 
-function chargeDayOf(epochMs: number): string | null {
+/**
+ * Offline accounting label. shiftMs moves the ledger instant onto the civil
+ * clock and back by the reset. The day starts at
+ * epoch - positiveMod(epoch + shift, one day). The label is the UTC calendar
+ * date of that start. Adding the shift, rather than subtracting it, keeps
+ * resetOffsetMs as the instant after civil midnight.
+ */
+function vendorDayLabel(epochMs: number, boundary: VendorDayBoundary): string | null {
+  const shiftMs = boundary.utcOffsetMs - boundary.resetOffsetMs;
+  if (!Number.isSafeInteger(shiftMs)) return null;
+  const shifted = epochMs + shiftMs;
+  if (!Number.isSafeInteger(shifted)) return null;
+  const elapsed = positiveMod(shifted, VENDOR_DAY_MS);
+  if (elapsed == null) return null;
+  const start = epochMs - elapsed;
+  if (!Number.isSafeInteger(start) || start < 0 || start > LEDGER_CLOCK_LIMIT) return null;
   try {
-    const day = new Date(epochMs).toISOString().slice(0, 10);
+    const day = new Date(start).toISOString().slice(0, 10);
     return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
   } catch {
     return null;
   }
+}
+
+function positiveMod(value: number, modulus: number): number | null {
+  if (!Number.isSafeInteger(value) || !Number.isSafeInteger(modulus) || modulus <= 0) return null;
+  const remainder = value % modulus;
+  if (!Number.isSafeInteger(remainder)) return null;
+  if (remainder >= 0) return remainder;
+  const adjusted = remainder + modulus;
+  if (!Number.isSafeInteger(adjusted) || adjusted < 0 || adjusted >= modulus) return null;
+  return adjusted;
+}
+
+function resolveActiveVendorDay(
+  state: LedgerState,
+  epochMs: number,
+): { label: string; boundaryKey: string } | null {
+  const boundary = state.vendorDayBoundary;
+  if (boundary == null) return null;
+  const label = vendorDayLabel(epochMs, boundary);
+  if (label == null) return null;
+  return { label, boundaryKey: boundaryKey(boundary) };
+}
+
+function boundaryKey(boundary: VendorDayBoundary): string {
+  return `${boundary.version}:${boundary.utcOffsetMs}:${boundary.resetOffsetMs}`;
+}
+
+function sameVendorDayBoundary(
+  candidate: VendorDayBoundary,
+  canonical: VendorDayBoundary | null,
+): boolean {
+  return (
+    canonical != null &&
+    candidate.version === canonical.version &&
+    candidate.utcOffsetMs === canonical.utcOffsetMs &&
+    candidate.resetOffsetMs === canonical.resetOffsetMs
+  );
+}
+
+function reservationIdOrBlank(input: BeginSendInput): string | undefined {
+  return typeof input.reservationId === "string" ? input.reservationId : undefined;
 }
 
 function isExternalState(value: string): value is ExternalChargeInput["state"] {

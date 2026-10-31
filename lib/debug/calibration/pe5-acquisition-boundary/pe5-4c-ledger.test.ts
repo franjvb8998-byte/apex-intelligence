@@ -1,9 +1,10 @@
 /**
- * PE-5.4C increment 2 — offline in-memory ledger tests.
+ * PE-5.4C increment 4 — offline in-memory ledger tests.
  * No provider calls, no environment reads, no sealed 2025 outcome reads.
  *
- * Fetch counts, canonical operation-id hashing, and vendor-day rebind are
- * later increments. Those portions are asserted as deferred.
+ * Fetch counts and canonical operation-id hashing stay deferred.
+ * Vendor-day values below are offline simulator configuration, not a
+ * verified provider quota reset.
  *
  * Promise.all races check one-winner occupancy. They stay green if the
  * in-memory queue is removed: after each yield the transition rechecks, then
@@ -29,6 +30,7 @@ import {
   readSnapshot,
   recordOutcome,
   replaceKillSwitch,
+  replaceVendorDayBoundaryForTests,
   setLedgerUnavailable,
   sweepExpired,
   tryReserve,
@@ -44,6 +46,27 @@ import type {
 
 const NOW = Date.UTC(2026, 0, 15, 12, 0, 0);
 const MAX_AGE_MS = 60_000;
+
+/** Offline test boundary. Not a verified provider quota reset. */
+const OFFLINE_UTC_MIDNIGHT = {
+  version: 1,
+  utcOffsetMs: 0,
+  resetOffsetMs: 0,
+} as const;
+
+/** Offline test boundary that rolls at 03:00 UTC. Not a verified provider quota reset. */
+const OFFLINE_RESET_03_UTC = {
+  version: 1,
+  utcOffsetMs: 0,
+  resetOffsetMs: 10_800_000,
+} as const;
+
+/** Same shift as OFFLINE_RESET_03_UTC: 05:00 at a fixed UTC+2. Offline test value only. */
+const OFFLINE_RESET_05_UTC_PLUS_2 = {
+  version: 1,
+  utcOffsetMs: 7_200_000,
+  resetOffsetMs: 18_000_000,
+} as const;
 
 type TestClock = {
   now(): number;
@@ -86,6 +109,7 @@ function approval(overrides: Partial<AcquisitionApproval> = {}): AcquisitionAppr
     fetchTimeoutMs: 1_000,
     maxAgeMs: MAX_AGE_MS,
     expiry: NOW + 86_400_000,
+    vendorDayBoundary: OFFLINE_UTC_MIDNIGHT,
     ...overrides,
   };
 }
@@ -744,50 +768,26 @@ describe("PE-5.4C increment 2 memory ledger", () => {
     expect(PE5_4C_LEDGER_DEFERRED.canonicalOperationId).toBe("increment-3");
   });
 
-  it("vendor-day rebind is deferred and beginSend does not move the charge day", async () => {
-    const start = Date.UTC(2026, 0, 15, 23, 0, 0);
-    const { ledger, clock } = await setup(
-      {
-        leaseMs: 12 * 60 * 60 * 1000,
-        fetchTimeoutMs: 1_000,
-        dailyCeiling: 1,
-        researchCeiling: 5,
-        rateCeiling: 5,
-      },
-      start,
-    );
-    const held = await reserveNew(ledger, "rollover-hold");
-    expect(held.chargeDay).toBe("2026-01-15");
-
-    clock.advance(2 * 60 * 60 * 1000);
-    expect(await replaceKillSwitch(ledger, clearKill(clock.now()))).toEqual({ ok: true });
-    expect(await beginSend(ledger, {
-      reservationId: held.reservationId,
-      fencingToken: held.fencingToken,
-    })).toEqual({
-      ok: false,
-      reason: "denied",
-      denyReason: "vendor_day_rebind_deferred",
-    });
-
+  it("same-day beginSend does not require a second daily slot", async () => {
+    const { ledger } = await setup({ dailyCeiling: 1, researchCeiling: 1, rateCeiling: 1 });
+    const reserved = await reserveNew(ledger, "same-day");
+    expect(reserved.chargeDay).toBe("2026-01-15");
     const before = await mustSnapshot(ledger);
-    expect(row(before, "rollover-hold")).toMatchObject({
-      state: "reserved",
-      chargeDay: "2026-01-15",
-    });
-    expect(before.occupancy.chargeDay).toBe("2026-01-16");
-    expect(before.occupancy.daily).toBe(0);
+    expect(before.occupancy.daily).toBe(1);
     expect(before.occupancy.research).toBe(1);
-    expect(before.rowCount).toBe(1);
+    expect(before.occupancy.rate).toBe(1);
 
-    const next = await reserveNew(ledger, "rollover-next");
-    expect(next.chargeDay).toBe("2026-01-16");
+    const sent = await beginSend(ledger, {
+      reservationId: reserved.reservationId,
+      fencingToken: reserved.fencingToken,
+    });
+    expect(sent).toMatchObject({ ok: true, chargeDay: "2026-01-15" });
     const after = await mustSnapshot(ledger);
-    expect(after.rowCount).toBe(2);
+    expect(row(after, "same-day")).toMatchObject({ state: "sending", chargeDay: "2026-01-15" });
     expect(after.occupancy.daily).toBe(1);
-    expect(after.occupancy.research).toBe(2);
-    expect(row(after, "rollover-hold").chargeDay).toBe("2026-01-15");
-    expect(PE5_4C_LEDGER_DEFERRED.vendorDayRollover).toBe("increment-4");
+    expect(after.occupancy.research).toBe(1);
+    expect(after.occupancy.rate).toBe(1);
+    expect(after.rowCount).toBe(1);
   });
 
   it("abandon releases reserved capacity and does not release a sending row", async () => {
@@ -919,6 +919,7 @@ describe("PE-5.4C increment 2 memory ledger", () => {
       durability: "in-process-only",
       atomicity: "single-process-serialized-queue",
       productionQuota: false,
+      credentialBoundary: "single-ledger-instance-only",
     });
   });
 
@@ -997,7 +998,6 @@ describe("PE-5.4C increment 2 memory ledger", () => {
     expect(PE5_4C_MEMORY_LEDGER_LIMIT.productionQuota).toBe(false);
     expect(PE5_4C_LEDGER_DEFERRED).toEqual({
       fetchCount: "no-transport-in-increment-2",
-      vendorDayRollover: "increment-4",
       canonicalOperationId: "increment-3",
     });
   });
@@ -1162,5 +1162,393 @@ describe("PE-5.4C increment 2 memory ledger", () => {
       denyReason: "approval_expired",
     });
     expect((await mustSnapshot(atExpiry)).rowCount).toBe(0);
+  });
+
+  it("rolls one charge onto a destination day that has room and does not add a second budget", async () => {
+    const start = Date.UTC(2026, 0, 15, 23, 0, 0);
+    const { ledger, clock } = await setup(
+      {
+        leaseMs: 12 * 60 * 60 * 1000,
+        fetchTimeoutMs: 1_000,
+        dailyCeiling: 2,
+        researchCeiling: 2,
+        rateCeiling: 2,
+      },
+      start,
+    );
+    const held = await reserveNew(ledger, "rollover-room");
+    expect(held.chargeDay).toBe("2026-01-15");
+    clock.advance(2 * 60 * 60 * 1000);
+    expect(await replaceKillSwitch(ledger, clearKill(clock.now()))).toEqual({ ok: true });
+
+    const before = await mustSnapshot(ledger);
+    expect(before.occupancy.chargeDay).toBe("2026-01-16");
+    expect(before.occupancy.daily).toBe(0);
+    expect(before.occupancy.research).toBe(1);
+    expect(before.occupancy.rate).toBe(1);
+    expect(row(before, "rollover-room").chargeDay).toBe("2026-01-15");
+
+    const sent = await beginSend(ledger, {
+      reservationId: held.reservationId,
+      fencingToken: held.fencingToken,
+    });
+    expect(sent).toMatchObject({ ok: true, chargeDay: "2026-01-16" });
+    const after = await mustSnapshot(ledger);
+    expect(row(after, "rollover-room")).toMatchObject({
+      state: "sending",
+      chargeDay: "2026-01-16",
+    });
+    expect(after.rowCount).toBe(1);
+    expect(after.occupancy.daily).toBe(1);
+    expect(after.occupancy.research).toBe(1);
+    expect(after.occupancy.rate).toBe(1);
+    expect(after.occupancy.chargeDay).toBe("2026-01-16");
+
+    expect(await recordOutcome(ledger, {
+      reservationId: held.reservationId,
+      sendToken: sent.ok ? sent.sendToken : "",
+      outcome: "failed",
+      failedReason: "outcome_unknown",
+    })).toMatchObject({ ok: true, state: "failed", chargeDay: "2026-01-16" });
+    expect(await sweepExpired(ledger)).toEqual({ ok: true, released: 0 });
+    const kept = await mustSnapshot(ledger);
+    expect(row(kept, "rollover-room")).toMatchObject({
+      state: "failed",
+      chargeDay: "2026-01-16",
+    });
+    expect(kept.occupancy.daily).toBe(1);
+    expect(kept.occupancy.research).toBe(1);
+    expect(kept.rowCount).toBe(1);
+  });
+
+  it("denies rollover when the destination day is already at the daily ceiling", async () => {
+    const start = Date.UTC(2026, 0, 15, 23, 0, 0);
+    const { ledger, clock } = await setup(
+      {
+        leaseMs: 12 * 60 * 60 * 1000,
+        fetchTimeoutMs: 1_000,
+        dailyCeiling: 1,
+        researchCeiling: 2,
+        rateCeiling: 5,
+      },
+      start,
+    );
+    const held = await reserveNew(ledger, "rollover-full");
+    clock.advance(2 * 60 * 60 * 1000);
+    expect(await replaceKillSwitch(ledger, clearKill(clock.now()))).toEqual({ ok: true });
+    expect(await insertExternalCharge(ledger, {
+      operationId: "destination-full",
+      state: "consumed",
+    })).toMatchObject({ ok: true, inserted: true });
+
+    expect(await beginSend(ledger, {
+      reservationId: held.reservationId,
+      fencingToken: held.fencingToken,
+    })).toEqual({ ok: false, reason: "denied", denyReason: "vendor_day_ceiling" });
+
+    const snapshot = await mustSnapshot(ledger);
+    expect(row(snapshot, "rollover-full")).toMatchObject({
+      state: "reserved",
+      chargeDay: "2026-01-15",
+    });
+    expect(row(snapshot, "destination-full").chargeDay).toBe("2026-01-16");
+    expect(snapshot.rowCount).toBe(2);
+    expect(snapshot.occupancy.daily).toBe(1);
+    expect(snapshot.occupancy.research).toBe(1);
+    expect(snapshot.rows.filter((candidate) => candidate.chargeDay === "2026-01-15")).toHaveLength(1);
+    expect(snapshot.rows.filter((candidate) => candidate.chargeDay === "2026-01-16")).toHaveLength(1);
+  });
+
+  it("lets one of two beginSend calls take the last destination slot", async () => {
+    const start = Date.UTC(2026, 0, 15, 23, 0, 0);
+    const { ledger, clock } = await setup(
+      {
+        leaseMs: 12 * 60 * 60 * 1000,
+        fetchTimeoutMs: 1_000,
+        dailyCeiling: 2,
+        researchCeiling: 2,
+        rateCeiling: 5,
+      },
+      start,
+    );
+    const first = await reserveNew(ledger, "race-day-a");
+    const second = await reserveNew(ledger, "race-day-b");
+    clock.advance(2 * 60 * 60 * 1000);
+    expect(await replaceKillSwitch(ledger, clearKill(clock.now()))).toEqual({ ok: true });
+    expect(await insertExternalCharge(ledger, {
+      operationId: "race-day-external",
+      state: "consumed",
+    })).toMatchObject({ ok: true, inserted: true });
+
+    const sends = await Promise.all([
+      beginSend(ledger, {
+        reservationId: first.reservationId,
+        fencingToken: first.fencingToken,
+      }),
+      beginSend(ledger, {
+        reservationId: second.reservationId,
+        fencingToken: second.fencingToken,
+      }),
+    ]);
+    expect(sends.filter((result) => result.ok)).toHaveLength(1);
+    expect(sends.filter((result) => !result.ok && result.reason === "denied" && result.denyReason === "vendor_day_ceiling")).toHaveLength(1);
+
+    const snapshot = await mustSnapshot(ledger);
+    const moved = snapshot.rows.filter(
+      (candidate) => candidate.consumer === "pe5" && candidate.state === "sending" && candidate.chargeDay === "2026-01-16",
+    );
+    const held = snapshot.rows.filter(
+      (candidate) => candidate.consumer === "pe5" && candidate.state === "reserved" && candidate.chargeDay === "2026-01-15",
+    );
+    expect(moved).toHaveLength(1);
+    expect(held).toHaveLength(1);
+    expect(snapshot.rowCount).toBe(3);
+    expect(snapshot.occupancy.research).toBe(2);
+    expect(snapshot.occupancy.daily).toBe(2);
+    expect(snapshot.occupancy.chargeDay).toBe("2026-01-16");
+  });
+
+  it("changes the accounting day at the reset instant and not one millisecond earlier", async () => {
+    const exact = Date.UTC(2026, 0, 15, 3, 0, 0);
+    const before = await setup(
+      {
+        vendorDayBoundary: OFFLINE_RESET_03_UTC,
+        leaseMs: 60_000,
+        fetchTimeoutMs: 1_000,
+        dailyCeiling: 4,
+        researchCeiling: 4,
+        rateCeiling: 4,
+      },
+      exact - 1,
+    );
+    const early = await reserveNew(before.ledger, "reset-before");
+    expect(early.chargeDay).toBe("2026-01-14");
+    before.clock.advance(1);
+    expect(await replaceKillSwitch(before.ledger, clearKill(before.clock.now()))).toEqual({ ok: true });
+    const sent = await beginSend(before.ledger, {
+      reservationId: early.reservationId,
+      fencingToken: early.fencingToken,
+    });
+    expect(sent).toMatchObject({ ok: true, chargeDay: "2026-01-15" });
+    expect(row(await mustSnapshot(before.ledger), "reset-before")).toMatchObject({
+      state: "sending",
+      chargeDay: "2026-01-15",
+    });
+
+    const atReset = await setup(
+      { vendorDayBoundary: OFFLINE_RESET_03_UTC, dailyCeiling: 2, researchCeiling: 2, rateCeiling: 2 },
+      exact,
+    );
+    expect((await reserveNew(atReset.ledger, "reset-at")).chargeDay).toBe("2026-01-15");
+
+    const plusTwo = await setup(
+      { vendorDayBoundary: OFFLINE_RESET_05_UTC_PLUS_2, dailyCeiling: 2, researchCeiling: 2, rateCeiling: 2 },
+      exact - 1,
+    );
+    expect((await reserveNew(plusTwo.ledger, "reset-civil")).chargeDay).toBe("2026-01-14");
+    plusTwo.clock.advance(1);
+    expect(await replaceKillSwitch(plusTwo.ledger, clearKill(plusTwo.clock.now()))).toEqual({ ok: true });
+    expect((await reserveNew(plusTwo.ledger, "reset-civil-next")).chargeDay).toBe("2026-01-15");
+  });
+
+  it("denies reservation on a ledger bound without a vendor day", async () => {
+    const clock = makeClock();
+    const ledger = createMemoryLedger({
+      approval: approval({ vendorDayBoundary: null }),
+      clock,
+    });
+    expect(await replaceKillSwitch(ledger, clearKill(clock.now()))).toEqual({ ok: true });
+    expect(await tryReserve(ledger, reserveInput("unbound-day"))).toEqual({
+      ok: false,
+      reason: "denied",
+      denyReason: "vendor_day_unknown",
+    });
+    expect(await lookupReservation(ledger, "unbound-day")).toEqual({ ok: true, found: false });
+    expect(await insertExternalCharge(ledger, {
+      operationId: "unbound-external",
+      state: "reserved",
+    })).toEqual({ ok: false, reason: "denied", denyReason: "vendor_day_unknown" });
+  });
+
+  it("denies a new reservation when the vendor day is absent and keeps an existing operation", async () => {
+    const { ledger } = await setup();
+    const existing = await reserveNew(ledger, "known-op");
+    expect(await replaceVendorDayBoundaryForTests(ledger, null)).toEqual({ ok: true });
+
+    expect(await tryReserve(ledger, reserveInput("known-op"))).toMatchObject({
+      ok: true,
+      idempotent: true,
+      reservationId: existing.reservationId,
+      chargeDay: "2026-01-15",
+      state: "reserved",
+    });
+    expect(await tryReserve(ledger, reserveInput("missing-day"))).toEqual({
+      ok: false,
+      reason: "denied",
+      denyReason: "vendor_day_unknown",
+    });
+    expect(await lookupReservation(ledger, "missing-day")).toEqual({ ok: true, found: false });
+    expect(await insertExternalCharge(ledger, {
+      operationId: "external-missing-day",
+      state: "consumed",
+    })).toEqual({ ok: false, reason: "denied", denyReason: "vendor_day_unknown" });
+
+    expect(await replaceVendorDayBoundaryForTests(ledger, OFFLINE_UTC_MIDNIGHT)).toEqual({ ok: true });
+    const snapshot = await mustSnapshot(ledger);
+    expect(snapshot.rowCount).toBe(1);
+    expect(row(snapshot, "known-op")).toMatchObject({ state: "reserved", chargeDay: "2026-01-15" });
+    expect(snapshot.audits.some((entry) => entry.action === "denied" && entry.reason === "vendor_day_unknown")).toBe(true);
+    expect(snapshot.occupancy.daily).toBe(1);
+    expect(snapshot.occupancy.research).toBe(1);
+  });
+
+  it("denies beginSend after the test control removes the boundary and leaves the row reserved", async () => {
+    const { ledger } = await setup();
+    const reserved = await reserveNew(ledger, "send-without-day");
+    expect(await replaceVendorDayBoundaryForTests(ledger, null)).toEqual({ ok: true });
+    expect(await beginSend(ledger, {
+      reservationId: reserved.reservationId,
+      fencingToken: reserved.fencingToken,
+    })).toEqual({ ok: false, reason: "denied", denyReason: "vendor_day_unknown" });
+    expect(await lookupReservation(ledger, "send-without-day")).toMatchObject({
+      ok: true,
+      found: true,
+      state: "reserved",
+      chargeDay: "2026-01-15",
+    });
+
+    expect(await replaceVendorDayBoundaryForTests(ledger, {
+      version: 1,
+      utcOffsetMs: 0,
+      resetOffsetMs: 10_800_000,
+    })).toEqual({ ok: false, reason: "approval_inconsistent" });
+    expect(await replaceVendorDayBoundaryForTests(ledger, {
+      version: 1,
+      utcOffsetMs: 0,
+      resetOffsetMs: 0,
+      extra: true,
+    })).toEqual({ ok: false, reason: "approval_invalid" });
+    expect(await replaceVendorDayBoundaryForTests(ledger, OFFLINE_UTC_MIDNIGHT)).toEqual({ ok: true });
+    const snapshot = await mustSnapshot(ledger);
+    expect(row(snapshot, "send-without-day")).toMatchObject({
+      state: "reserved",
+      chargeDay: "2026-01-15",
+    });
+    expect(snapshot.rowCount).toBe(1);
+  });
+
+  it("fails closed when the day arithmetic cannot produce a label", async () => {
+    const epoch = await setup({ vendorDayBoundary: OFFLINE_RESET_03_UTC }, 0);
+    expect(await tryReserve(epoch.ledger, reserveInput("epoch-zero"))).toEqual({
+      ok: false,
+      reason: "denied",
+      denyReason: "vendor_day_unknown",
+    });
+    expect(await lookupReservation(epoch.ledger, "epoch-zero")).toEqual({ ok: true, found: false });
+
+    let live = true;
+    let value = NOW;
+    const clock = {
+      now() {
+        if (!live) throw new Error("secret-clock-failure");
+        return value;
+      },
+      advance(ms: number) {
+        value += ms;
+      },
+    };
+    const ledger = createMemoryLedger({ approval: approval(), clock });
+    expect(await replaceKillSwitch(ledger, clearKill(clock.now()))).toEqual({ ok: true });
+    const reserved = await reserveNew(ledger, "clock-then-throw");
+    live = false;
+    const denied = await beginSend(ledger, {
+      reservationId: reserved.reservationId,
+      fencingToken: reserved.fencingToken,
+    });
+    expect(denied).toEqual({ ok: false, reason: "denied", denyReason: "vendor_day_unknown" });
+    expect(JSON.stringify(denied)).not.toContain("secret-clock-failure");
+    live = true;
+    expect(await lookupReservation(ledger, "clock-then-throw")).toMatchObject({
+      ok: true,
+      found: true,
+      state: "reserved",
+      chargeDay: "2026-01-15",
+    });
+  });
+
+  it("charges an external row on the same vendor day as a reservation", async () => {
+    const start = Date.UTC(2026, 0, 15, 2, 30, 0);
+    const { ledger, clock } = await setup(
+      { vendorDayBoundary: OFFLINE_RESET_03_UTC, dailyCeiling: 2, researchCeiling: 2, rateCeiling: 4 },
+      start,
+    );
+    const reserved = await reserveNew(ledger, "external-same-day");
+    expect(await insertExternalCharge(ledger, {
+      operationId: "external-same",
+      state: "consumed",
+    })).toMatchObject({ ok: true, inserted: true });
+    const before = await mustSnapshot(ledger);
+    expect(row(before, "external-same-day").chargeDay).toBe("2026-01-14");
+    expect(row(before, "external-same").chargeDay).toBe("2026-01-14");
+    expect(before.occupancy.daily).toBe(2);
+
+    clock.advance(30 * 60 * 1000);
+    expect(await replaceKillSwitch(ledger, clearKill(clock.now()))).toEqual({ ok: true });
+    expect((await reserveNew(ledger, "external-next-day")).chargeDay).toBe("2026-01-15");
+    expect(reserved.chargeDay).toBe("2026-01-14");
+  });
+
+  it("keeps a lost rollover acknowledgement on the destination day without a second row", async () => {
+    const start = Date.UTC(2026, 0, 15, 23, 0, 0);
+    const { ledger, clock } = await setup(
+      {
+        leaseMs: 12 * 60 * 60 * 1000,
+        fetchTimeoutMs: 1_000,
+        dailyCeiling: 2,
+        researchCeiling: 2,
+        rateCeiling: 2,
+      },
+      start,
+    );
+    const reserved = await reserveNew(ledger, "rollover-ack");
+    clock.advance(2 * 60 * 60 * 1000);
+    expect(await replaceKillSwitch(ledger, clearKill(clock.now()))).toEqual({ ok: true });
+    expect(await armLostAcknowledgement(ledger, "beginSend")).toEqual({ ok: true });
+    expect(await beginSend(ledger, {
+      reservationId: reserved.reservationId,
+      fencingToken: reserved.fencingToken,
+    })).toEqual({ ok: false, reason: "ambiguous" });
+
+    const snapshot = await mustSnapshot(ledger);
+    expect(row(snapshot, "rollover-ack")).toMatchObject({
+      state: "sending",
+      chargeDay: "2026-01-16",
+    });
+    expect(snapshot.rowCount).toBe(1);
+    expect(snapshot.occupancy.research).toBe(1);
+    expect(snapshot.occupancy.daily).toBe(1);
+    expect(await beginSend(ledger, {
+      reservationId: reserved.reservationId,
+      fencingToken: reserved.fencingToken,
+    })).toEqual({ ok: false, reason: "denied", denyReason: "stale_token" });
+    expect((await mustSnapshot(ledger)).rowCount).toBe(1);
+  });
+
+  it("does not share a credential's vendor day across two ledger objects", async () => {
+    const { ledger, clock, approval: record } = await setup({ dailyCeiling: 1, researchCeiling: 2, rateCeiling: 2 });
+    await reserveNew(ledger, "cred-a");
+    const other = createMemoryLedger({
+      approval: approval({
+        ...record,
+        ledgerInstanceId: "ledger-b",
+        vendorDayBoundary: OFFLINE_RESET_03_UTC,
+      }),
+      clock,
+    });
+    expect(await replaceKillSwitch(other, clearKill(clock.now()))).toEqual({ ok: true });
+    expect(isNewReserve(await tryReserve(other, reserveInput("cred-b")))).toBe(true);
+    expect((await mustSnapshot(ledger)).rowCount).toBe(1);
+    expect((await mustSnapshot(other)).rowCount).toBe(1);
+    expect(PE5_4C_MEMORY_LEDGER_LIMIT.credentialBoundary).toBe("single-ledger-instance-only");
   });
 });

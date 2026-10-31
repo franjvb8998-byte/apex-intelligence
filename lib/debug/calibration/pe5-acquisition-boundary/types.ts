@@ -55,7 +55,17 @@ export type ProtocolFlagSnapshot = {
  * Instants are ledger-clock epoch milliseconds.
  * Ceilings are counts. Durations are milliseconds.
  * `credentialId` is an identifier, never a provider secret.
+ *
+ * `vendorDayBoundary` is an offline accounting rule for one fixed
+ * 24-hour cycle. A label derived from it is not a verified provider
+ * civil date or quota reset. Null means the boundary is absent.
  */
+export type VendorDayBoundary = {
+  readonly version: 1;
+  readonly utcOffsetMs: number;
+  readonly resetOffsetMs: number;
+};
+
 export type AcquisitionApproval = {
   readonly mode: AuthorizationMode;
   readonly credentialId: string;
@@ -69,6 +79,7 @@ export type AcquisitionApproval = {
   readonly fetchTimeoutMs: number;
   readonly maxAgeMs: number;
   readonly expiry: number;
+  readonly vendorDayBoundary: VendorDayBoundary | null;
 };
 
 export type ClearKillSwitch = {

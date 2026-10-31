@@ -17,7 +17,13 @@ import {
   type AuthorizationMode,
   type ProtocolFlagKey,
   type ProtocolFlagSnapshot,
+  type VendorDayBoundary,
 } from "@/lib/debug/calibration/pe5-acquisition-boundary/types";
+
+/** Length of one version-1 accounting day, and the inclusive offset limit. */
+export const VENDOR_DAY_MS = 86_400_000;
+
+const VENDOR_DAY_KEYS = ["version", "utcOffsetMs", "resetOffsetMs"] as const;
 
 const CEILING_FIELDS = [
   "researchCeiling",
@@ -57,7 +63,12 @@ type ApprovalFields = {
   readonly fetchTimeoutMs: number;
   readonly maxAgeMs: number;
   readonly expiry: number;
+  readonly vendorDayBoundary: VendorDayBoundary | null;
 };
+
+export type VendorDayBoundaryParse =
+  | { readonly ok: true; readonly boundary: VendorDayBoundary | null }
+  | { readonly ok: false; readonly reason: "approval_invalid" | "approval_inconsistent" };
 
 type ApprovalAssessment =
   | { readonly ok: true; readonly approval: ApprovalFields }
@@ -291,6 +302,9 @@ function parseApproval(value: unknown): ApprovalAssessment {
     return { ok: false, reason: "approval_invalid" };
   }
 
+  const boundary = parseApprovalVendorDayBoundary(value);
+  if (!boundary.ok) return { ok: false, reason: boundary.reason };
+
   return {
     ok: true,
     approval: {
@@ -306,8 +320,92 @@ function parseApproval(value: unknown): ApprovalAssessment {
       fetchTimeoutMs: durations.fetchTimeoutMs,
       maxAgeMs: durations.maxAgeMs,
       expiry: expiry.value,
+      vendorDayBoundary: boundary.boundary,
     },
   };
+}
+
+/**
+ * Absent and null are allowed. A present value must be a version-1 boundary
+ * with exactly the three own data properties. Two disagreeing reads deny
+ * as inconsistent. Malformed values are not rewritten.
+ */
+export function parseApprovalVendorDayBoundary(approval: object): VendorDayBoundaryParse {
+  const field = readData(approval, "vendorDayBoundary");
+  if (!field.present || field.value === null) return { ok: true, boundary: null };
+  if (!isDataRecord(field.value)) return { ok: false, reason: "approval_invalid" };
+
+  const first = readBoundarySnapshot(field.value);
+  const second = readBoundarySnapshot(field.value);
+  if (first.kind === "invalid" || second.kind === "invalid") {
+    return first.kind === second.kind
+      ? { ok: false, reason: "approval_invalid" }
+      : { ok: false, reason: "approval_inconsistent" };
+  }
+  if (
+    !Object.is(first.version, second.version) ||
+    !Object.is(first.utcOffsetMs, second.utcOffsetMs) ||
+    !Object.is(first.resetOffsetMs, second.resetOffsetMs)
+  ) {
+    return { ok: false, reason: "approval_inconsistent" };
+  }
+  if (!isVendorDayBoundary(first)) return { ok: false, reason: "approval_invalid" };
+  return {
+    ok: true,
+    boundary: Object.freeze({
+      version: 1,
+      utcOffsetMs: first.utcOffsetMs,
+      resetOffsetMs: first.resetOffsetMs,
+    }),
+  };
+}
+
+type BoundarySnapshot =
+  | { readonly kind: "invalid" }
+  | { readonly kind: "fields"; readonly version: unknown; readonly utcOffsetMs: unknown; readonly resetOffsetMs: unknown };
+
+function readBoundarySnapshot(record: object): BoundarySnapshot {
+  let names: string[];
+  let symbols: symbol[];
+  try {
+    names = Object.getOwnPropertyNames(record);
+    symbols = Object.getOwnPropertySymbols(record);
+  } catch {
+    return { kind: "invalid" };
+  }
+  if (symbols.length !== 0 || names.length !== VENDOR_DAY_KEYS.length) {
+    return { kind: "invalid" };
+  }
+  if (!VENDOR_DAY_KEYS.every((key) => names.includes(key))) return { kind: "invalid" };
+
+  const version = readData(record, "version");
+  const utcOffsetMs = readData(record, "utcOffsetMs");
+  const resetOffsetMs = readData(record, "resetOffsetMs");
+  if (!version.present || !utcOffsetMs.present || !resetOffsetMs.present) {
+    return { kind: "invalid" };
+  }
+  return {
+    kind: "fields",
+    version: version.value,
+    utcOffsetMs: utcOffsetMs.value,
+    resetOffsetMs: resetOffsetMs.value,
+  };
+}
+
+function isVendorDayBoundary(value: {
+  readonly version: unknown;
+  readonly utcOffsetMs: unknown;
+  readonly resetOffsetMs: unknown;
+}): value is VendorDayBoundary {
+  return value.version === 1 && isUtcOffsetMs(value.utcOffsetMs) && isResetOffsetMs(value.resetOffsetMs);
+}
+
+function isUtcOffsetMs(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= -VENDOR_DAY_MS && value <= VENDOR_DAY_MS;
+}
+
+function isResetOffsetMs(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value < VENDOR_DAY_MS;
 }
 
 function isFresh(updatedAt: number, now: number, maxAgeMs: number): boolean {

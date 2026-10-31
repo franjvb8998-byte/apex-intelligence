@@ -497,6 +497,70 @@ describe("PE-5.4C increment 1 authorization", () => {
     });
   });
 
+  it("allows an absent or null vendor-day boundary and denies a malformed one", () => {
+    expect(decide()).toEqual({ decision: "allow-offline" });
+    expect(decide({ approval: approval({ vendorDayBoundary: null }) })).toEqual({
+      decision: "allow-offline",
+    });
+    expect(decide({
+      approval: approval({
+        vendorDayBoundary: { version: 1, utcOffsetMs: 0, resetOffsetMs: 0 },
+      }),
+    })).toEqual({ decision: "allow-offline" });
+
+    const malformed = [
+      { version: 2, utcOffsetMs: 0, resetOffsetMs: 0 },
+      { version: 1, utcOffsetMs: 86_400_001, resetOffsetMs: 0 },
+      { version: 1, utcOffsetMs: -86_400_001, resetOffsetMs: 0 },
+      { version: 1, utcOffsetMs: 0, resetOffsetMs: 86_400_000 },
+      { version: 1, utcOffsetMs: 0, resetOffsetMs: -1 },
+      { version: 1, utcOffsetMs: 1.5, resetOffsetMs: 0 },
+      { version: "1", utcOffsetMs: 0, resetOffsetMs: 0 },
+      { version: 1, utcOffsetMs: 0, resetOffsetMs: 0, extra: true },
+      { utcOffsetMs: 0, resetOffsetMs: 0 },
+    ];
+    for (const vendorDayBoundary of malformed) {
+      expect(decide({ approval: approval({ vendorDayBoundary }) })).toEqual({
+        decision: "deny",
+        reason: "approval_invalid",
+      });
+    }
+  });
+
+  it("does not call an accessor on a vendor-day field and denies an inconsistent read", () => {
+    let reads = 0;
+    const boundary = { version: 1, utcOffsetMs: 0, resetOffsetMs: 0 };
+    Object.defineProperty(boundary, "utcOffsetMs", {
+      configurable: true,
+      enumerable: true,
+      get() {
+        reads += 1;
+        return 0;
+      },
+    });
+    expect(decide({ approval: approval({ vendorDayBoundary: boundary }) })).toEqual({
+      decision: "deny",
+      reason: "approval_invalid",
+    });
+    expect(reads).toBe(0);
+
+    let offsetReads = 0;
+    const shifting = { version: 1, utcOffsetMs: 0, resetOffsetMs: 0 };
+    const proxy = new Proxy(shifting, {
+      getOwnPropertyDescriptor(target, prop) {
+        const descriptor = Object.getOwnPropertyDescriptor(target, prop);
+        if (prop !== "utcOffsetMs" || descriptor == null) return descriptor;
+        offsetReads += 1;
+        return { ...descriptor, value: offsetReads === 1 ? 0 : 1 };
+      },
+    });
+    expect(decide({ approval: approval({ vendorDayBoundary: proxy }) })).toEqual({
+      decision: "deny",
+      reason: "approval_inconsistent",
+    });
+    expect(offsetReads).toBeGreaterThan(1);
+  });
+
   it("does not read the process environment or name a provider client", () => {
     const source = readFileSync(
       path.join(
