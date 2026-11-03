@@ -20,7 +20,16 @@
  * consistency for one shared credential remains a live-pilot blocker.
  *
  * No network, credentials, process-global registry, or production cache.
+ *
+ * `matchSendCommit` is a read-only proof of a committed `sending` row.
+ * It does not change occupancy or reservation state. A later raw append is a
+ * separate step and is not crash-atomic with this proof. Optional `endpoint`
+ * and `fixtureId` on `tryReserve` are stored for that proof. Omitting both
+ * keeps the previous reserve behavior. Operation ids stay caller-supplied
+ * opaque strings. This module does not hash them.
  */
+
+import { types } from "node:util";
 
 import {
   parseApprovalVendorDayBoundary,
@@ -99,7 +108,28 @@ export type MemoryLedger = {
 export type TryReserveInput = {
   readonly operationId: string;
   readonly protocolFlags: unknown;
+  /** Stored for `matchSendCommit`. Omit both this and `fixtureId` to reserve as before. */
+  readonly endpoint?: "lineups" | "injuries";
+  /** Canonical requested fixture id. Paired with `endpoint`. */
+  readonly fixtureId?: string;
 };
+
+export type MatchSendCommitResult =
+  | {
+      readonly ok: true;
+      readonly operationId: string;
+      readonly approvalId: string;
+      readonly credentialId: string;
+      readonly endpoint: "lineups" | "injuries";
+      readonly fixtureId: string;
+      readonly sendingCommittedAt: number;
+    }
+  | { readonly ok: false; readonly reason: "denied"; readonly denyReason: LedgerDenyReason }
+  | { readonly ok: false; readonly reason: "unavailable" };
+
+export type LedgerNowResult =
+  | { readonly ok: true; readonly now: number }
+  | { readonly ok: false; readonly reason: "clock_unavailable" | "unavailable" };
 
 export type TryReserveResult =
   | {
@@ -295,6 +325,9 @@ type Row = {
   sendingCommittedAt: number | null;
   failedReason: string | null;
   createdAt: number;
+  /** Null when the reserve did not bind evidence identity. */
+  endpoint: "lineups" | "injuries" | null;
+  fixtureId: string | null;
 };
 
 type Audit = {
@@ -421,6 +454,29 @@ export async function lookupReservation(
   operationId: string,
 ): Promise<LookupResult> {
   return run(ledger, (state) => readReservation(state, operationId));
+}
+
+/**
+ * Read-only proof that this reservation is in `sending` and the send token
+ * matches. The result does not include the token. Occupancy, quota, and
+ * reservation state are unchanged. This read and a later raw append are not
+ * one crash-atomic transaction.
+ */
+export async function matchSendCommit(
+  ledger: MemoryLedger,
+  input: unknown,
+): Promise<MatchSendCommitResult> {
+  return run(ledger, async (state) => proveSendCommit(state, input));
+}
+
+/** Ledger clock at the moment this read runs. Does not write an audit. */
+export async function readLedgerNow(ledger: MemoryLedger): Promise<LedgerNowResult> {
+  return run(ledger, async (state) => {
+    if (state.unavailable) return { ok: false as const, reason: "unavailable" as const };
+    const now = readNow(state.clock);
+    if (now == null) return { ok: false as const, reason: "clock_unavailable" as const };
+    return { ok: true as const, now };
+  });
 }
 
 export async function readKillSwitch(ledger: MemoryLedger): Promise<KillSwitchResult> {
@@ -572,6 +628,12 @@ async function reserveBody(state: LedgerState, input: TryReserveInput): Promise<
       operationId: confirmed.operationId,
     });
   }
+  if (first.endpoint !== confirmed.endpoint || first.fixtureId !== confirmed.fixtureId) {
+    return deniedAudit(state, "operation_rejected", {
+      at: confirmed.now,
+      operationId: confirmed.operationId,
+    });
+  }
 
   const token = `fence-${state.nextFence}`;
   state.nextFence += 1;
@@ -591,6 +653,8 @@ async function reserveBody(state: LedgerState, input: TryReserveInput): Promise<
     sendingCommittedAt: null,
     failedReason: null,
     createdAt: confirmed.now,
+    endpoint: confirmed.endpoint,
+    fixtureId: confirmed.fixtureId,
   };
   state.rows.set(row.operationId, row);
   audit(state, {
@@ -633,6 +697,8 @@ type ReserveEvaluation =
       boundaryKey: string;
       leaseDeadline: number;
       credentialId: string;
+      endpoint: "lineups" | "injuries" | null;
+      fixtureId: string | null;
     }
   | { kind: "done"; result: TryReserveResult };
 
@@ -682,6 +748,11 @@ function evaluateReserve(state: LedgerState, input: TryReserveInput): ReserveEva
     });
   }
 
+  const identity = readBoundIdentity(input);
+  if (identity === "invalid") {
+    return done(deniedAudit(state, "operation_rejected", { at: now, operationId: input.operationId }));
+  }
+
   const leaseDeadline = now + state.approval.leaseMs;
   if (!Number.isSafeInteger(leaseDeadline)) {
     return done(deniedAudit(state, "clock_unavailable", { at: now, operationId: input.operationId }));
@@ -711,6 +782,8 @@ function evaluateReserve(state: LedgerState, input: TryReserveInput): ReserveEva
     boundaryKey: vendorDay.boundaryKey,
     leaseDeadline,
     credentialId: state.approval.credentialId,
+    endpoint: identity === "absent" ? null : identity.endpoint,
+    fixtureId: identity === "absent" ? null : identity.fixtureId,
   };
 }
 
@@ -1076,6 +1149,8 @@ async function commitExternalCharge(
     sendingCommittedAt: charged ? committedNow : null,
     failedReason: input.state === "failed" ? "external_charge" : null,
     createdAt: committedNow,
+    endpoint: null,
+    fixtureId: null,
   };
   state.rows.set(row.operationId, row);
   audit(state, {
@@ -1481,6 +1556,100 @@ function hasSecretField(record: object): boolean {
 
 function isDataRecord(value: unknown): value is object {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function proveSendCommit(state: LedgerState, input: unknown): MatchSendCommitResult {
+  if (state.unavailable) return unready();
+  if (!isSafeProof(input)) return denied("operation_rejected");
+  let names: string[];
+  try {
+    names = Object.getOwnPropertyNames(input);
+  } catch {
+    return denied("operation_rejected");
+  }
+  for (const name of names) {
+    if (name !== "reservationId" && name !== "sendToken") return denied("operation_rejected");
+  }
+  const reservationId = readOwn(input, "reservationId");
+  const sendToken = readOwn(input, "sendToken");
+  if (
+    reservationId.state !== "value" ||
+    sendToken.state !== "value" ||
+    !isIdentity(reservationId.value) ||
+    !isIdentity(sendToken.value)
+  ) {
+    return denied("operation_rejected");
+  }
+  const row = findByReservation(state, reservationId.value);
+  if (row == null) return denied("reservation_missing");
+  if (row.state !== "sending" || row.sendToken == null || row.sendToken !== sendToken.value) {
+    return denied("invalid_transition");
+  }
+  if (
+    (row.endpoint !== "lineups" && row.endpoint !== "injuries") ||
+    row.fixtureId == null ||
+    !isCanonicalFixtureId(row.fixtureId) ||
+    row.sendingCommittedAt == null ||
+    !isEpochMillis(row.sendingCommittedAt)
+  ) {
+    return denied("operation_rejected");
+  }
+  return {
+    ok: true,
+    operationId: row.operationId,
+    approvalId: row.approvalId,
+    credentialId: row.credentialId,
+    endpoint: row.endpoint,
+    fixtureId: row.fixtureId,
+    sendingCommittedAt: row.sendingCommittedAt,
+  };
+}
+
+function isSafeProof(value: unknown): value is object {
+  try {
+    if (!isDataRecord(value)) return false;
+    return types.isProxy(value) !== true;
+  } catch {
+    return false;
+  }
+}
+
+type BoundIdentity =
+  | "absent"
+  | "invalid"
+  | { readonly endpoint: "lineups" | "injuries"; readonly fixtureId: string };
+
+function readBoundIdentity(input: TryReserveInput): BoundIdentity {
+  if (!isDataRecord(input)) return "invalid";
+  const endpoint = readOwn(input, "endpoint");
+  const fixtureId = readOwn(input, "fixtureId");
+  if (endpoint.state === "unsafe" || fixtureId.state === "unsafe") return "invalid";
+  if (endpoint.state === "missing" && fixtureId.state === "missing") return "absent";
+  if (endpoint.state !== "value" || fixtureId.state !== "value") return "invalid";
+  if (endpoint.value !== "lineups" && endpoint.value !== "injuries") return "invalid";
+  if (!isCanonicalFixtureId(fixtureId.value)) return "invalid";
+  return { endpoint: endpoint.value, fixtureId: fixtureId.value };
+}
+
+function isCanonicalFixtureId(value: unknown): value is string {
+  return typeof value === "string" && /^[1-9][0-9]{0,11}$/.test(value);
+}
+
+type OwnRead =
+  | { readonly state: "missing" }
+  | { readonly state: "unsafe" }
+  | { readonly state: "value"; readonly value: unknown };
+
+function readOwn(record: object, key: string): OwnRead {
+  let descriptor: PropertyDescriptor | undefined;
+  try {
+    descriptor = Object.getOwnPropertyDescriptor(record, key);
+  } catch {
+    return { state: "unsafe" };
+  }
+  if (descriptor == null) return { state: "missing" };
+  if (!Object.hasOwn(descriptor, "value")) return { state: "unsafe" };
+  return { state: "value", value: descriptor.value };
 }
 
 function readData(

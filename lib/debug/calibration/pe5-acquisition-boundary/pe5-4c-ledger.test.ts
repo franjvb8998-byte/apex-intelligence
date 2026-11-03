@@ -26,7 +26,9 @@ import {
   createMemoryLedger,
   insertExternalCharge,
   lookupReservation,
+  matchSendCommit,
   readKillSwitch,
+  readLedgerNow,
   readSnapshot,
   recordOutcome,
   replaceKillSwitch,
@@ -1550,5 +1552,202 @@ describe("PE-5.4C increment 2 memory ledger", () => {
     expect((await mustSnapshot(ledger)).rowCount).toBe(1);
     expect((await mustSnapshot(other)).rowCount).toBe(1);
     expect(PE5_4C_MEMORY_LEDGER_LIMIT.credentialBoundary).toBe("single-ledger-instance-only");
+  });
+
+  it("matchSendCommit returns bound metadata and does not disclose the send token or change occupancy", async () => {
+    const { ledger } = await setup();
+    const reserved = await tryReserve(ledger, {
+      ...reserveInput("bound-op"),
+      endpoint: "lineups",
+      fixtureId: "42",
+    });
+    expect(reserved.ok).toBe(true);
+    if (!reserved.ok || reserved.idempotent) throw new Error("expected a bound reserve");
+    const sent = await beginSend(ledger, {
+      reservationId: reserved.reservationId,
+      fencingToken: reserved.fencingToken,
+    });
+    expect(sent.ok).toBe(true);
+    if (!sent.ok) throw new Error("expected beginSend");
+
+    const before = await mustSnapshot(ledger);
+    const matched = await matchSendCommit(ledger, {
+      reservationId: reserved.reservationId,
+      sendToken: sent.sendToken,
+    });
+    const after = await mustSnapshot(ledger);
+
+    expect(matched).toEqual({
+      ok: true,
+      operationId: "bound-op",
+      approvalId: before.approvalId,
+      credentialId: "cred-research",
+      endpoint: "lineups",
+      fixtureId: "42",
+      sendingCommittedAt: sent.sendingCommittedAt,
+    });
+    expect(Object.hasOwn(matched, "sendToken")).toBe(false);
+    expect(JSON.stringify(matched)).not.toContain(sent.sendToken);
+    expect(after.rows).toEqual(before.rows);
+    expect(after.audits).toEqual(before.audits);
+    expect(after.occupancy).toEqual(before.occupancy);
+    expect(row(after, "bound-op").state).toBe("sending");
+  });
+
+  it("matchSendCommit fails closed for missing, wrong, stale, and non-sending proofs", async () => {
+    const { ledger } = await setup();
+    const reserved = await reserveNew(ledger, "proof-row");
+    const beforeSend = await mustSnapshot(ledger);
+    expect(await matchSendCommit(ledger, {
+      reservationId: reserved.reservationId,
+      sendToken: "send-not-issued",
+    })).toEqual({ ok: false, reason: "denied", denyReason: "invalid_transition" });
+    expect(await mustSnapshot(ledger)).toMatchObject({
+      rowCount: beforeSend.rowCount,
+      occupancy: beforeSend.occupancy,
+    });
+
+    const sent = await beginSend(ledger, {
+      reservationId: reserved.reservationId,
+      fencingToken: reserved.fencingToken,
+    });
+    expect(sent.ok).toBe(true);
+    if (!sent.ok) throw new Error("expected beginSend");
+
+    expect(await matchSendCommit(ledger, {
+      reservationId: "res-missing",
+      sendToken: sent.sendToken,
+    })).toEqual({ ok: false, reason: "denied", denyReason: "reservation_missing" });
+    expect(await matchSendCommit(ledger, {
+      reservationId: reserved.reservationId,
+      sendToken: "send-wrong",
+    })).toEqual({ ok: false, reason: "denied", denyReason: "invalid_transition" });
+    expect(await matchSendCommit(ledger, {
+      reservationId: reserved.reservationId,
+      sendToken: reserved.fencingToken,
+    })).toEqual({ ok: false, reason: "denied", denyReason: "invalid_transition" });
+
+    const consumed = await finish(ledger, "proof-consumed", "consumed");
+    expect(await matchSendCommit(ledger, {
+      reservationId: consumed.reserved.reservationId,
+      sendToken: consumed.sent.sendToken,
+    })).toEqual({ ok: false, reason: "denied", denyReason: "invalid_transition" });
+    const failed = await finish(ledger, "proof-failed", "failed");
+    expect(await matchSendCommit(ledger, {
+      reservationId: failed.reserved.reservationId,
+      sendToken: failed.sent.sendToken,
+    })).toEqual({ ok: false, reason: "denied", denyReason: "invalid_transition" });
+
+    const held = await mustSnapshot(ledger);
+    expect(row(held, "proof-row").state).toBe("sending");
+    expect(row(held, "proof-consumed").state).toBe("consumed");
+    expect(row(held, "proof-failed").state).toBe("failed");
+    expect(held.occupancy.research).toBe(3);
+    expect(held.occupancy.daily).toBe(3);
+  });
+
+  it("rejects an unbound or invalid evidence identity without inserting a row", async () => {
+    const { ledger } = await setup();
+    const unbound = await reserveNew(ledger, "unbound-op");
+    const sent = await beginSend(ledger, {
+      reservationId: unbound.reservationId,
+      fencingToken: unbound.fencingToken,
+    });
+    expect(sent.ok).toBe(true);
+    if (!sent.ok) throw new Error("expected beginSend");
+    expect(await matchSendCommit(ledger, {
+      reservationId: unbound.reservationId,
+      sendToken: sent.sendToken,
+    })).toEqual({ ok: false, reason: "denied", denyReason: "operation_rejected" });
+
+    expect(await tryReserve(ledger, {
+      ...reserveInput("bad-fixture"),
+      endpoint: "lineups",
+      fixtureId: "01",
+    })).toEqual({ ok: false, reason: "denied", denyReason: "operation_rejected" });
+    expect(await tryReserve(ledger, {
+      ...reserveInput("half-identity"),
+      endpoint: "injuries",
+    })).toEqual({ ok: false, reason: "denied", denyReason: "operation_rejected" });
+
+    const hits = { count: 0 };
+    const accessor = {
+      operationId: "accessor-endpoint",
+      protocolFlags: openFlags(),
+      fixtureId: "15",
+    };
+    Object.defineProperty(accessor, "endpoint", {
+      get() {
+        hits.count += 1;
+        return "lineups";
+      },
+      enumerable: true,
+    });
+    expect(await tryReserve(ledger, accessor)).toEqual({
+      ok: false,
+      reason: "denied",
+      denyReason: "operation_rejected",
+    });
+    expect(hits.count).toBe(0);
+
+    const snapshot = await mustSnapshot(ledger);
+    expect(snapshot.rows.map((item) => item.operationId)).toEqual(["unbound-op"]);
+    expect(snapshot.occupancy.research).toBe(1);
+  });
+
+  it("does not treat a proxy proof as a send commit and keeps clock errors free of exception text", async () => {
+    const { ledger } = await setup();
+    const { reserved, sent } = await sendNew(ledger, "proxy-proof");
+    const hits = { count: 0 };
+    const { proxy, revoke } = Proxy.revocable(
+      { reservationId: reserved.reservationId, sendToken: sent.sendToken },
+      {
+        get() {
+          hits.count += 1;
+          return "trap";
+        },
+      },
+    );
+    expect(await matchSendCommit(ledger, proxy)).toEqual({
+      ok: false,
+      reason: "denied",
+      denyReason: "operation_rejected",
+    });
+    expect(hits.count).toBe(0);
+    revoke();
+    expect(await matchSendCommit(ledger, proxy)).toEqual({
+      ok: false,
+      reason: "denied",
+      denyReason: "operation_rejected",
+    });
+    expect(hits.count).toBe(0);
+    expect(row(await mustSnapshot(ledger), "proxy-proof").state).toBe("sending");
+
+    let throwsLeft = 0;
+    let value = NOW;
+    const clock = {
+      now() {
+        if (throwsLeft > 0) {
+          throwsLeft -= 1;
+          throw new Error("secret-clock-failure");
+        }
+        return value;
+      },
+    };
+    const custom = createMemoryLedger({ approval: approval(), clock });
+    expect(await replaceKillSwitch(custom, clearKill(value))).toEqual({ ok: true });
+    const customReserved = await reserveNew(custom, "clock-proof");
+    const customSent = await beginSend(custom, {
+      reservationId: customReserved.reservationId,
+      fencingToken: customReserved.fencingToken,
+    });
+    expect(customSent.ok).toBe(true);
+    throwsLeft = 1;
+    value += 1;
+    const denied = await readLedgerNow(custom);
+    expect(denied).toEqual({ ok: false, reason: "clock_unavailable" });
+    expect(JSON.stringify(denied)).not.toContain("secret-clock-failure");
+    expect(row(await mustSnapshot(custom), "clock-proof").state).toBe("sending");
+    expect((await mustSnapshot(custom)).occupancy.research).toBe(1);
   });
 });
