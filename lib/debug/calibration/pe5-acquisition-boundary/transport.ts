@@ -1,12 +1,12 @@
 /**
  * PE-5.4C increment 7 — offline one-shot transport simulation.
  *
- * One transport object runs at most one data script for one committed send.
- * The send is the ledger object plus its reservation, not the reservation
- * string alone. A second transport object, or another process that holds the
- * same send proof, is outside this guarantee. Mutable gate state is not a
- * property of the public transport object. The gate does not change ledger
- * occupancy.
+ * Every transport that holds the same registered ledger instance shares one
+ * in-process send claim for a committed reservation. The claim follows that
+ * instance, not a copied shell and not the reservation string alone. A
+ * second ledger instance, or another process that holds the same send proof,
+ * is outside this guarantee. Mutable gate state is not a property of the
+ * public transport object. The gate does not change ledger occupancy.
  *
  * A complete result may carry one allowlisted quota header. That value lives
  * only in the result. A raw envelope does not store it and cannot rebuild it
@@ -22,6 +22,7 @@ import { createHash } from "node:crypto";
 import { types } from "node:util";
 
 import {
+  isRegisteredMemoryLedger,
   matchSendCommit,
   type MatchSendCommitResult,
   type MemoryLedger,
@@ -33,7 +34,7 @@ import {
 
 export const PE5_4C_TRANSPORT_LIMIT = {
   durability: "in-process-only",
-  uniqueness: "per-transport-object",
+  uniqueness: "per-ledger-object-in-process",
   crossProcessUniqueness: false,
   network: false,
   timers: false,
@@ -200,17 +201,22 @@ type AuditEntry = {
 type TransportState = {
   readonly closed: boolean;
   readonly fetchTimeoutMs: number;
-  readonly claimed: WeakMap<object, Map<string, string>>;
   readonly audits: AuditEntry[];
   tail: Promise<void>;
 };
+
+type LedgerClaimGate = {
+  readonly claims: Map<string, string>;
+  tail: Promise<void>;
+};
+
+const LEDGER_CLAIMS = new WeakMap<object, LedgerClaimGate>();
 
 export function createOfflineTransport(config: unknown): OfflineTransport {
   const parsed = parseConfig(config);
   const state: TransportState = {
     closed: !parsed.ok,
     fetchTimeoutMs: parsed.ok ? parsed.fetchTimeoutMs : 0,
-    claimed: new WeakMap(),
     audits: [],
     tail: Promise.resolve(),
   };
@@ -246,37 +252,39 @@ async function runSend(state: TransportState, input: unknown): Promise<ExecuteOf
   if (!parsed.ok) return fail("operation_rejected");
   const identity = parsed.value;
 
-  const digest = tokenDigest(identity.sendToken);
-  const prior = claimDigest(state, identity.ledger, identity.reservationId);
-  if (prior != null) {
-    return fail(prior === digest ? "duplicate_send" : "invalid_transition");
-  }
+  return withLedgerClaims(identity.ledger, async (claims) => {
+    const digest = tokenDigest(identity.sendToken);
+    const prior = claims.get(identity.reservationId);
+    if (prior != null) {
+      return fail(prior === digest ? "duplicate_send" : "invalid_transition");
+    }
 
-  let proof: MatchSendCommitResult;
-  try {
-    proof = await matchSendCommit(identity.ledger, {
-      reservationId: identity.reservationId,
-      sendToken: identity.sendToken,
-    });
-  } catch {
-    return fail("unavailable");
-  }
-  if (!proof.ok) return mapProof(proof);
-  if (!canonicalProof(identity.ledger, proof)) return fail("operation_rejected");
-  if (!echoAllowed(input, proof, state.fetchTimeoutMs)) return fail("operation_rejected");
+    let proof: MatchSendCommitResult;
+    try {
+      proof = await matchSendCommit(identity.ledger, {
+        reservationId: identity.reservationId,
+        sendToken: identity.sendToken,
+      });
+    } catch {
+      return fail("unavailable");
+    }
+    if (!proof.ok) return mapProof(proof);
+    if (!canonicalProof(identity.ledger, proof)) return fail("operation_rejected");
+    if (!echoAllowed(input, proof, state.fetchTimeoutMs)) return fail("operation_rejected");
 
-  const prepared = parseScript(input);
-  if (!prepared.ok) return fail("operation_rejected");
+    const prepared = parseScript(input);
+    if (!prepared.ok) return fail("operation_rejected");
 
-  storeClaim(state, identity.ledger, identity.reservationId, digest);
-  try {
-    return finish(state, proof, prepared.value);
-  } catch {
-    return recordAttempt(state, proof, {
-      script: "exception",
-      reason: "outcome_unknown",
-    });
-  }
+    claims.set(identity.reservationId, digest);
+    try {
+      return finish(state, proof, prepared.value);
+    } catch {
+      return recordAttempt(state, proof, {
+        script: "exception",
+        reason: "outcome_unknown",
+      });
+    }
+  });
 }
 
 function finish(
@@ -632,15 +640,7 @@ function tokenDigest(token: string): string {
 }
 
 function isLedger(value: unknown): value is MemoryLedger {
-  if (!isDataObject(value)) return false;
-  const kind = readOwn(value, "kind");
-  const generation = readOwn(value, "generation");
-  return (
-    kind.state === "value" &&
-    kind.value === "pe5-memory-ledger" &&
-    generation.state === "value" &&
-    generation.value === 0
-  );
+  return isRegisteredMemoryLedger(value);
 }
 
 function isPositiveMillis(value: unknown): value is number {
@@ -691,22 +691,31 @@ function readOwn(record: object, key: string): OwnRead {
   return { state: "value", value: descriptor.value };
 }
 
-function claimDigest(state: TransportState, ledger: object, reservationId: string): string | undefined {
-  return state.claimed.get(ledger)?.get(reservationId);
+function ledgerClaimGate(ledger: object): LedgerClaimGate {
+  let gate = LEDGER_CLAIMS.get(ledger);
+  if (gate == null) {
+    gate = { claims: new Map(), tail: Promise.resolve() };
+    LEDGER_CLAIMS.set(ledger, gate);
+  }
+  return gate;
 }
 
-function storeClaim(
-  state: TransportState,
+async function withLedgerClaims<T>(
   ledger: object,
-  reservationId: string,
-  digest: string,
-): void {
-  let claims = state.claimed.get(ledger);
-  if (claims == null) {
-    claims = new Map();
-    state.claimed.set(ledger, claims);
+  body: (claims: Map<string, string>) => Promise<T>,
+): Promise<T> {
+  const gate = ledgerClaimGate(ledger);
+  const previous = gate.tail;
+  let release: () => void = () => {};
+  gate.tail = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    return await body(gate.claims);
+  } finally {
+    release();
   }
-  claims.set(reservationId, digest);
 }
 
 function fail(reason: TransportReason): ExecuteOfflineSendResult {

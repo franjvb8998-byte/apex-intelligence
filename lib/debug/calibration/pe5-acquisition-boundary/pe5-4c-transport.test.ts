@@ -375,24 +375,22 @@ describe("PE-5.4C increment 7 offline transport", () => {
       reason: "invalid_transition",
     });
 
-    const unbound = await sendBound(ledger, "lineups", "20", operationFor("lineups", "20"), {});
-    expect(await executeOfflineSend(transport, withLedger(ledger, unbound, script))).toEqual({
-      ok: false,
-      reason: "operation_rejected",
-    });
-
-    const mismatched = await sendBound(ledger, "lineups", "21", "purpose-alias");
-    expect(await executeOfflineSend(transport, withLedger(ledger, mismatched, script))).toEqual({
-      ok: false,
-      reason: "operation_rejected",
-    });
+    expect(await tryReserve(ledger, {
+      operationId: operationFor("lineups", "20"),
+      protocolFlags: openFlags(),
+    })).toEqual({ ok: false, reason: "denied", denyReason: "operation_rejected" });
+    expect(await tryReserve(ledger, {
+      operationId: "purpose-alias",
+      protocolFlags: openFlags(),
+      endpoint: "lineups",
+      fixtureId: "21",
+    })).toEqual({ ok: false, reason: "denied", denyReason: "operation_rejected" });
 
     expect(hits.count).toBe(0);
     expect(await attemptCount(transport)).toBe(0);
     const after = await ledgerView(ledger);
     expect(after.rows.find((row) => row.operationId === sent.operationId)?.state).toBe("sending");
-    expect(after.occupancy.research).toBe(before.occupancy.research + 5);
-    expect(after.rows.find((row) => row.operationId === mismatched.operationId)?.state).toBe("sending");
+    expect(after.occupancy.research).toBe(before.occupancy.research + 3);
   });
 
   it("does not run a script when authorization or the kill switch blocks the caller", async () => {
@@ -801,7 +799,7 @@ describe("PE-5.4C increment 7 offline transport", () => {
     expect(await executeOfflineSend(
       other,
       withLedger(failed.ledger, sent, { outcome: "timeout" }),
-    )).toEqual({ ok: false, reason: "invalid_transition" });
+    )).toEqual({ ok: false, reason: "duplicate_send" });
     expect(await attemptCount(other)).toBe(0);
 
     const killed = await setup();
@@ -825,7 +823,7 @@ describe("PE-5.4C increment 7 offline transport", () => {
     )).toEqual({ ok: false, reason: "duplicate_send" });
   });
 
-  it("lets one of two concurrent calls execute and does not share the claim across objects", async () => {
+  it("lets one of two concurrent calls execute and shares the claim across transports", async () => {
     const { ledger, transport } = await setup();
     const sent = await sendBound(ledger, "lineups", "101");
     const other = await sendBound(ledger, "injuries", "102");
@@ -863,10 +861,10 @@ describe("PE-5.4C increment 7 offline transport", () => {
       separate,
       withLedger(ledger, sent, completeScript(Uint8Array.of(9))),
     );
-    expect(repeated.ok).toBe(true);
-    expect(await attemptCount(separate)).toBe(1);
+    expect(repeated).toEqual({ ok: false, reason: "duplicate_send" });
+    expect(await attemptCount(separate)).toBe(0);
     expect(await attemptCount(transport)).toBe(2);
-    expect(PE5_4C_TRANSPORT_LIMIT.uniqueness).toBe("per-transport-object");
+    expect(PE5_4C_TRANSPORT_LIMIT.uniqueness).toBe("per-ledger-object-in-process");
     expect(PE5_4C_TRANSPORT_LIMIT.crossProcessUniqueness).toBe(false);
   });
 
@@ -1218,6 +1216,98 @@ describe("PE-5.4C increment 7 offline transport", () => {
     expect((await mustSnapshot(ledger)).occupancy.research).toBe(1);
   });
 
+  it("shares one in-process claim across transports for the same ledger object", async () => {
+    const { ledger } = await setup();
+    const sent = await sendBound(ledger, "lineups", "261");
+    const before = await ledgerView(ledger);
+    const transports = Array.from({ length: 20 }, () =>
+      createOfflineTransport({ fetchTimeoutMs: FETCH_TIMEOUT_MS }),
+    );
+    const results = await Promise.all(transports.map((gate, index) => executeOfflineSend(
+      gate,
+      withLedger(ledger, sent, completeScript(Uint8Array.of(index + 1))),
+    )));
+    const winners = results.filter((item) => item.ok);
+    expect(winners).toHaveLength(1);
+    expect(results.filter((item) => !item.ok && item.reason === "duplicate_send")).toHaveLength(19);
+    expect(winners[0]?.ok).toBe(true);
+    if (!winners[0]?.ok) return;
+    expect(winners[0].bodyBytes).toHaveLength(1);
+    const executed = await Promise.all(transports.map((gate) => attemptCount(gate)));
+    expect(executed.reduce((sum, count) => sum + count, 0)).toBe(1);
+    expect(await ledgerView(ledger)).toEqual(before);
+
+    const again = createOfflineTransport({ fetchTimeoutMs: FETCH_TIMEOUT_MS });
+    const hits = { count: 0 };
+    const trapped = {};
+    Object.defineProperty(trapped, "outcome", {
+      get() {
+        hits.count += 1;
+        return "timeout";
+      },
+    });
+    expect(await executeOfflineSend(again, withLedger(ledger, sent, trapped, {
+      purpose: "retry-with-another-label",
+    }))).toEqual({ ok: false, reason: "duplicate_send" });
+    expect(await executeOfflineSend(again, withLedger(ledger, sent, trapped, {
+      sendToken: "send-other",
+    }))).toEqual({ ok: false, reason: "invalid_transition" });
+    expect(hits.count).toBe(0);
+    expect(await attemptCount(again)).toBe(0);
+    expect(await ledgerView(ledger)).toEqual(before);
+
+    const firstGate = transports[0];
+    if (firstGate == null) throw new Error("expected a transport");
+    const published = await readTransportAudit(firstGate);
+    expect(published.ok).toBe(true);
+    if (!published.ok) return;
+    expect(JSON.stringify(published)).not.toContain("claims");
+    expect(findCollection(published)).toBe(false);
+    for (const gate of [again, ...transports]) {
+      expect(Object.getOwnPropertyNames(gate)).toEqual(["kind"]);
+      expect(Object.getOwnPropertySymbols(gate)).toEqual([]);
+      expect(findCollection(gate)).toBe(false);
+    }
+  });
+
+  it("does not let a second transport retry after timeout, redirect, cancel, partial, or success", async () => {
+    const cases: { script: Record<string, unknown>; reason?: string; complete: boolean }[] = [
+      { script: { outcome: "timeout" }, reason: "timeout", complete: false },
+      { script: { outcome: "cancelled" }, reason: "cancelled", complete: false },
+      { script: { outcome: "redirect", status: 302, location: LOCATION }, reason: "redirect_rejected", complete: false },
+      { script: { outcome: "incomplete" }, reason: "response_incomplete", complete: false },
+      { script: completeScript(Uint8Array.of(4)), complete: true },
+    ];
+    for (const [index, item] of cases.entries()) {
+      const { ledger } = await setup();
+      const first = createOfflineTransport({ fetchTimeoutMs: FETCH_TIMEOUT_MS });
+      const second = createOfflineTransport({ fetchTimeoutMs: FETCH_TIMEOUT_MS });
+      const sent = await sendBound(ledger, "injuries", String(270 + index));
+      const before = await ledgerView(ledger);
+      const opened = await executeOfflineSend(first, withLedger(ledger, sent, item.script));
+      if (item.complete) {
+        expect(opened.ok).toBe(true);
+      } else {
+        expect(opened).toMatchObject({ ok: false, reason: item.reason });
+      }
+      const hits = { count: 0 };
+      const trapped = completeScript(Uint8Array.of(9));
+      Object.defineProperty(trapped, "note", {
+        get() {
+          hits.count += 1;
+          return "alias";
+        },
+      });
+      expect(await executeOfflineSend(second, withLedger(ledger, sent, trapped, {
+        purpose: "purpose-alias",
+      }))).toEqual({ ok: false, reason: "duplicate_send" });
+      expect(hits.count).toBe(0);
+      expect(await attemptCount(first)).toBe(1);
+      expect(await attemptCount(second)).toBe(0);
+      expect(await ledgerView(ledger)).toEqual(before);
+    }
+  });
+
   it("does not expose the claim map on the public transport object", async () => {
     const { ledger, transport } = await setup();
     const sent = await sendBound(ledger, "lineups", "171");
@@ -1351,6 +1441,100 @@ describe("PE-5.4C increment 7 offline transport", () => {
       if (!audit.ok) continue;
       assertNoLeak(audit.audits);
     }
+  });
+
+  it("rejects symbol-copied and forged ledger shells without a second script", async () => {
+    const { ledger } = await setup();
+    const other = await openLedger(INSTANCE);
+    const sent = await sendBound(ledger, "lineups", "301");
+    const otherSent = await sendBound(other, "lineups", "302");
+    const before = await ledgerView(ledger);
+    const otherBefore = await ledgerView(other);
+    const first = createOfflineTransport({ fetchTimeoutMs: FETCH_TIMEOUT_MS });
+    const second = createOfflineTransport({ fetchTimeoutMs: FETCH_TIMEOUT_MS });
+    expect((await executeOfflineSend(
+      first,
+      withLedger(ledger, sent, completeScript(Uint8Array.of(1))),
+    )).ok).toBe(true);
+
+    const legacy = Symbol.for("apex.pe5.acquisition-boundary.memory-ledger.state.v1");
+    const hits = { count: 0 };
+    function trappedScript(byte: number) {
+      const script = completeScript(Uint8Array.of(byte));
+      Object.defineProperty(script, "note", {
+        get() {
+          hits.count += 1;
+          return "alias";
+        },
+      });
+      return script;
+    }
+    function copiedShell(): MemoryLedger {
+      const shell = {
+        kind: ledger.kind,
+        instanceId: ledger.instanceId,
+        approvalId: ledger.approvalId,
+        generation: ledger.generation,
+        allowRegeneration: ledger.allowRegeneration,
+      };
+      for (const symbol of Object.getOwnPropertySymbols(ledger)) {
+        const descriptor = Object.getOwnPropertyDescriptor(ledger, symbol);
+        if (descriptor != null) Object.defineProperty(shell, symbol, descriptor);
+      }
+      Object.defineProperty(shell, legacy, {
+        value: { kind: "pe5-memory-ledger-state", rows: new Map() },
+        enumerable: false,
+      });
+      return shell;
+    }
+
+    const alias = copiedShell();
+    expect(await executeOfflineSend(
+      second,
+      withLedger(alias, sent, trappedScript(2)),
+    )).toEqual({ ok: false, reason: "operation_rejected" });
+    for (let index = 0; index < 5; index += 1) {
+      expect(await executeOfflineSend(
+        createOfflineTransport({ fetchTimeoutMs: FETCH_TIMEOUT_MS }),
+        withLedger(copiedShell(), sent, trappedScript(10 + index)),
+      )).toEqual({ ok: false, reason: "operation_rejected" });
+    }
+    expect(await executeOfflineSend(
+      second,
+      withLedger(Object.create(ledger) as MemoryLedger, sent, trappedScript(3)),
+    )).toEqual({ ok: false, reason: "operation_rejected" });
+    expect(await executeOfflineSend(
+      second,
+      withLedger(Object.assign({}, ledger), sent, trappedScript(4)),
+    )).toEqual({ ok: false, reason: "operation_rejected" });
+    const forged = {
+      kind: "pe5-memory-ledger" as const,
+      generation: 0 as const,
+      instanceId: ledger.instanceId,
+      approvalId: ledger.approvalId,
+      allowRegeneration: false as const,
+    };
+    expect(await executeOfflineSend(
+      second,
+      withLedger(forged, sent, trappedScript(5)),
+    )).toEqual({ ok: false, reason: "operation_rejected" });
+    expect(hits.count).toBe(0);
+    expect(await attemptCount(first)).toBe(1);
+    expect(await attemptCount(second)).toBe(0);
+    expect(await executeOfflineSend(
+      second,
+      withLedger(ledger, sent, { outcome: "timeout" }),
+    )).toEqual({ ok: false, reason: "duplicate_send" });
+    expect(await executeOfflineSend(
+      second,
+      withLedger(ledger, sent, { outcome: "timeout" }, { sendToken: "send-other" }),
+    )).toEqual({ ok: false, reason: "invalid_transition" });
+    expect((await executeOfflineSend(
+      createOfflineTransport({ fetchTimeoutMs: FETCH_TIMEOUT_MS }),
+      withLedger(other, otherSent, completeScript(Uint8Array.of(6))),
+    )).ok).toBe(true);
+    expect(await ledgerView(ledger)).toEqual(before);
+    expect(await ledgerView(other)).toEqual(otherBefore);
   });
 });
 

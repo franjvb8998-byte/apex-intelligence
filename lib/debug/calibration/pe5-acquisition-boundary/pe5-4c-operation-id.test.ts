@@ -2,8 +2,8 @@
  * PE-5.4C increment 3 — canonical operation identity tests.
  * No provider calls, no ledger writes, no sealed 2025 outcome reads.
  *
- * Identical ids are not ledger deduplication. tryReserve still accepts a
- * caller-supplied operation id until a later integration.
+ * Identical ids are the ledger's in-process deduplication key. Cross-process
+ * and durable deduplication stay unresolved.
  */
 
 import { createHash } from "node:crypto";
@@ -92,7 +92,9 @@ describe("PE-5.4C increment 3 operation identity", () => {
       "ok",
       "operationId",
     ]);
-    expect(PE5_4C_OPERATION_ID_DEFERRED.fetchCount).toBe("no-transport-in-increment-3");
+    expect(PE5_4C_OPERATION_ID_DEFERRED.fetchCount).toBe("not-this-module");
+    expect(PE5_4C_OPERATION_ID_DEFERRED.crossProcessDedup).toBe(false);
+    expect(PE5_4C_OPERATION_ID_DEFERRED.durableDedup).toBe(false);
   });
 
   it("equivalent-path-identity collapses the permitted lineups spellings", () => {
@@ -120,7 +122,7 @@ describe("PE-5.4C increment 3 operation identity", () => {
     expect(new Set(injuryIds).size).toBe(1);
     expect(injuryIds[0]).not.toBe(ids[0]);
     expect(PE5_4C_OPERATION_ID_DEFERRED.ledgerDedup).toBe(
-      "tryReserve-still-takes-a-caller-operationId",
+      "in-process-single-ledger-object",
     );
   });
 
@@ -130,7 +132,7 @@ describe("PE-5.4C increment 3 operation identity", () => {
     expect(first.operationId).toBe(second.operationId);
     expect(first.operationId).toMatch(/^[0-9a-f]{64}$/);
     expect(PE5_4C_OPERATION_ID_DEFERRED.ledgerDedup).toBe(
-      "tryReserve-still-takes-a-caller-operationId",
+      "in-process-single-ledger-object",
     );
   });
 

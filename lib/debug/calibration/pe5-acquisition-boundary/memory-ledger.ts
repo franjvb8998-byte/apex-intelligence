@@ -2,13 +2,17 @@
  * PE-5.4C increment 4 — in-memory reservation ledger simulator.
  *
  * One ledger object per approval. Occupancy checks and writes for that object
- * share one queue. This is not a durable, distributed, or production quota
+ * share one queue. State is kept in a module-private WeakMap. A copied shell
+ * is not that ledger. This is not a durable, distributed, or production quota
  * system, and it does not prove cross-process atomicity.
  *
- * Operation ids are caller-supplied opaque strings. They are not canonical
- * hashes. Vendor-day labels are offline accounting identities computed from
- * the bound approval and the injected ledger clock. They are not a verified
- * provider civil date or quota reset.
+ * tryReserve derives the canonical operation id from the ledger-owned
+ * identity, generation 0, and the endpoint plus fixture on the request.
+ * A caller-supplied id is accepted only when it equals that derived id.
+ * This check is inside one process and one ledger object. It is not durable
+ * and it is not shared with another object. Vendor-day labels are offline
+ * accounting identities computed from the bound approval and the injected
+ * ledger clock. They are not a verified provider civil date or quota reset.
  *
  * The bound boundary is immutable after createMemoryLedger.
  * replaceVendorDayBoundaryForTests may only remove that boundary or restore
@@ -19,14 +23,15 @@
  * object does not share rows with another ledger or approval. Cross-approval
  * consistency for one shared credential remains a live-pilot blocker.
  *
- * No network, credentials, process-global registry, or production cache.
+ * No network, credentials, or production cache. The private ledger registry is
+ * not shared with a re-evaluated copy of this module.
  *
  * `matchSendCommit` is a read-only proof of a committed `sending` row.
  * It does not change occupancy or reservation state. A later raw append is a
  * separate step and is not crash-atomic with this proof. Optional `endpoint`
  * and `fixtureId` on `tryReserve` are stored for that proof. Omitting both
- * keeps the previous reserve behavior. Operation ids stay caller-supplied
- * opaque strings. This module does not hash them.
+ * keeps no second identity. Both fields are required for a new row. This
+ * module calls the operation-id helper. It does not hash on its own.
  */
 
 import { types } from "node:util";
@@ -37,6 +42,7 @@ import {
   readRealProtocolFlags,
   VENDOR_DAY_MS,
 } from "@/lib/debug/calibration/pe5-acquisition-boundary/authorize";
+import { deriveOperationId } from "@/lib/debug/calibration/pe5-acquisition-boundary/operation-id";
 import {
   PROTOCOL_FLAG_KEYS,
   type AcquisitionApproval,
@@ -47,7 +53,7 @@ import {
 
 export const PE5_4C_LEDGER_DEFERRED = {
   fetchCount: "no-transport-in-increment-2",
-  canonicalOperationId: "increment-3",
+  canonicalOperationId: "in-process-derived-not-durable",
 } as const;
 
 export const PE5_4C_MEMORY_LEDGER_LIMIT = {
@@ -108,10 +114,22 @@ export type MemoryLedger = {
 export type TryReserveInput = {
   readonly operationId: string;
   readonly protocolFlags: unknown;
-  /** Stored for `matchSendCommit`. Omit both this and `fixtureId` to reserve as before. */
+  /** Required with `fixtureId`. The ledger derives the canonical id from it. */
   readonly endpoint?: "lineups" | "injuries";
   /** Canonical requested fixture id. Paired with `endpoint`. */
   readonly fixtureId?: string;
+  /** Present only to prove an equivalent path. It is not a second identity. */
+  readonly callerPath?: string;
+  /** Ignored by the canonical id. A different purpose is the same operation. */
+  readonly purpose?: string;
+  /** Rejected when it disagrees with the bound ledger. */
+  readonly credentialId?: string;
+  readonly approvalId?: string;
+  readonly ledgerInstanceId?: string;
+  readonly generation?: number;
+  readonly query?: unknown;
+  readonly parameters?: unknown;
+  readonly canonicalPath?: string;
 };
 
 export type MatchSendCommitResult =
@@ -361,8 +379,8 @@ type LedgerState = {
   audits: Audit[];
 };
 
-const STATE_KEY = Symbol.for("apex.pe5.acquisition-boundary.memory-ledger.state.v1");
 const STATE_KIND = "pe5-memory-ledger-state" as const;
+const LEDGER_STATE = new WeakMap<object, LedgerState>();
 
 const CHARGED: ReadonlySet<ReservationState> = new Set([
   "reserved",
@@ -408,13 +426,19 @@ export function createMemoryLedger(config: {
     generation: 0,
     allowRegeneration: false,
   };
-  Object.defineProperty(ledger, STATE_KEY, {
-    value: state,
-    enumerable: false,
-    writable: false,
-    configurable: false,
-  });
+  LEDGER_STATE.set(ledger, state);
   return Object.freeze(ledger);
+}
+
+/** True only for the instance registered by `createMemoryLedger`. */
+export function isRegisteredMemoryLedger(value: unknown): value is MemoryLedger {
+  try {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+    if (types.isProxy(value) === true) return false;
+    return LEDGER_STATE.has(value);
+  } catch {
+    return false;
+  }
 }
 
 export async function tryReserve(
@@ -706,10 +730,16 @@ function evaluateReserve(state: LedgerState, input: TryReserveInput): ReserveEva
   if (state.unavailable) return done(unready());
   if (state.configDeny != null) return done(denied(state.configDeny));
   if (state.approval == null || state.clock == null) return done(denied("approval_invalid"));
+  if (!isPlainData(input)) return done(deniedAudit(state, "operation_rejected"));
 
-  const flags = readSuppliedFlags(input.protocolFlags);
+  const flagsField = readOwn(input, "protocolFlags");
+  const flags = flagsField.state === "value" && isPlainData(flagsField.value)
+    ? readSuppliedFlags(flagsField.value)
+    : null;
   if (flags == null || protocolFlagsDeny(readRealProtocolFlags(), flags)) {
-    return done(deniedAudit(state, "protocol_flag_violation", { operationId: inputOrBlank(input) }));
+    return done(deniedAudit(state, "protocol_flag_violation", {
+      operationId: auditOperationId(input),
+    }));
   }
 
   const now = readNow(state.clock);
@@ -724,11 +754,15 @@ function evaluateReserve(state: LedgerState, input: TryReserveInput): ReserveEva
     return done(deniedAudit(state, "approval_inconsistent", { at: now }));
   }
 
-  if (!isIdentity(input.operationId)) {
-    return done(deniedAudit(state, "operation_rejected", { at: now }));
+  const canonical = resolveCanonicalReservation(state, input);
+  if (!canonical.ok) {
+    return done(deniedAudit(state, "operation_rejected", {
+      at: now,
+      operationId: canonical.supplied,
+    }));
   }
 
-  const existing = state.rows.get(input.operationId);
+  const existing = state.rows.get(canonical.operationId);
   if (existing != null) {
     audit(state, {
       at: now,
@@ -748,42 +782,37 @@ function evaluateReserve(state: LedgerState, input: TryReserveInput): ReserveEva
     });
   }
 
-  const identity = readBoundIdentity(input);
-  if (identity === "invalid") {
-    return done(deniedAudit(state, "operation_rejected", { at: now, operationId: input.operationId }));
-  }
-
   const leaseDeadline = now + state.approval.leaseMs;
   if (!Number.isSafeInteger(leaseDeadline)) {
-    return done(deniedAudit(state, "clock_unavailable", { at: now, operationId: input.operationId }));
+    return done(deniedAudit(state, "clock_unavailable", { at: now, operationId: canonical.operationId }));
   }
 
   const vendorDay = resolveActiveVendorDay(state, now);
   if (vendorDay == null) {
-    return done(deniedAudit(state, "vendor_day_unknown", { at: now, operationId: input.operationId }));
+    return done(deniedAudit(state, "vendor_day_unknown", { at: now, operationId: canonical.operationId }));
   }
   const chargeDay = vendorDay.label;
 
   if (dailyOccupancy(state, chargeDay) >= state.approval.dailyCeiling) {
-    return done(deniedAudit(state, "daily_ceiling", { at: now, operationId: input.operationId }));
+    return done(deniedAudit(state, "daily_ceiling", { at: now, operationId: canonical.operationId }));
   }
   if (researchOccupancy(state) >= state.approval.researchCeiling) {
-    return done(deniedAudit(state, "research_ceiling", { at: now, operationId: input.operationId }));
+    return done(deniedAudit(state, "research_ceiling", { at: now, operationId: canonical.operationId }));
   }
   if (rateOccupancy(state, now) >= state.approval.rateCeiling) {
-    return done(deniedAudit(state, "rate_ceiling", { at: now, operationId: input.operationId }));
+    return done(deniedAudit(state, "rate_ceiling", { at: now, operationId: canonical.operationId }));
   }
 
   return {
     kind: "insert",
     now,
-    operationId: input.operationId,
+    operationId: canonical.operationId,
     chargeDay,
     boundaryKey: vendorDay.boundaryKey,
     leaseDeadline,
     credentialId: state.approval.credentialId,
-    endpoint: identity === "absent" ? null : identity.endpoint,
-    fixtureId: identity === "absent" ? null : identity.fixtureId,
+    endpoint: canonical.endpoint,
+    fixtureId: canonical.fixtureId,
   };
 }
 
@@ -1411,13 +1440,10 @@ function readSuppliedFlags(value: unknown): ProtocolFlagSnapshot | null {
 }
 
 function readState(ledger: MemoryLedger): LedgerState | null {
-  if (ledger == null || ledger.kind !== "pe5-memory-ledger") return null;
-  const holder = ledger as unknown as Record<symbol, unknown>;
-  const value = holder[STATE_KEY];
-  if (!isDataRecord(value)) return null;
-  const kind = readData(value, "kind");
-  if (!kind.present || kind.value !== STATE_KIND) return null;
-  return value as LedgerState;
+  if (!isRegisteredMemoryLedger(ledger)) return null;
+  const state = LEDGER_STATE.get(ledger);
+  if (state == null || state.kind !== STATE_KIND) return null;
+  return state;
 }
 
 function isClock(value: unknown): value is LedgerClock {
@@ -1540,8 +1566,19 @@ function isIdentity(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.trim() === value;
 }
 
-function inputOrBlank(input: TryReserveInput): string | undefined {
-  return typeof input.operationId === "string" ? input.operationId : undefined;
+function auditOperationId(input: object): string | undefined {
+  const read = readOwn(input, "operationId");
+  if (read.state !== "value" || typeof read.value !== "string") return undefined;
+  return CANONICAL_ID.test(read.value) ? read.value : undefined;
+}
+
+function isPlainData(value: unknown): value is object {
+  try {
+    if (!isDataRecord(value)) return false;
+    return types.isProxy(value) !== true;
+  } catch {
+    return false;
+  }
 }
 
 function hasSecretField(record: object): boolean {
@@ -1614,21 +1651,74 @@ function isSafeProof(value: unknown): value is object {
   }
 }
 
-type BoundIdentity =
-  | "absent"
-  | "invalid"
-  | { readonly endpoint: "lineups" | "injuries"; readonly fixtureId: string };
+type CanonicalReservation =
+  | {
+      readonly ok: true;
+      readonly operationId: string;
+      readonly endpoint: "lineups" | "injuries";
+      readonly fixtureId: string;
+    }
+  | { readonly ok: false; readonly supplied?: string };
 
-function readBoundIdentity(input: TryReserveInput): BoundIdentity {
-  if (!isDataRecord(input)) return "invalid";
-  const endpoint = readOwn(input, "endpoint");
-  const fixtureId = readOwn(input, "fixtureId");
-  if (endpoint.state === "unsafe" || fixtureId.state === "unsafe") return "invalid";
-  if (endpoint.state === "missing" && fixtureId.state === "missing") return "absent";
-  if (endpoint.state !== "value" || fixtureId.state !== "value") return "invalid";
-  if (endpoint.value !== "lineups" && endpoint.value !== "injuries") return "invalid";
-  if (!isCanonicalFixtureId(fixtureId.value)) return "invalid";
-  return { endpoint: endpoint.value, fixtureId: fixtureId.value };
+const CANONICAL_ID = /^[0-9a-f]{64}$/;
+const REQUEST_SKIP = new Set(["operationId", "protocolFlags"]);
+
+function resolveCanonicalReservation(state: LedgerState, input: TryReserveInput): CanonicalReservation {
+  if (state.approval == null || !isDataRecord(input)) return { ok: false };
+  try {
+    if (types.isProxy(input)) return { ok: false };
+  } catch {
+    return { ok: false };
+  }
+
+  const suppliedRead = readOwn(input, "operationId");
+  if (suppliedRead.state !== "value" || typeof suppliedRead.value !== "string") return { ok: false };
+  if (!CANONICAL_ID.test(suppliedRead.value)) return { ok: false };
+  const supplied = suppliedRead.value;
+
+  const request = canonicalRequest(input);
+  if (request == null) return { ok: false, supplied };
+
+  let derived: ReturnType<typeof deriveOperationId>;
+  try {
+    derived = deriveOperationId(
+      {
+        ledgerInstanceId: state.approval.ledgerInstanceId,
+        credentialId: state.approval.credentialId,
+        approvalId: state.approvalId,
+        generation: 0,
+      },
+      request,
+    );
+  } catch {
+    return { ok: false, supplied };
+  }
+  if (!derived.ok || derived.operationId !== supplied || derived.generation !== 0) {
+    return { ok: false, supplied };
+  }
+  return {
+    ok: true,
+    operationId: derived.operationId,
+    endpoint: derived.endpoint,
+    fixtureId: derived.canonicalFixtureId,
+  };
+}
+
+function canonicalRequest(input: object): Record<string, unknown> | null {
+  let names: string[];
+  try {
+    names = Object.getOwnPropertyNames(input);
+  } catch {
+    return null;
+  }
+  const request: Record<string, unknown> = {};
+  for (const name of names) {
+    if (REQUEST_SKIP.has(name)) continue;
+    const read = readOwn(input, name);
+    if (read.state === "unsafe") return null;
+    if (read.state === "value") request[name] = read.value;
+  }
+  return request;
 }
 
 function isCanonicalFixtureId(value: unknown): value is string {

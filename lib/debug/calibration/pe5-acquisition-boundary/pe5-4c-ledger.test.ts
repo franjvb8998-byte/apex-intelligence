@@ -2,7 +2,8 @@
  * PE-5.4C increment 4 — offline in-memory ledger tests.
  * No provider calls, no environment reads, no sealed 2025 outcome reads.
  *
- * Fetch counts and canonical operation-id hashing stay deferred.
+ * Fetch counts stay deferred. Canonical ids are enforced inside one ledger
+ * object. That check is not durable and it is not cross-process.
  * Vendor-day values below are offline simulator configuration, not a
  * verified provider quota reset.
  *
@@ -25,6 +26,7 @@ import {
   beginSend,
   createMemoryLedger,
   insertExternalCharge,
+  isRegisteredMemoryLedger,
   lookupReservation,
   matchSendCommit,
   readKillSwitch,
@@ -39,12 +41,62 @@ import {
   type LedgerRowView,
   type LedgerSnapshot,
   type MemoryLedger,
+  type TryReserveInput,
   type TryReserveResult,
 } from "@/lib/debug/calibration/pe5-acquisition-boundary/memory-ledger";
+import { deriveOperationId } from "@/lib/debug/calibration/pe5-acquisition-boundary/operation-id";
 import type {
   AcquisitionApproval,
   ProtocolFlagSnapshot,
 } from "@/lib/debug/calibration/pe5-acquisition-boundary/types";
+
+const DEFAULT_OPERATION_IDENTITY = {
+  ledgerInstanceId: "ledger-a",
+  credentialId: "cred-research",
+  approvalId: "approval:ledger-a",
+  generation: 0,
+} as const;
+
+const LABEL_FIXTURE = new Map<string, string>();
+let nextFixture = 1;
+
+function fixtureKey(
+  label: string,
+  ledgerInstanceId: string = DEFAULT_OPERATION_IDENTITY.ledgerInstanceId,
+): string {
+  return `${ledgerInstanceId}\n${label}`;
+}
+
+function fixtureForLabel(label: string, ledgerInstanceId: string): string {
+  const key = fixtureKey(label, ledgerInstanceId);
+  let fixture = LABEL_FIXTURE.get(key);
+  if (fixture == null) {
+    fixture = String(nextFixture);
+    nextFixture += 1;
+    LABEL_FIXTURE.set(key, fixture);
+  }
+  return fixture;
+}
+
+function canonicalFor(
+  label: string,
+  identity: {
+    ledgerInstanceId: string;
+    credentialId: string;
+    approvalId: string;
+    generation: number;
+  } = DEFAULT_OPERATION_IDENTITY,
+) {
+  const fixtureId = fixtureForLabel(label, identity.ledgerInstanceId);
+  const derived = deriveOperationId(identity, { endpoint: "lineups", fixtureId });
+  if (!derived.ok) throw new Error(`canonical id for ${label}`);
+  return { operationId: derived.operationId, endpoint: "lineups" as const, fixtureId };
+}
+
+function storedId(label: string): string {
+  if (!LABEL_FIXTURE.has(fixtureKey(label))) return label;
+  return canonicalFor(label).operationId;
+}
 
 const NOW = Date.UTC(2026, 0, 15, 12, 0, 0);
 const MAX_AGE_MS = 60_000;
@@ -126,8 +178,22 @@ function clearKill(now: number, overrides: Record<string, unknown> = {}) {
   };
 }
 
-function reserveInput(operationId: string) {
-  return { operationId, protocolFlags: openFlags() };
+function reserveInput(
+  label: string,
+  identity: {
+    ledgerInstanceId: string;
+    credentialId: string;
+    approvalId: string;
+    generation: number;
+  } = DEFAULT_OPERATION_IDENTITY,
+) {
+  const canonical = canonicalFor(label, identity);
+  return {
+    operationId: canonical.operationId,
+    protocolFlags: openFlags(),
+    endpoint: canonical.endpoint,
+    fixtureId: canonical.fixtureId,
+  };
 }
 
 async function setup(overrides: Partial<AcquisitionApproval> = {}, start = NOW) {
@@ -194,9 +260,10 @@ async function finish(
   return { reserved, sent, recorded };
 }
 
-function row(snapshot: LedgerSnapshot, operationId: string): LedgerRowView {
+function row(snapshot: LedgerSnapshot, label: string): LedgerRowView {
+  const operationId = storedId(label);
   const found = snapshot.rows.find((candidate) => candidate.operationId === operationId);
-  if (found == null) throw new Error(`missing row ${operationId}`);
+  if (found == null) throw new Error(`missing row ${label}`);
   return found;
 }
 
@@ -623,7 +690,7 @@ describe("PE-5.4C increment 2 memory ledger", () => {
       reason: "ambiguous",
     });
 
-    const attested = await lookupReservation(ledger, "ambiguous-1");
+    const attested = await lookupReservation(ledger, storedId("ambiguous-1"));
     expect(attested).toMatchObject({ ok: true, found: true, state: "reserved" });
     const snapshot = await mustSnapshot(ledger);
     expect(snapshot.rowCount).toBe(1);
@@ -645,7 +712,7 @@ describe("PE-5.4C increment 2 memory ledger", () => {
     expect(hidden.occupancy.daily).toBe(1);
     expect(hidden.occupancy.research).toBe(1);
 
-    const looked = await lookupReservation(ledger, "ack-1");
+    const looked = await lookupReservation(ledger, storedId("ack-1"));
     expect(looked.ok).toBe(true);
     if (!looked.ok || !looked.found || looked.fencingToken == null) {
       throw new Error("expected the reserved fencing token");
@@ -692,7 +759,7 @@ describe("PE-5.4C increment 2 memory ledger", () => {
     expect(snapshot.occupancy.research).toBe(1);
     expect(JSON.stringify(snapshot)).not.toContain("send-");
 
-    const looked = await lookupReservation(ledger, "begin-ack");
+    const looked = await lookupReservation(ledger, storedId("begin-ack"));
     expect(looked).toMatchObject({
       ok: true,
       found: true,
@@ -767,7 +834,7 @@ describe("PE-5.4C increment 2 memory ledger", () => {
       state: "reserved",
     });
     expect((await mustSnapshot(ledger)).rowCount).toBe(1);
-    expect(PE5_4C_LEDGER_DEFERRED.canonicalOperationId).toBe("increment-3");
+    expect(PE5_4C_LEDGER_DEFERRED.canonicalOperationId).toBe("in-process-derived-not-durable");
   });
 
   it("same-day beginSend does not require a second daily slot", async () => {
@@ -889,9 +956,9 @@ describe("PE-5.4C increment 2 memory ledger", () => {
       denyReason: "approval_invalid",
     });
     expect(JSON.stringify(secretLedger)).not.toContain("not-a-real-secret");
-    const symbol = Object.getOwnPropertySymbols(secretLedger)[0];
-    const state = (secretLedger as unknown as Record<symbol, unknown>)[symbol];
-    expect(JSON.stringify(state)).not.toContain("not-a-real-secret");
+    expect(Object.getOwnPropertySymbols(secretLedger)).toEqual([]);
+    const legacyState = Symbol.for("apex.pe5.acquisition-boundary.memory-ledger.state.v1");
+    expect(Object.getOwnPropertyDescriptor(secretLedger, legacyState)).toBeUndefined();
 
     const pilot = createMemoryLedger({
       approval: approval({ mode: "pilot" }),
@@ -915,8 +982,8 @@ describe("PE-5.4C increment 2 memory ledger", () => {
     const separate = await mustSnapshot(other);
     expect(original.rowCount).toBe(1);
     expect(separate.rowCount).toBe(1);
-    expect(original.rows[0]?.operationId).toBe("instance-1");
-    expect(separate.rows[0]?.operationId).toBe("instance-2");
+    expect(original.rows[0]?.operationId).toBe(storedId("instance-1"));
+    expect(separate.rows[0]?.operationId).toBe(storedId("instance-2"));
     expect(PE5_4C_MEMORY_LEDGER_LIMIT).toEqual({
       durability: "in-process-only",
       atomicity: "single-process-serialized-queue",
@@ -925,25 +992,28 @@ describe("PE-5.4C increment 2 memory ledger", () => {
     });
   });
 
-  it("module-reeval does not give a second module evaluation a new ceiling", async () => {
+  it("module-reeval cannot reserve on a ledger created by another evaluation", async () => {
     const { ledger } = await setup({ researchCeiling: 1, dailyCeiling: 5, rateCeiling: 5 });
     await reserveNew(ledger, "module-filled");
 
     vi.resetModules();
     const second = await import("@/lib/debug/calibration/pe5-acquisition-boundary/memory-ledger");
+    expect(second.isRegisteredMemoryLedger(ledger)).toBe(false);
     expect(await second.tryReserve(ledger, reserveInput("module-second"))).toEqual({
       ok: false,
-      reason: "denied",
-      denyReason: "research_ceiling",
+      reason: "unavailable",
     });
-    const snapshot = await second.readSnapshot(ledger);
+    expect(await second.readSnapshot(ledger)).toEqual({ ok: false, reason: "unavailable" });
+    const snapshot = await readSnapshot(ledger);
     expect(snapshot.ok).toBe(true);
     if (!snapshot.ok) return;
     expect(snapshot.snapshot.rowCount).toBe(1);
     expect(snapshot.snapshot.occupancy.research).toBe(1);
     expect(snapshot.snapshot.generation).toBe(0);
     expect(snapshot.snapshot.allowRegeneration).toBe(false);
-    expect(second.PE5_4C_LEDGER_DEFERRED.canonicalOperationId).toBe("increment-3");
+    expect(second.PE5_4C_LEDGER_DEFERRED.canonicalOperationId).toBe(
+      "in-process-derived-not-durable",
+    );
   });
 
   it("keeps simulator limits visible and does not import transport or product clients", async () => {
@@ -1000,7 +1070,7 @@ describe("PE-5.4C increment 2 memory ledger", () => {
     expect(PE5_4C_MEMORY_LEDGER_LIMIT.productionQuota).toBe(false);
     expect(PE5_4C_LEDGER_DEFERRED).toEqual({
       fetchCount: "no-transport-in-increment-2",
-      canonicalOperationId: "increment-3",
+      canonicalOperationId: "in-process-derived-not-durable",
     });
   });
 
@@ -1412,7 +1482,7 @@ describe("PE-5.4C increment 2 memory ledger", () => {
       reservationId: reserved.reservationId,
       fencingToken: reserved.fencingToken,
     })).toEqual({ ok: false, reason: "denied", denyReason: "vendor_day_unknown" });
-    expect(await lookupReservation(ledger, "send-without-day")).toMatchObject({
+    expect(await lookupReservation(ledger, storedId("send-without-day"))).toMatchObject({
       ok: true,
       found: true,
       state: "reserved",
@@ -1470,7 +1540,7 @@ describe("PE-5.4C increment 2 memory ledger", () => {
     expect(denied).toEqual({ ok: false, reason: "denied", denyReason: "vendor_day_unknown" });
     expect(JSON.stringify(denied)).not.toContain("secret-clock-failure");
     live = true;
-    expect(await lookupReservation(ledger, "clock-then-throw")).toMatchObject({
+    expect(await lookupReservation(ledger, storedId("clock-then-throw"))).toMatchObject({
       ok: true,
       found: true,
       state: "reserved",
@@ -1548,7 +1618,12 @@ describe("PE-5.4C increment 2 memory ledger", () => {
       clock,
     });
     expect(await replaceKillSwitch(other, clearKill(clock.now()))).toEqual({ ok: true });
-    expect(isNewReserve(await tryReserve(other, reserveInput("cred-b")))).toBe(true);
+    expect(isNewReserve(await tryReserve(other, reserveInput("cred-b", {
+      ledgerInstanceId: "ledger-b",
+      credentialId: "cred-research",
+      approvalId: "approval:ledger-b",
+      generation: 0,
+    })))).toBe(true);
     expect((await mustSnapshot(ledger)).rowCount).toBe(1);
     expect((await mustSnapshot(other)).rowCount).toBe(1);
     expect(PE5_4C_MEMORY_LEDGER_LIMIT.credentialBoundary).toBe("single-ledger-instance-only");
@@ -1556,11 +1631,8 @@ describe("PE-5.4C increment 2 memory ledger", () => {
 
   it("matchSendCommit returns bound metadata and does not disclose the send token or change occupancy", async () => {
     const { ledger } = await setup();
-    const reserved = await tryReserve(ledger, {
-      ...reserveInput("bound-op"),
-      endpoint: "lineups",
-      fixtureId: "42",
-    });
+    const input = reserveInput("bound-op");
+    const reserved = await tryReserve(ledger, input);
     expect(reserved.ok).toBe(true);
     if (!reserved.ok || reserved.idempotent) throw new Error("expected a bound reserve");
     const sent = await beginSend(ledger, {
@@ -1579,11 +1651,11 @@ describe("PE-5.4C increment 2 memory ledger", () => {
 
     expect(matched).toEqual({
       ok: true,
-      operationId: "bound-op",
+      operationId: input.operationId,
       approvalId: before.approvalId,
       credentialId: "cred-research",
       endpoint: "lineups",
-      fixtureId: "42",
+      fixtureId: input.fixtureId,
       sendingCommittedAt: sent.sendingCommittedAt,
     });
     expect(Object.hasOwn(matched, "sendToken")).toBe(false);
@@ -1648,31 +1720,25 @@ describe("PE-5.4C increment 2 memory ledger", () => {
 
   it("rejects an unbound or invalid evidence identity without inserting a row", async () => {
     const { ledger } = await setup();
-    const unbound = await reserveNew(ledger, "unbound-op");
-    const sent = await beginSend(ledger, {
-      reservationId: unbound.reservationId,
-      fencingToken: unbound.fencingToken,
-    });
-    expect(sent.ok).toBe(true);
-    if (!sent.ok) throw new Error("expected beginSend");
-    expect(await matchSendCommit(ledger, {
-      reservationId: unbound.reservationId,
-      sendToken: sent.sendToken,
+    const unbound = canonicalFor("unbound-op");
+    expect(await tryReserve(ledger, {
+      operationId: unbound.operationId,
+      protocolFlags: openFlags(),
     })).toEqual({ ok: false, reason: "denied", denyReason: "operation_rejected" });
 
     expect(await tryReserve(ledger, {
       ...reserveInput("bad-fixture"),
-      endpoint: "lineups",
       fixtureId: "01",
     })).toEqual({ ok: false, reason: "denied", denyReason: "operation_rejected" });
     expect(await tryReserve(ledger, {
-      ...reserveInput("half-identity"),
+      operationId: canonicalFor("half-identity").operationId,
+      protocolFlags: openFlags(),
       endpoint: "injuries",
     })).toEqual({ ok: false, reason: "denied", denyReason: "operation_rejected" });
 
     const hits = { count: 0 };
     const accessor = {
-      operationId: "accessor-endpoint",
+      operationId: canonicalFor("accessor-endpoint").operationId,
       protocolFlags: openFlags(),
       fixtureId: "15",
     };
@@ -1691,8 +1757,236 @@ describe("PE-5.4C increment 2 memory ledger", () => {
     expect(hits.count).toBe(0);
 
     const snapshot = await mustSnapshot(ledger);
-    expect(snapshot.rows.map((item) => item.operationId)).toEqual(["unbound-op"]);
+    expect(snapshot.rows).toEqual([]);
+    expect(snapshot.occupancy.research).toBe(0);
+    expect(snapshot.occupancy.daily).toBe(0);
+    expect(snapshot.occupancy.rate).toBe(0);
+  });
+
+  it("accepts one canonical id and rejects a formatted or malformed substitute", async () => {
+    const { ledger } = await setup();
+    const input = reserveInput("canonical-accept");
+    const created = await tryReserve(ledger, input);
+    expect(isNewReserve(created)).toBe(true);
+    if (!isNewReserve(created)) return;
+    expect(created.operationId).toBe(input.operationId);
+    expect(created.operationId).toMatch(/^[0-9a-f]{64}$/);
+
+    const before = await mustSnapshot(ledger);
+    const unrelated = deriveOperationId(DEFAULT_OPERATION_IDENTITY, {
+      endpoint: "injuries",
+      fixtureId: input.fixtureId,
+    });
+    if (!unrelated.ok) throw new Error("expected a different canonical id");
+    expect(unrelated.operationId).not.toBe(input.operationId);
+
+    const rejected = { ok: false, reason: "denied", denyReason: "operation_rejected" } as const;
+    expect(await tryReserve(ledger, { ...input, operationId: unrelated.operationId })).toEqual(rejected);
+    expect(await tryReserve(ledger, { ...input, operationId: "a".repeat(64) })).toEqual(rejected);
+    expect(await tryReserve(ledger, { ...input, operationId: "A".repeat(64) })).toEqual(rejected);
+    expect(await tryReserve(ledger, { ...input, operationId: "not-a-hash" })).toEqual(rejected);
+    expect(await tryReserve(ledger, { ...input, operationId: "" })).toEqual(rejected);
+    expect(await tryReserve(ledger, {
+      operationId: input.operationId,
+      protocolFlags: openFlags(),
+      endpoint: "lineups",
+      fixtureId: "01",
+    })).toEqual(rejected);
+
+    const after = await mustSnapshot(ledger);
+    expect(after.rowCount).toBe(1);
+    expect(after.occupancy).toEqual(before.occupancy);
+    expect(row(after, "canonical-accept").state).toBe("reserved");
+  });
+
+  it("collapses path spellings and purpose aliases onto one reservation", async () => {
+    const { ledger } = await setup();
+    const input = reserveInput("path-alias");
+    const first = await tryReserve(ledger, { ...input, callerPath: "/fixtures/lineups", purpose: "scan" });
+    expect(isNewReserve(first)).toBe(true);
+    if (!isNewReserve(first)) return;
+
+    const spellings = ["fixtures/lineups", "fixtures\\lineups", "  /fixtures/lineups/  "];
+    for (const callerPath of spellings) {
+      expect(await tryReserve(ledger, {
+        ...input,
+        callerPath,
+        purpose: `alias-${callerPath}`,
+      })).toMatchObject({
+        ok: true,
+        idempotent: true,
+        reservationId: first.reservationId,
+        operationId: input.operationId,
+        state: "reserved",
+      });
+    }
+
+    const otherPurpose = deriveOperationId(DEFAULT_OPERATION_IDENTITY, {
+      endpoint: "lineups",
+      fixtureId: "900001",
+    });
+    if (!otherPurpose.ok) throw new Error("expected another id");
+    expect(await tryReserve(ledger, {
+      operationId: otherPurpose.operationId,
+      protocolFlags: openFlags(),
+      endpoint: "lineups",
+      fixtureId: input.fixtureId,
+      callerPath: "//fixtures/lineups",
+      purpose: "retry-with-another-label",
+    })).toEqual({ ok: false, reason: "denied", denyReason: "operation_rejected" });
+
+    const snapshot = await mustSnapshot(ledger);
+    expect(snapshot.rowCount).toBe(1);
     expect(snapshot.occupancy.research).toBe(1);
+    expect(snapshot.occupancy.daily).toBe(1);
+    expect(snapshot.occupancy.rate).toBe(1);
+  });
+
+  it("rejects credential, approval, fixture, and generation substitution", async () => {
+    const { ledger } = await setup();
+    const input = reserveInput("substitution");
+    expect(isNewReserve(await tryReserve(ledger, input))).toBe(true);
+    const before = await mustSnapshot(ledger);
+    const rejected = { ok: false, reason: "denied", denyReason: "operation_rejected" } as const;
+
+    expect(await tryReserve(ledger, { ...input, credentialId: "cred-other" })).toEqual(rejected);
+    expect(await tryReserve(ledger, { ...input, approvalId: "approval:attacker" })).toEqual(rejected);
+    expect(await tryReserve(ledger, { ...input, ledgerInstanceId: "ledger-b" })).toEqual(rejected);
+    expect(await tryReserve(ledger, { ...input, generation: 1 })).toEqual(rejected);
+    expect(await tryReserve(ledger, { ...input, fixtureId: "900002" })).toEqual(rejected);
+    expect(await tryReserve(ledger, { ...input, endpoint: "injuries" })).toEqual(rejected);
+
+    const substituted = deriveOperationId(
+      { ...DEFAULT_OPERATION_IDENTITY, credentialId: "cred-other" },
+      { endpoint: "lineups", fixtureId: input.fixtureId },
+    );
+    if (!substituted.ok) throw new Error("expected a substituted id");
+    expect(await tryReserve(ledger, {
+      ...input,
+      operationId: substituted.operationId,
+      credentialId: "cred-other",
+    })).toEqual(rejected);
+
+    const after = await mustSnapshot(ledger);
+    expect(after.rowCount).toBe(1);
+    expect(after.occupancy).toEqual(before.occupancy);
+  });
+
+  it("returns the existing row for a duplicate canonical reserve, including a concurrent burst", async () => {
+    const { ledger } = await setup();
+    const input = reserveInput("concurrent-canonical");
+    const first = await tryReserve(ledger, input);
+    expect(isNewReserve(first)).toBe(true);
+    if (!isNewReserve(first)) return;
+    expect(await tryReserve(ledger, input)).toMatchObject({
+      ok: true,
+      idempotent: true,
+      reservationId: first.reservationId,
+      fencingToken: first.fencingToken,
+      state: "reserved",
+    });
+
+    const burst = await Promise.all(
+      Array.from({ length: 8 }, () => tryReserve(ledger, input)),
+    );
+    expect(burst.filter(isNewReserve)).toHaveLength(0);
+    expect(burst.every((result) => result.ok && result.idempotent)).toBe(true);
+    const snapshot = await mustSnapshot(ledger);
+    expect(snapshot.rowCount).toBe(1);
+    expect(snapshot.occupancy.research).toBe(1);
+    expect(row(snapshot, "concurrent-canonical").state).toBe("reserved");
+  });
+
+  it("keeps ceilings, vendor-day rollover, lost acks, and terminal rows on canonical ids", async () => {
+    const daily = await setup({ dailyCeiling: 1, researchCeiling: 4, rateCeiling: 4 });
+    const held = reserveInput("ceiling-held");
+    expect(isNewReserve(await tryReserve(daily.ledger, held))).toBe(true);
+    const beforeRejects = await mustSnapshot(daily.ledger);
+    expect(await tryReserve(daily.ledger, {
+      ...held,
+      operationId: "b".repeat(64),
+    })).toEqual({ ok: false, reason: "denied", denyReason: "operation_rejected" });
+    expect(await tryReserve(daily.ledger, reserveInput("ceiling-next"))).toEqual({
+      ok: false,
+      reason: "denied",
+      denyReason: "daily_ceiling",
+    });
+    expect((await mustSnapshot(daily.ledger)).occupancy).toEqual(beforeRejects.occupancy);
+
+    const research = await setup({ dailyCeiling: 4, researchCeiling: 1, rateCeiling: 4 });
+    expect(isNewReserve(await tryReserve(research.ledger, reserveInput("research-held")))).toBe(true);
+    expect(await tryReserve(research.ledger, reserveInput("research-next-canonical"))).toEqual({
+      ok: false,
+      reason: "denied",
+      denyReason: "research_ceiling",
+    });
+
+    const rate = await setup({ dailyCeiling: 4, researchCeiling: 4, rateCeiling: 1 });
+    expect(isNewReserve(await tryReserve(rate.ledger, reserveInput("rate-held-canonical")))).toBe(true);
+    expect(await tryReserve(rate.ledger, reserveInput("rate-next-canonical"))).toEqual({
+      ok: false,
+      reason: "denied",
+      denyReason: "rate_ceiling",
+    });
+
+    const rollover = await setup({
+      leaseMs: 12 * 60 * 60 * 1000,
+      fetchTimeoutMs: 1_000,
+      dailyCeiling: 2,
+      researchCeiling: 2,
+      rateCeiling: 2,
+    }, Date.UTC(2026, 0, 15, 23, 0, 0));
+    const reserved = await reserveNew(rollover.ledger, "canonical-rollover");
+    rollover.clock.advance(2 * 60 * 60 * 1000);
+    expect(await replaceKillSwitch(rollover.ledger, clearKill(rollover.clock.now()))).toEqual({ ok: true });
+    const sent = await beginSend(rollover.ledger, {
+      reservationId: reserved.reservationId,
+      fencingToken: reserved.fencingToken,
+    });
+    expect(sent.ok).toBe(true);
+    if (!sent.ok) return;
+    expect(row(await mustSnapshot(rollover.ledger), "canonical-rollover")).toMatchObject({
+      state: "sending",
+      chargeDay: "2026-01-16",
+    });
+    expect((await mustSnapshot(rollover.ledger)).rowCount).toBe(1);
+
+    const lost = await setup({ dailyCeiling: 1, researchCeiling: 1, rateCeiling: 1 });
+    expect(await armLostAcknowledgement(lost.ledger, "tryReserve")).toEqual({ ok: true });
+    const input = reserveInput("canonical-lost-ack");
+    expect(await tryReserve(lost.ledger, input)).toEqual({ ok: false, reason: "ambiguous" });
+    const looked = await lookupReservation(lost.ledger, input.operationId);
+    if (!looked.ok || !looked.found || looked.fencingToken == null) {
+      throw new Error("expected the reserved fencing token");
+    }
+    expect(await tryReserve(lost.ledger, input)).toMatchObject({
+      ok: true,
+      idempotent: true,
+      reservationId: looked.reservationId,
+      fencingToken: looked.fencingToken,
+    });
+    expect((await mustSnapshot(lost.ledger)).rowCount).toBe(1);
+
+    const terminal = await setup();
+    const finished = await finish(terminal.ledger, "canonical-terminal", "failed");
+    const occupied = await mustSnapshot(terminal.ledger);
+    expect(row(occupied, "canonical-terminal").state).toBe("failed");
+    expect(await tryReserve(terminal.ledger, reserveInput("canonical-terminal"))).toMatchObject({
+      ok: true,
+      idempotent: true,
+      state: "failed",
+      fencingToken: null,
+    });
+    expect(await recordOutcome(terminal.ledger, {
+      reservationId: finished.reserved.reservationId,
+      sendToken: finished.sent.sendToken,
+      outcome: "failed",
+      failedReason: "outcome_unknown",
+    })).toEqual({ ok: false, reason: "denied", denyReason: "invalid_transition" });
+    const still = await mustSnapshot(terminal.ledger);
+    expect(still.occupancy.research).toBe(occupied.occupancy.research);
+    expect(still.occupancy.daily).toBe(occupied.occupancy.daily);
+    expect(still.rowCount).toBe(1);
   });
 
   it("does not treat a proxy proof as a send commit and keeps clock errors free of exception text", async () => {
@@ -1749,5 +2043,144 @@ describe("PE-5.4C increment 2 memory ledger", () => {
     expect(JSON.stringify(denied)).not.toContain("secret-clock-failure");
     expect(row(await mustSnapshot(custom), "clock-proof").state).toBe("sending");
     expect((await mustSnapshot(custom)).occupancy.research).toBe(1);
+  });
+
+  it("rejects a proxy reserve before reading its traps", async () => {
+    const { ledger } = await setup();
+    const hits = { count: 0 };
+    const target = reserveInput("proxy-reserve");
+    const live = new Proxy(target, {
+      get() {
+        hits.count += 1;
+        return "trap";
+      },
+      getOwnPropertyDescriptor() {
+        hits.count += 1;
+        return undefined;
+      },
+    });
+    const denied = await tryReserve(ledger, live);
+    expect(denied).toEqual({ ok: false, reason: "denied", denyReason: "operation_rejected" });
+    expect(JSON.stringify(denied)).not.toContain("trap");
+    const revocable = Proxy.revocable(target, {
+      get() {
+        hits.count += 1;
+        return "trap";
+      },
+    });
+    revocable.revoke();
+    expect(await tryReserve(ledger, revocable.proxy)).toEqual({
+      ok: false,
+      reason: "denied",
+      denyReason: "operation_rejected",
+    });
+    expect(hits.count).toBe(0);
+
+    const flagHits = { count: 0 };
+    const flagged = reserveInput("flag-proxy");
+    Object.defineProperty(flagged, "protocolFlags", {
+      enumerable: true,
+      get() {
+        flagHits.count += 1;
+        return openFlags();
+      },
+    });
+    expect(await tryReserve(ledger, flagged)).toEqual({
+      ok: false,
+      reason: "denied",
+      denyReason: "protocol_flag_violation",
+    });
+    expect(flagHits.count).toBe(0);
+    expect((await mustSnapshot(ledger)).rowCount).toBe(0);
+    expect((await mustSnapshot(ledger)).occupancy.research).toBe(0);
+    expect(isNewReserve(await tryReserve(ledger, reserveInput("plain-after-proxy")))).toBe(true);
+    const snapshot = await mustSnapshot(ledger);
+    expect(snapshot.rowCount).toBe(1);
+    expect(snapshot.occupancy.research).toBe(1);
+  });
+
+  it("does not copy a getter operation id into a denial audit", async () => {
+    const { ledger } = await setup();
+    const hits = { count: 0 };
+    const secret = "secret-op-id";
+    const thrown = "secret-op-throw";
+    const flags = openFlags();
+    const getterInput = {
+      protocolFlags: { ...flags, pe53Authorized: true },
+      endpoint: "lineups" as const,
+      fixtureId: "15",
+    };
+    Object.defineProperty(getterInput, "operationId", {
+      enumerable: true,
+      get() {
+        hits.count += 1;
+        return secret;
+      },
+    });
+    const denied = await tryReserve(ledger, getterInput as TryReserveInput);
+    expect(denied).toEqual({ ok: false, reason: "denied", denyReason: "protocol_flag_violation" });
+    expect(hits.count).toBe(0);
+
+    const throwingInput = {
+      protocolFlags: openFlags(),
+      endpoint: "lineups" as const,
+      fixtureId: "16",
+    };
+    Object.defineProperty(throwingInput, "operationId", {
+      enumerable: true,
+      get() {
+        hits.count += 1;
+        throw new Error(thrown);
+      },
+    });
+    let escaped = "";
+    let thrownResult: unknown;
+    try {
+      thrownResult = await tryReserve(ledger, throwingInput as TryReserveInput);
+    } catch (error) {
+      escaped = error instanceof Error ? error.message : String(error);
+    }
+    expect(escaped).toBe("");
+    expect(thrownResult).toEqual({ ok: false, reason: "denied", denyReason: "operation_rejected" });
+    expect(hits.count).toBe(0);
+    const rendered = JSON.stringify(await mustSnapshot(ledger));
+    expect(rendered).not.toContain(secret);
+    expect(rendered).not.toContain(thrown);
+    expect((await mustSnapshot(ledger)).rowCount).toBe(0);
+  });
+
+  it("does not authenticate a copied ledger shell or expose registered state", async () => {
+    const { ledger } = await setup();
+    const created = await reserveNew(ledger, "registered-shell");
+    const before = await mustSnapshot(ledger);
+    expect(isRegisteredMemoryLedger(ledger)).toBe(true);
+    expect(Object.getOwnPropertySymbols(ledger)).toEqual([]);
+    const legacy = Symbol.for("apex.pe5.acquisition-boundary.memory-ledger.state.v1");
+    const shell = {
+      kind: "pe5-memory-ledger" as const,
+      instanceId: ledger.instanceId,
+      approvalId: ledger.approvalId,
+      generation: 0 as const,
+      allowRegeneration: false as const,
+    };
+    Object.defineProperty(shell, legacy, {
+      value: { kind: "pe5-memory-ledger-state", rows: new Map() },
+      enumerable: false,
+    });
+    expect(isRegisteredMemoryLedger(shell)).toBe(false);
+    expect(await tryReserve(shell, reserveInput("forged-shell"))).toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
+    expect(await beginSend(shell, {
+      reservationId: created.reservationId,
+      fencingToken: created.fencingToken,
+    })).toEqual({ ok: false, reason: "unavailable" });
+    expect(await matchSendCommit(shell, {
+      reservationId: created.reservationId,
+      sendToken: "send-1",
+    })).toEqual({ ok: false, reason: "unavailable" });
+    expect(await readSnapshot(shell)).toEqual({ ok: false, reason: "unavailable" });
+    expect(await mustSnapshot(ledger)).toEqual(before);
   });
 });

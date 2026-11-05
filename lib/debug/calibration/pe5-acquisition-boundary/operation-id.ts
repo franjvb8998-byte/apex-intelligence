@@ -3,14 +3,17 @@
  *
  * Offline only. This module hashes the PE-5.4B operation id. It does not
  * reserve a ledger row, open a socket, or read a credential secret.
- * Ledger deduplication remains deferred until tryReserve computes this id.
+ * tryReserve checks this id inside one ledger object. That check is not
+ * durable and it is not shared across processes or ledger objects.
  */
 
 import { createHash } from "node:crypto";
 
 export const PE5_4C_OPERATION_ID_DEFERRED = {
-  ledgerDedup: "tryReserve-still-takes-a-caller-operationId",
-  fetchCount: "no-transport-in-increment-3",
+  ledgerDedup: "in-process-single-ledger-object",
+  crossProcessDedup: false,
+  durableDedup: false,
+  fetchCount: "not-this-module",
 } as const;
 
 export const CANONICAL_OPERATION_PATHS = {

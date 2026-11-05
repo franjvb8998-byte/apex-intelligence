@@ -802,6 +802,7 @@ describe("PE-5.4C increment 6 raw envelopes", () => {
       });
     }
 
+    const beforeMismatch = await mustSnapshot(ledger);
     const mismatched = operationFor("lineups", "99");
     const reservedMismatch = await tryReserve(ledger, {
       operationId: mismatched,
@@ -809,24 +810,25 @@ describe("PE-5.4C increment 6 raw envelopes", () => {
       endpoint: "lineups",
       fixtureId: "91",
     });
-    expect(reservedMismatch.ok).toBe(true);
-    if (!reservedMismatch.ok || reservedMismatch.idempotent) return;
-    const sentMismatch = await beginSend(ledger, {
-      reservationId: reservedMismatch.reservationId,
-      fencingToken: reservedMismatch.fencingToken,
+    expect(reservedMismatch).toEqual({
+      ok: false,
+      reason: "denied",
+      denyReason: "operation_rejected",
     });
-    expect(sentMismatch.ok).toBe(true);
-    if (!sentMismatch.ok) return;
-    expect(await appendRaw(store, appendInput(
-      { reservationId: reservedMismatch.reservationId, sendToken: sentMismatch.sendToken },
-      Uint8Array.of(1),
-    ))).toEqual({ ok: false, reason: "operation_rejected" });
+    const afterMismatch = await mustSnapshot(ledger);
+    expect(afterMismatch.rowCount).toBe(beforeMismatch.rowCount);
+    expect(afterMismatch.rows).toEqual(beforeMismatch.rows);
+    expect(afterMismatch.occupancy).toEqual(beforeMismatch.occupancy);
 
     expect(await readRaw(store, { operationId })).toEqual({ ok: false, reason: "raw_missing" });
     expect(await readRaw(store, { operationId: mismatched })).toEqual({ ok: false, reason: "raw_missing" });
     const snapshot = await mustSnapshot(ledger);
+    expect(snapshot.rowCount).toBe(1);
     expect(snapshot.rows.every((item) => item.state === "sending")).toBe(true);
-    expect(snapshot.occupancy.research).toBe(2);
+    expect(snapshot.rows[0]?.operationId).toBe(operationId);
+    expect(snapshot.occupancy.research).toBe(1);
+    expect(snapshot.occupancy.daily).toBe(1);
+    expect(snapshot.occupancy.rate).toBe(1);
   });
 
   it("keeps secrets, body text, player names, and the send token out of errors and audits", async () => {
@@ -916,6 +918,8 @@ describe("PE-5.4C increment 6 raw envelopes", () => {
     expect(source).not.toMatch(/createApiFootballClient|API_FOOTBALL|classifyPe5Evidence|normalizePe5/);
     expect(source).not.toMatch(/abandonReservation|sweepExpired|recordOutcome|tryReserve|beginSend/);
     expect(source).not.toMatch(/from\s+["']node:fs["']|from\s+["']node:http["']/);
+    expect(source).not.toContain("Symbol.for");
+    expect(source).toContain("isRegisteredMemoryLedger");
     expect(source).toContain("match-then-append-not-crash-atomic");
 
     const now = vi.spyOn(Date, "now");
@@ -961,5 +965,303 @@ describe("PE-5.4C increment 6 raw envelopes", () => {
     if (!read.ok) return;
     expect(Array.from(read.bodyBytes)).toEqual([1]);
     await expectSendingUnchanged(ledger, operationId, 1);
+  });
+});
+
+describe("PE-5.4C raw store authenticity", () => {
+  const LEGACY_STATE = Symbol.for("apex.pe5.acquisition-boundary.raw-store.state.v1");
+
+  async function openLedger(instanceId: string) {
+    const clock = makeClock();
+    const ledger = createMemoryLedger({
+      approval: approval({ ledgerInstanceId: instanceId, expiry: NOW + 86_400_000 }),
+      clock,
+    });
+    expect(await replaceKillSwitch(ledger, clearKill(clock.now()))).toEqual({ ok: true });
+    return ledger;
+  }
+
+  async function sendOn(ledger: MemoryLedger, instanceId: string, fixtureId: string) {
+    const derived = deriveOperationId(
+      {
+        ledgerInstanceId: instanceId,
+        credentialId: CREDENTIAL,
+        approvalId: `approval:${instanceId}`,
+        generation: 0,
+      },
+      { endpoint: "lineups", fixtureId },
+    );
+    if (!derived.ok) throw new Error("canonical operation id was rejected");
+    const reserved = await tryReserve(ledger, {
+      operationId: derived.operationId,
+      protocolFlags: openFlags(),
+      endpoint: "lineups",
+      fixtureId,
+    });
+    expect(reserved.ok).toBe(true);
+    if (!reserved.ok || reserved.idempotent) throw new Error("expected a new reserve");
+    const sent = await beginSend(ledger, {
+      reservationId: reserved.reservationId,
+      fencingToken: reserved.fencingToken,
+    });
+    expect(sent.ok).toBe(true);
+    if (!sent.ok) throw new Error("expected beginSend");
+    return { operationId: derived.operationId, reserved, sent };
+  }
+
+  function proofOf(bound: { reserved: { reservationId: string }; sent: { sendToken: string } }) {
+    return { reservationId: bound.reserved.reservationId, sendToken: bound.sent.sendToken };
+  }
+
+  it("keeps one immutable envelope on the genuine store", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    try {
+      const ledger = await openLedger(INSTANCE);
+      const store = createRawStore({ ledger, maxCaptureLagMs: 5_000 });
+      const bound = await sendOn(ledger, INSTANCE, "801");
+      const before = await mustSnapshot(ledger);
+      const body = Uint8Array.of(9, 8, 7);
+      const appended = await appendRaw(store, appendInput(proofOf(bound), body));
+      expect(appended.ok).toBe(true);
+      if (!appended.ok) return;
+      expect(appended.duplicate).toBe(false);
+      expect(appended.envelope.digest).toBe(sha256(body));
+      expect(Object.getOwnPropertySymbols(store)).toEqual([]);
+      expect(Object.getOwnPropertyDescriptor(store, LEGACY_STATE)).toBeUndefined();
+
+      const first = await readRaw(store, { operationId: bound.operationId });
+      expect(first.ok).toBe(true);
+      if (!first.ok) return;
+      expect(Array.from(first.bodyBytes)).toEqual([9, 8, 7]);
+      first.bodyBytes[0] = 0;
+      const second = await readRaw(store, { operationId: bound.operationId });
+      expect(second.ok).toBe(true);
+      if (!second.ok) return;
+      expect(Array.from(second.bodyBytes)).toEqual([9, 8, 7]);
+      expect(second.envelope.digest).toBe(first.envelope.digest);
+
+      const duplicate = await appendRaw(store, appendInput(proofOf(bound), Uint8Array.of(9, 8, 7)));
+      expect(duplicate).toEqual({ ok: true, duplicate: true, envelope: first.envelope });
+      const conflict = await appendRaw(store, appendInput(proofOf(bound), Uint8Array.of(1)));
+      expect(conflict).toEqual({ ok: false, reason: "raw_conflict" });
+      const afterConflict = await readRaw(store, { operationId: bound.operationId });
+      expect(afterConflict.ok).toBe(true);
+      if (!afterConflict.ok) return;
+      expect(Array.from(afterConflict.bodyBytes)).toEqual([9, 8, 7]);
+      expect(afterConflict.envelope.digest).toBe(sha256(body));
+
+      expect(await armLostAppendAcknowledgement(store)).toEqual({ ok: true });
+      const lost = await sendOn(ledger, INSTANCE, "802");
+      expect(await appendRaw(store, appendInput(proofOf(lost), Uint8Array.of(4, 5)))).toEqual({
+        ok: false,
+        reason: "ambiguous",
+      });
+      const lostRead = await readRaw(store, { operationId: lost.operationId });
+      expect(lostRead.ok).toBe(true);
+      if (!lostRead.ok) return;
+      const lostReplay = await appendRaw(store, appendInput(proofOf(lost), Uint8Array.of(4, 5)));
+      expect(lostReplay).toEqual({ ok: true, duplicate: true, envelope: lostRead.envelope });
+      expect(await appendRaw(store, appendInput(proofOf(lost), Uint8Array.of(4)))).toEqual({
+        ok: false,
+        reason: "raw_conflict",
+      });
+
+      const after = await mustSnapshot(ledger);
+      expect(after.occupancy).toEqual({ ...before.occupancy, research: 2, daily: 2, rate: 2 });
+      expect(after.rows.every((row) => row.state === "sending")).toBe(true);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("rejects forged, copied, prototype, and proxy stores without exposing records", async () => {
+    const ledger = await openLedger(INSTANCE);
+    const store = createRawStore({ ledger, maxCaptureLagMs: 5_000 });
+    const bound = await sendOn(ledger, INSTANCE, "803");
+    const body = Uint8Array.of(3, 3, 3);
+    const appended = await appendRaw(store, appendInput(proofOf(bound), body));
+    expect(appended.ok).toBe(true);
+    const before = await mustSnapshot(ledger);
+    const secret = "SECRET-RAW-KIND";
+    const query = { operationId: bound.operationId };
+    const input = appendInput(proofOf(bound), Uint8Array.of(1));
+
+    const forged = { kind: "pe5-raw-store" };
+    const symbolShell = { kind: "pe5-raw-store" };
+    Object.defineProperty(symbolShell, LEGACY_STATE, {
+      value: { kind: "pe5-raw-store-state", records: new Map() },
+      enumerable: false,
+    });
+    const assigned = Object.assign({}, store);
+    const shells = [forged, symbolShell, Object.create(store), assigned];
+    for (let index = 0; index < 5; index += 1) {
+      const shell = { kind: "pe5-raw-store", generation: index };
+      Object.defineProperty(shell, LEGACY_STATE, {
+        value: { kind: "pe5-raw-store-state", records: new Map() },
+        enumerable: false,
+      });
+      shells.push(shell);
+    }
+    for (const shell of shells) {
+      expect(await readRaw(shell as never, query)).toEqual({ ok: false, reason: "unavailable" });
+      expect(await appendRaw(shell as never, input)).toEqual({ ok: false, reason: "unavailable" });
+    }
+
+    const hits = { get: 0, desc: 0, keys: 0 };
+    const proxy = new Proxy(store, {
+      get() {
+        hits.get += 1;
+        return "pe5-raw-store";
+      },
+      getOwnPropertyDescriptor() {
+        hits.desc += 1;
+        return undefined;
+      },
+      ownKeys() {
+        hits.keys += 1;
+        return [];
+      },
+    });
+    expect(await readRaw(proxy, query)).toEqual({ ok: false, reason: "unavailable" });
+    expect(await appendRaw(proxy, input)).toEqual({ ok: false, reason: "unavailable" });
+    const revocable = Proxy.revocable(store, {
+      get() {
+        hits.get += 1;
+        throw new Error(secret);
+      },
+      getOwnPropertyDescriptor() {
+        hits.desc += 1;
+        return undefined;
+      },
+    });
+    revocable.revoke();
+    let escaped = "";
+    let revoked: unknown;
+    try {
+      revoked = await readRaw(revocable.proxy, query);
+    } catch (error) {
+      escaped = error instanceof Error ? error.message : String(error);
+    }
+    expect(escaped).toBe("");
+    expect(revoked).toEqual({ ok: false, reason: "unavailable" });
+    expect(JSON.stringify(revoked)).not.toContain(secret);
+    expect(hits).toEqual({ get: 0, desc: 0, keys: 0 });
+
+    const hostile = {};
+    Object.defineProperty(hostile, "kind", {
+      enumerable: true,
+      get() {
+        hits.get += 1;
+        throw new Error(secret);
+      },
+    });
+    const handles = [
+      () => readRaw(hostile as never, query),
+      () => appendRaw(hostile as never, input),
+      () => readRawStoreAudit(hostile as never),
+      () => setRawStoreUnavailable(hostile as never, true),
+      () => armRawAppendFailure(hostile as never),
+      () => armRawPartialAppend(hostile as never),
+      () => armLostAppendAcknowledgement(hostile as never),
+      () => armAmbiguousRawRead(hostile as never),
+      () => corruptStoredBytesForTests(hostile as never, bound.operationId),
+    ];
+    for (const call of handles) {
+      let leaked = "";
+      let result: unknown;
+      try {
+        result = await call();
+      } catch (error) {
+        leaked = error instanceof Error ? error.message : String(error);
+      }
+      expect(leaked).toBe("");
+      expect(result).toEqual({ ok: false, reason: "unavailable" });
+      expect(JSON.stringify(result)).not.toContain(secret);
+    }
+    expect(hits.get).toBe(0);
+
+    const preserved = await readRaw(store, query);
+    expect(preserved.ok).toBe(true);
+    if (!preserved.ok) return;
+    expect(Array.from(preserved.bodyBytes)).toEqual([3, 3, 3]);
+    expect(preserved.envelope.digest).toBe(sha256(body));
+    expect(await mustSnapshot(ledger)).toEqual(before);
+  });
+
+  it("binds only a registered ledger and keeps independent stores apart", async () => {
+    const leftLedger = await openLedger("ledger-left");
+    const rightLedger = await openLedger("ledger-right");
+    const leftStore = createRawStore({ ledger: leftLedger, maxCaptureLagMs: 5_000 });
+    const rightStore = createRawStore({ ledger: rightLedger, maxCaptureLagMs: 5_000 });
+    const leftBound = await sendOn(leftLedger, "ledger-left", "804");
+    const rightBound = await sendOn(rightLedger, "ledger-right", "804");
+    const leftBody = Uint8Array.of(8);
+    const rightBody = Uint8Array.of(6);
+    expect((await appendRaw(leftStore, appendInput(proofOf(leftBound), leftBody))).ok).toBe(true);
+    expect((await appendRaw(rightStore, appendInput(proofOf(rightBound), rightBody))).ok).toBe(true);
+    const leftRead = await readRaw(leftStore, { operationId: leftBound.operationId });
+    const rightRead = await readRaw(rightStore, { operationId: rightBound.operationId });
+    expect(leftRead.ok && rightRead.ok).toBe(true);
+    if (!leftRead.ok || !rightRead.ok) return;
+    expect(Array.from(leftRead.bodyBytes)).toEqual([8]);
+    expect(Array.from(rightRead.bodyBytes)).toEqual([6]);
+    expect(await readRaw(leftStore, { operationId: rightBound.operationId })).toEqual({
+      ok: false,
+      reason: "raw_missing",
+    });
+    expect(await readRaw(rightStore, { operationId: leftBound.operationId })).toEqual({
+      ok: false,
+      reason: "raw_missing",
+    });
+    expect((await mustSnapshot(leftLedger)).occupancy.research).toBe(1);
+    expect((await mustSnapshot(rightLedger)).occupancy.research).toBe(1);
+    expect((await mustSnapshot(leftLedger)).rowCount).toBe(1);
+    expect((await mustSnapshot(rightLedger)).rowCount).toBe(1);
+
+    const forgedLedger = {
+      kind: "pe5-memory-ledger" as const,
+      instanceId: leftLedger.instanceId,
+      approvalId: leftLedger.approvalId,
+      generation: 0 as const,
+      allowRegeneration: false as const,
+    };
+    const copiedLedger = {
+      kind: leftLedger.kind,
+      instanceId: leftLedger.instanceId,
+      approvalId: leftLedger.approvalId,
+      generation: leftLedger.generation,
+      allowRegeneration: leftLedger.allowRegeneration,
+    };
+    const ledgerHits = { get: 0, desc: 0 };
+    const proxyLedger = new Proxy(leftLedger, {
+      get() {
+        ledgerHits.get += 1;
+        return "pe5-memory-ledger";
+      },
+      getOwnPropertyDescriptor() {
+        ledgerHits.desc += 1;
+        return undefined;
+      },
+    });
+    const before = await mustSnapshot(leftLedger);
+    for (const candidate of [forgedLedger, copiedLedger, Object.create(leftLedger), proxyLedger]) {
+      const unbound = createRawStore({ ledger: candidate as never, maxCaptureLagMs: 5_000 });
+      expect(await appendRaw(unbound, appendInput(proofOf(leftBound), Uint8Array.of(1)))).toEqual({
+        ok: false,
+        reason: "unavailable",
+      });
+      expect(await readRaw(unbound, { operationId: leftBound.operationId })).toEqual({
+        ok: false,
+        reason: "unavailable",
+      });
+    }
+    expect(ledgerHits).toEqual({ get: 0, desc: 0 });
+    const still = await readRaw(leftStore, { operationId: leftBound.operationId });
+    expect(still.ok).toBe(true);
+    if (!still.ok) return;
+    expect(Array.from(still.bodyBytes)).toEqual([8]);
+    expect(await mustSnapshot(leftLedger)).toEqual(before);
   });
 });

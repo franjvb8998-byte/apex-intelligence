@@ -2,8 +2,15 @@
  * PE-5.4C increment 6 — in-memory append-only raw envelopes.
  *
  * A successful append is visible to a later read on this same store instance.
- * It does not persist to disk, survive process exit, or provide cross-process
- * uniqueness or recovery. It does not know a provider's daily reset.
+ * State is kept in a module-private WeakMap. A copied shell, prototype
+ * wrapper, or proxy is not that store. The private registry is not shared
+ * with a re-evaluated copy of this module. This store does not persist to
+ * disk, survive process exit, or provide cross-process uniqueness or
+ * recovery. It does not know a provider's daily reset.
+ *
+ * The bound ledger is accepted only when it is the instance registered by
+ * `createMemoryLedger`. Construction does not reserve a row or acquire a
+ * send claim.
  *
  * `matchSendCommit` and the append are separate queue turns. They are not one
  * crash-atomic transaction. The store does not change ledger occupancy or
@@ -19,6 +26,7 @@ import { types } from "node:util";
 
 import { deriveOperationId } from "@/lib/debug/calibration/pe5-acquisition-boundary/operation-id";
 import {
+  isRegisteredMemoryLedger,
   matchSendCommit,
   readLedgerNow,
   type MemoryLedger,
@@ -84,8 +92,8 @@ export type RawStore = {
   readonly kind: "pe5-raw-store";
 };
 
-const STATE_KEY = Symbol.for("apex.pe5.acquisition-boundary.raw-store.state.v1");
 const STATE_KIND = "pe5-raw-store-state" as const;
+const STORES = new WeakMap<object, StoreState>();
 const OPERATION_ID = /^[0-9a-f]{64}$/;
 const CAPTURE_UTC = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d{3})Z$/;
 
@@ -197,12 +205,7 @@ export function createRawStore(config: unknown): RawStore {
     audits: [],
   };
   const store: RawStore = { kind: "pe5-raw-store" };
-  Object.defineProperty(store, STATE_KEY, {
-    value: state,
-    enumerable: false,
-    writable: false,
-    configurable: false,
-  });
+  STORES.set(store, state);
   return Object.freeze(store);
 }
 
@@ -466,6 +469,16 @@ async function commitRead(
     });
     return fail("integrity_mismatch");
   }
+  const bodyBytes = copyBytes(located.record.bytes);
+  if (bodyBytes == null) {
+    audit(state, {
+      action: "read_rejected",
+      operationId: located.record.operationId,
+      envelopeId: located.record.envelopeId,
+      reason: "integrity_mismatch",
+    });
+    return fail("integrity_mismatch");
+  }
   audit(state, {
     action: "read",
     operationId: located.record.operationId,
@@ -476,7 +489,7 @@ async function commitRead(
   return {
     ok: true,
     envelope: view(located.record),
-    bodyBytes: new Uint8Array(located.record.bytes),
+    bodyBytes,
   };
 }
 
@@ -838,21 +851,7 @@ function isPlainUint8Array(value: unknown): value is Uint8Array {
 }
 
 function isLedgerHandle(value: unknown): value is MemoryLedger {
-  if (!isSafeObject(value)) return false;
-  const kind = readOwn(value, "kind");
-  const instanceId = readOwn(value, "instanceId");
-  const approvalId = readOwn(value, "approvalId");
-  const generation = readOwn(value, "generation");
-  return (
-    kind.state === "value" &&
-    kind.value === "pe5-memory-ledger" &&
-    instanceId.state === "value" &&
-    typeof instanceId.value === "string" &&
-    approvalId.state === "value" &&
-    typeof approvalId.value === "string" &&
-    generation.state === "value" &&
-    generation.value === 0
-  );
+  return isRegisteredMemoryLedger(value);
 }
 
 function isSafeObject(value: unknown): value is object {
@@ -884,7 +883,12 @@ async function enqueue<T extends { ok: boolean }>(
   store: RawStore,
   body: (state: StoreState) => Promise<T>,
 ): Promise<T> {
-  const state = readState(store);
+  let state: StoreState | null;
+  try {
+    state = readState(store);
+  } catch {
+    return { ok: false, reason: "unavailable" } as unknown as T;
+  }
   if (state == null) return { ok: false, reason: "unavailable" } as unknown as T;
   const previous = state.tail;
   let release: () => void = () => {};
@@ -901,12 +905,17 @@ async function enqueue<T extends { ok: boolean }>(
   }
 }
 
-function readState(store: RawStore): StoreState | null {
-  if (store == null || store.kind !== "pe5-raw-store") return null;
-  const holder = store as unknown as Record<symbol, unknown>;
-  const value = holder[STATE_KEY];
-  if (!isSafeObject(value)) return null;
-  const kind = readOwn(value, "kind");
-  if (kind.state !== "value" || kind.value !== STATE_KIND) return null;
-  return value as StoreState;
+function readState(store: unknown): StoreState | null {
+  try {
+    if (typeof store !== "object" || store === null || Array.isArray(store)) return null;
+    if (types.isProxy(store) === true) return null;
+    if (!STORES.has(store)) return null;
+    const state = STORES.get(store);
+    if (state == null || state.kind !== STATE_KIND) return null;
+    const kind = readOwn(store, "kind");
+    if (kind.state !== "value" || kind.value !== "pe5-raw-store") return null;
+    return state;
+  } catch {
+    return null;
+  }
 }
